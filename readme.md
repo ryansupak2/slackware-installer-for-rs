@@ -1,4 +1,4 @@
-The purpose of this doc is to get Slackware set up after the successful ISO install to the machine. You'll have to type this stuff manually in practice, as you won't have the script down yet. This all assumes Slackware was installed with at least the following packages before you start:
+The purpose of this doc is to get Slackware set up after the successful ISO install to the machine. You'll have to type the stuff in this readme manually in practice, as you won't have the script down yet. This all assumes Slackware was installed with at least the following packages before you start:
 ```
 A, AP, D, L, N, X, XAP
 ```
