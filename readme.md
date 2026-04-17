@@ -1,4 +1,4 @@
-Slackware Post-Install. To use:
+The purpose of this is to get Slackware set up after the ISO install.
 
 # NOTE: this all assumes Slackware was installed with the following packages before you start:
 ```
