@@ -1,7 +1,15 @@
 #!/bin/bash
 
+echo "*****************************************************"
+echo "INITIALIZATION"
+echo "*****************************************************"
+
 echo "First of all, setting a reasonable Font Size..."
 setfont ter-v32b
+
+echo "Copying rc.font..."
+cp /root/slackware-installer-for-rs/dotfiles/rc.font /etc/rc.d/rc.font
+chmod 600 /etc/rc.d/rc.font
 
 echo "Reading Keys from setup.keys..."
 while IFS='=' read -r key value; do
@@ -9,9 +17,9 @@ while IFS='=' read -r key value; do
   export "$key"="$value"
 done < "$KEY_FILE"
 
-echo "Copying rc.font..."
-cp /root/slackware-installer-for-rs/dotfiles/rc.font /etc/rc.d/rc.font
-chmod 600 /etc/rc.d/rc.font
+echo "*****************************************************"
+echo "NETWORKING AND WIFI"
+echo "*****************************************************"
 
 echo "Copying Wifi Power Management Settings (to prevent random WiFi dropouts)..."
 cp /root/slackware-installer-for-rs/dotfiles/wifi-powersave-off.conf /etc/NetworkManager/conf.d/wifi-powersave-off.conf 
@@ -27,6 +35,10 @@ echo "Configuring WiFi for $WIFI_SSID..."
 nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID"
 nmcli connection modify "$WIFI_SSID" connection.autoconnect yes
 
+echo "*****************************************************"
+echo "PACKAGING AND RELATED SECURITY"
+echo "*****************************************************"
+
 echo "Fixing package manager GPG issue by removing then reinstalling latest of gnupg2..."
 slackpkg -batch=on -default_answer=y remove gnupg2
 slackpkg -batch=on -default_answer=y install gnupg2
@@ -37,6 +49,10 @@ sed -i 's|^#http://mirrors.slackware.com/slackware/slackware64-15.0/|http://mirr
 echo "Fixing HTTPS/SSL so that git (among others) will work..."
 update-ca-certificates --fresh
 ln -sf /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-bundle.crt
+
+echo "*****************************************************"
+echo "OPENCODE"
+echo "*****************************************************"
 
 echo "Installing OpenCode..." 
 
