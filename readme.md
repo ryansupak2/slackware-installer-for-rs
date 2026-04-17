@@ -9,7 +9,7 @@ cd ~
 
 git -c http.sslVerify=false clone https://YOUR_PAT@github.com/ryansupak2/slackware-installer-for-rs.git
 ```
-(Notice that this bypasses SSL just for this one instance; this is to sidestep other problems).
+(Notice that this bypasses SSL just for this one instance; this is to temporarily sidestep a required Cert upgrade that post-installer.sh handles).
 
 
 Grant execute permissions for the installer script:
@@ -18,8 +18,10 @@ Grant execute permissions for the installer script:
 chmod +x /root/slackware-installer-for-rs/post-install.sh
 ```
 
+Gather required items and paste them in config.txt(pass? something else?)
 
-run it (:
+
+run the script (:
 ```
 ./root/slackware-installer-for-rs/post-install.sh
 ```
