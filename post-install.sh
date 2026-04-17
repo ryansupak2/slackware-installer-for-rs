@@ -54,7 +54,9 @@ echo "*****************************************************"
 echo "OPENCODE"
 echo "*****************************************************"
 
-echo "Installing OpenCode..." 
+echo "Installing OpenCode..."
+curl -fsSL https://opencode.ai/install | bash
+export PATH=/root/.opencode/bin:$PATH
 
 echo "Configuring OpenCode..."
 opencode auth login --provider "$OPENCODE_PROVIDER" --key "$OPENCODE_API_KEY"
