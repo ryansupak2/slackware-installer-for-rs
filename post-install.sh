@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Setting reasonable Font Size..."
+echo "First of all, setting a reasonable Font Size..."
 setfont ter-v32b
 
 echo "Copying Wifi Power Management Settings (to prevent random WiFi dropouts)..."
