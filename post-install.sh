@@ -3,6 +3,12 @@
 echo "First of all, setting a reasonable Font Size..."
 setfont ter-v32b
 
+echo "Reading Keys from setup.keys..."
+while IFS='=' read -r key value; do
+  [[ -z "$key" || "$key" =~ ^# ]] && continue
+  export "$key"="$value"
+done < "$KEY_FILE"
+
 echo "Copying Wifi Power Management Settings (to prevent random WiFi dropouts)..."
 cp /root/slackware-installer-for-rs/dotfiles/wifi-powersave-off.conf /etc/NetworkManager/conf.d/wifi-powersave-off.conf 
 chmod 600 /etc/NetworkManager/conf.d/wifi-powersave-off.conf
