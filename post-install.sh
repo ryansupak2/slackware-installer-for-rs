@@ -85,6 +85,9 @@ echo "*****************************************************"
 echo "SUCKLESS DWM/DMENU/ST"
 echo "*****************************************************"
 
+mkdir -p ~/suckless
+cd ~/suckless
+
 for tool in dwm dmenu st; do
     echo "Installing ${tool}..."
     git clone https://git.suckless.org/${tool}
