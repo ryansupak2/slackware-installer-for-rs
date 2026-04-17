@@ -80,3 +80,18 @@ mkdir -p ~/.local/share/opencode
 #TODO: replace keys in file with keys from memory of same name
 cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.json ~/.local/share/opencode/auth.json
 chmod 600 ~/.local/share/opencode/auth.json
+
+echo "*****************************************************"
+echo "SUCKLESS DWM/DMENU/ST"
+echo "*****************************************************"
+
+for tool in dwm dmenu st; do
+    echo "Installing ${tool}..."
+    git clone https://git.suckless.org/${tool}
+    cd ${tool}
+    # Build and install (requires root for 'install' step)
+    sudo make clean install
+    cd ..
+done
+
+cp /root/slackware-installer-for-rs/dotfiles/.xinitrc ~/.xinitrc
