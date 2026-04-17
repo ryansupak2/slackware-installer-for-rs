@@ -30,3 +30,8 @@ sed -i 's|^#http://mirrors.slackware.com/slackware/slackware64-15.0/|http://mirr
 echo "Fixing HTTPS/SSL so that git (among others) will work..."
 update-ca-certificates --fresh
 ln -sf /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-bundle.crt
+
+echo "Installing OpenCode..." 
+
+echo "Configuring OpenCode..."
+opencode auth login --provider "$OPENCODE_PROVIDER" --key "$OPENCODE_API_KEY"
