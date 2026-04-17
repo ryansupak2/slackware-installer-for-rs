@@ -11,14 +11,17 @@ cd ~
 
 git -c http.sslVerify=false clone https://YOUR_PAT@github.com/ryansupak2/slackware-installer-for-rs.git
 ```
-(Notice that this bypasses SSL just for this one instance; this is to temporarily sidestep a required Cert upgrade that post-installer.sh handles).
+*(Notice that this bypasses SSL just for this one instance; this is to temporarily sidestep a required Cert upgrade that running post-install.sh handles later).*
 
 ***
 
 Gather required items and paste them in config.txt(pass? something else?)
 ```
-some examples go here
+WIFI_SSID=MyWifiNetworkName
+WIFI_PASS=MyWifiPassword
+GITHUB_PAT=MyGithubPATWithRepoPermissions
 ```
+*(Notice that the format is strict: KEY=VALUE with no spaces or bounding quotes, etc...)*
 
 ***
 
