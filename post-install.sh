@@ -89,12 +89,15 @@ mkdir -p ~/suckless
 cd ~/suckless
 
 for tool in dwm dmenu st; do
-    echo "Installing ${tool}..."
+    echo "Installing Suckless ${tool}..."
     git clone https://git.suckless.org/${tool}
     cd ${tool}
+    #copy out existing config file into place
+    cp -f /root/slackware-installer-for-rs/dotfiles/suckless/${tool}/config.h config.h
     # Build and install (requires root for 'install' step)
     sudo make clean install
     cd ..
 done
 
+echo "Configuring startx..."
 cp /root/slackware-installer-for-rs/dotfiles/.xinitrc ~/.xinitrc
