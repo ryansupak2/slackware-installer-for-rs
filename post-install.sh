@@ -11,6 +11,9 @@ echo "Setting Permissions for and then Starting Network Manager..."
 chmod +x /etc/rc.d/rc.networkmanager
 /etc/rc.d/rc.networkmanager start
 
+echo "Configuring WiFi for $WIFI_SSID..."
+nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID"
+
 echo "Fixing package manager GPG issue by removing then reinstalling latest of gnupg2..."
 slackpkg -batch=on -default_answer=y remove gnupg2
 slackpkg -batch=on -default_answer=y install gnupg2
