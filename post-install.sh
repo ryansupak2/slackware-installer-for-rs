@@ -59,4 +59,12 @@ curl -fsSL https://opencode.ai/install | bash
 export PATH=/root/.opencode/bin:$PATH
 
 echo "Configuring OpenCode..."
-opencode auth login --provider "$OPENCODE_PROVIDER" --key "$OPENCODE_API_KEY"
+mkdir -p ~/.config/opencode
+#TODO: replace keys in file with keys from memory of same name
+cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.json ~/.config/opencode/opencode.json
+chmod 600 ~/.config/opencode/opencode.json
+
+mkdir -p ~/.local/share/opencode
+#TODO: replace keys in file with keys from memory of same name
+cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.json ~/.local/share/opencode/auth.json
+chmod 600 ~/.local/share/opencode/auth.json
