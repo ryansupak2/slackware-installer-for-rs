@@ -9,7 +9,7 @@ while IFS='=' read -r key value; do
   export "$key"="$value"
 done < "$KEY_FILE"
 
-echo "Copying Wifi Power Management Settings (to prevent random WiFi dropouts)..."
+echo "Copying rc.local (for commands that run on every Startup)..."
 cp /root/slackware-installer-for-rs/dotfiles/rc.local /etc/rc.d/rc.local
 chmod 600 /etc/rc.d/rc.local
 
