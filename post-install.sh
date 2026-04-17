@@ -5,6 +5,7 @@ setfont ter-v32b
 
 echo "Copying Wifi Power Management Settings (to prevent random WiFi dropouts)..."
 cp /root/slackware-installer-for-rs/dotfiles/wifi-powersave-off.conf /etc/NetworkManager/conf.d/wifi-powersave-off.conf 
+chmod 600 /etc/NetworkManager/conf.d/wifi-powersave-off.conf
 
 echo "Setting Permissions for and then Starting Network Manager..."
 chmod +x /etc/rc.d/rc.networkmanager
