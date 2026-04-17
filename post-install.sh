@@ -9,7 +9,7 @@ setfont ter-v32b
 
 echo "Copying rc.font..."
 cp /root/slackware-installer-for-rs/dotfiles/rc.font /etc/rc.d/rc.font
-chmod 600 /etc/rc.d/rc.font
+chmod +x /etc/rc.d/rc.font
 
 echo "Reading Keys from setup.keys..."
 while IFS='=' read -r key value; do
