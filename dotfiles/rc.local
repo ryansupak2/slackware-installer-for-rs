@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+# /etc/rc,d/rc.local: Local system initialization script.
+#
+# For shutdown time? Make /etc/rc.d/rc.local_shutdown
+
+echo "First of all, setting a reasonable Font Size..."
+setfont ter-v32b
