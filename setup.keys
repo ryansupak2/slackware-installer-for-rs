@@ -1,1 +1,4 @@
-
+WIFI_SSID=MyWifiNetworkName
+WIFI_PASS=MyWifiPassword
+GITHUB_PAT=MyGithubPATWithRepoPermissions
+OPENCODE_XAI_KEY=MyXAIAPIKey
