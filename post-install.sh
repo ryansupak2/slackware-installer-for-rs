@@ -24,8 +24,20 @@ echo "*****************************************************"
 echo "Copying Wifi Power Management Settings (to prevent random WiFi dropouts)..."
 cp /root/slackware-installer-for-rs/dotfiles/wifi-powersave-off.conf /etc/NetworkManager/conf.d/wifi-powersave-off.conf 
 chmod 600 /etc/NetworkManager/conf.d/wifi-powersave-off.conf
+
 cp /root/slackware-installer-for-rs/dotfiles/iwlwifi.conf /etc/modprobe.d/iwlwifi.conf
 chmod 600 /etc/modprobe.d/iwlwifi.conf
+
+ELILO_PATH="/boot/efi/EFI/Slackware/elilo.conf"
+ELILO_PARAMS="pcie_aspm=off iwlwifi.power_save=0"
+
+if ! grep -q "pcie_aspm=off" "$ELILO_PATH"; then
+    sed -i "/append=/ s/\"$/ $ELILO_PARAMS\"/" "$ELILO_PATH"
+    echo "Power Management Parameters added to $ELILO_PATH"
+else
+    echo "Power Management Parameters already exist in $ELILO_PATH"
+fi
+
 
 echo "Setting Permissions for and then Starting Network Manager..."
 chmod +x /etc/rc.d/rc.networkmanager
