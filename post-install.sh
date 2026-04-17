@@ -18,6 +18,6 @@ slackpkg -batch=on -default_answer=y install gnupg2
 echo "Setting mirror (to most reliable)..."
 sed -i 's|^#http://mirrors.slackware.com/slackware/slackware64-15.0/|http://mirrors.slackware.com/slackware/slackware64-15.0/|' /etc/slackpkg/mirrors
 
-echo "Fixing HTTPS/SSL..."
+echo "Fixing HTTPS/SSL so that git (among others) will work..."
 update-ca-certificates --fresh
 ln -sf /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-bundle.crt
