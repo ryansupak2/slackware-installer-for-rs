@@ -10,6 +10,10 @@ while IFS='=' read -r key value; do
 done < "$KEY_FILE"
 
 echo "Copying Wifi Power Management Settings (to prevent random WiFi dropouts)..."
+cp /root/slackware-installer-for-rs/dotfiles/rc.local /etc/rc.d/rc.local
+chmod 600 /etc/rc.d/rc.local
+
+echo "Copying Wifi Power Management Settings (to prevent random WiFi dropouts)..."
 cp /root/slackware-installer-for-rs/dotfiles/wifi-powersave-off.conf /etc/NetworkManager/conf.d/wifi-powersave-off.conf 
 chmod 600 /etc/NetworkManager/conf.d/wifi-powersave-off.conf
 cp /root/slackware-installer-for-rs/dotfiles/iwlwifi.conf /etc/modprobe.d/iwlwifi.conf
