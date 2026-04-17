@@ -8,7 +8,6 @@ A, AP, D, L, N, X, XAP
 Pull the code down to root on the target machine:
 ```
 cd ~
-
 git -c http.sslVerify=false clone https://YOUR_PAT@github.com/ryansupak2/slackware-installer-for-rs.git
 ```
 *(Notice that this bypasses SSL just for this one instance; this is to temporarily sidestep a required Cert upgrade that running post-install.sh handles later).*
@@ -27,7 +26,6 @@ GITHUB_PAT=MyGithubPATWithRepoPermissions
 
 Grant execute permissions for the installer script:
 ```
-# grant execute permissions to installer script
 chmod +x /root/slackware-installer-for-rs/post-install.sh
 ```
 
