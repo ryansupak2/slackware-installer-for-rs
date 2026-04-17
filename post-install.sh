@@ -21,6 +21,7 @@ chmod +x /etc/rc.d/rc.networkmanager
 
 echo "Configuring WiFi for $WIFI_SSID..."
 nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID"
+nmcli connection modify "$WIFI_SSID" connection.autoconnect yes
 
 echo "Fixing package manager GPG issue by removing then reinstalling latest of gnupg2..."
 slackpkg -batch=on -default_answer=y remove gnupg2
