@@ -68,7 +68,11 @@ echo "*****************************************************"
 
 echo "Installing OpenCode..."
 curl -fsSL https://opencode.ai/install | bash
+
+echo "Adding OpenCode to PATH..."
 export PATH=/root/.opencode/bin:$PATH
+cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.sh /etc/profile.d/opencode.sh
+chmod +x /etc/profile.d/opencode.sh
 
 echo "Configuring OpenCode..."
 mkdir -p ~/.config/opencode
