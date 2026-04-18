@@ -9,6 +9,9 @@ echo "*****************************************************"
 echo "First of all, setting a reasonable Font Size..."
 setfont ter-v32b
 
+echo "Copying User Preferences..."
+cp /root/slackware-installer-for-rs/dotfiles/bashrc /root/.bashrc
+
 echo "Copying rc.font..."
 cp /root/slackware-installer-for-rs/dotfiles/rc.font /etc/rc.d/rc.font
 chmod +x /etc/rc.d/rc.font
@@ -83,6 +86,13 @@ echo "*****************************************************"
 
 echo "Installing xclip..."
 sbopkg -B -i xclip
+
+echo "*****************************************************"
+echo "VI TEXT EDITOR                                       "
+echo "*****************************************************"
+
+echo "Updating Config..."
+cp /root/slackware-installer-for-rs/dotfiles/vimrc /root/.vimrc
 
 echo "*****************************************************"
 echo "OPENCODE"
