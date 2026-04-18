@@ -63,6 +63,26 @@ update-ca-certificates --fresh
 ln -sf /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-bundle.crt
 
 echo "*****************************************************"
+echo "SBOPKG PACKAGE BROWSER"
+echo "*****************************************************"
+
+echo "Installing sbopkg from Binary..."
+cd ~
+wget https://github.com/sbopkg/sbopkg/releases/download/0.38.3/sbopkg-0.38.3-noarch-1_wsr.tgz 
+installpkg sbopkg-0.38.3-noarch-1_wsr.tgz
+rm sbopkg-0.38.3-noarch-1_wsr.tgz
+
+echo "Syncing sbopkg to Repository..."
+sbopkg -r
+
+echo "*****************************************************"
+echo "CLIPBOARD                                            "
+echo "*****************************************************"
+
+echo "Installing xclip..."
+sbopkg -B -i xclip
+
+echo "*****************************************************"
 echo "OPENCODE"
 echo "*****************************************************"
 
