@@ -47,6 +47,7 @@ fi
 echo "Setting Permissions for and then Starting Network Manager..."
 chmod +x /etc/rc.d/rc.networkmanager
 /etc/rc.d/rc.networkmanager start
+cp /root/slackware-installer-for-rs/dotfiles/rc.local /etc/rc.d/rc.local
 
 echo "Configuring WiFi for $WIFI_SSID..."
 nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID"
@@ -93,6 +94,18 @@ echo "*****************************************************"
 
 echo "Updating Config..."
 cp /root/slackware-installer-for-rs/dotfiles/vimrc /root/.vimrc
+
+echo "*****************************************************"
+echo "GOOGLE CHROME                                        "
+echo "*****************************************************"
+
+echo "Installing Required Utilities..."
+sbokpg -i -B alien
+
+echo "Installing Browser..."
+cd /root
+wget https//dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+alien -t google-chrome-stable_current_amd64.deb
 
 echo "*****************************************************"
 echo "OPENCODE"
