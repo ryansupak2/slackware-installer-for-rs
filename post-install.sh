@@ -98,6 +98,7 @@ git clone https://github.com/vim/vim.git
 cd vim
 make -j$(nproc)
 sudo make install
+rm -rf vim
 
 echo "Updating Config..."
 cp /root/slackware-installer-for-rs/dotfiles/vimrc /root/.vimrc
@@ -113,6 +114,8 @@ echo "Installing Browser..."
 cd /root
 wget https//dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 alien -t google-chrome-stable_current_amd64.deb
+rm https//dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+rm google-chrome-stable-147.0.7727.101-x86_64-1_alien.tgz
 
 echo "*****************************************************"
 echo "OPENCODE"

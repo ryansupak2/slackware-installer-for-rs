@@ -1,6 +1,8 @@
 #!/bin/sh
-selected=$( (echo -e "network\nwifi"; dmenu_path) | dmenu "$@" | tr '[:upper:]' '[:lower:]' )
+selected=$( (echo -e "wifi\nweb\neditor\nnetwork"; dmenu_path) | dmenu "$@" | tr '[:upper:]' '[:lower:]' )
 case $selected in
-    network|wifi|nmtui) st -e nmtui & ;;
+    wifi|network|nmtui) st -e nmtui & ;;
+    web) google-chrome-stable --no-sandbox & ;;
+    editor) st -e vim & ;;
     *) [ -n "$selected" ] && $selected & ;;
 esac
