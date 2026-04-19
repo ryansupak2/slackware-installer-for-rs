@@ -1,0 +1,6 @@
+#!/bin/sh
+selected=$( (echo -e "network\nwifi"; dmenu_path) | dmenu "$@" | tr '[:upper:]' '[:lower:]' )
+case $selected in
+    network|wifi|nmtui) st -e nmtui & ;;
+    *) [ -n "$selected" ] && $selected & ;;
+esac
