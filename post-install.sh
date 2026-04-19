@@ -92,6 +92,13 @@ echo "*****************************************************"
 echo "VI TEXT EDITOR                                       "
 echo "*****************************************************"
 
+echo "Installing vim..."
+cd ~
+git clone https://github.com/vim/vim.git
+cd vim
+make -j$(nproc)
+sudo make install
+
 echo "Updating Config..."
 cp /root/slackware-installer-for-rs/dotfiles/vimrc /root/.vimrc
 
