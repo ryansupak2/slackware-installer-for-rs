@@ -54,6 +54,12 @@ nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID"
 nmcli connection modify "$WIFI_SSID" connection.autoconnect yes
 
 echo "*****************************************************"
+echo "INPUT HARDWARE                                       "
+echo "*****************************************************"
+
+cp /root/slackware-installer-for-rs/dotfiles/99-disable-touchscreen.conf /etc/X11/xorg.conf.d/99-disable-touchscreen.conf
+
+echo "*****************************************************"
 echo "PACKAGING AND RELATED SECURITY"
 echo "*****************************************************"
 
