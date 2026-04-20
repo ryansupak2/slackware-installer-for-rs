@@ -19,6 +19,11 @@ echo "Copying User Preferences..."
 cp /root/slackware-installer-for-rs/dotfiles/bashrc $HOME/.bashrc
 
 echo "Updating vim Config..."
+
+mkdir -p ~/.vim/swap
+mkdir -p ~/.vim/backup
+mkdir -p ~/.vim/undo
+
 cp /root/slackware-installer-for-rs/dotfiles/vimrc $HOME/.vimrc
 
 echo "Configuring OpenCode..."

@@ -3,6 +3,17 @@
 # post-install-global.sh - Global system setup for Slackware installer
 # Run once as root after ISO install.
 
+# TODO: alter dwm to control screen brightness with Fn+F5 anf Fn+F6
+# echo 24242 > /sys/class/backlight/intel_backlight/brightness
+#
+# TODO: alter dwm to control audio volume with Fn+F1, Fn+F2, and Fn+F3
+# TODO: alter dwm to control keyboard brightness with Shift+Fn+F5 and Shift+Fn+F6
+# echo 0 > /sys/class/leds/tpacpi::kbd_backlight/brightness
+
+# TODO: alter dwm to disable all other Fn+F combinations
+
+# TODO: alter dwm to show Brightness, Kbd Light, Volume for 2 seconds, replacing BAT and Date but not Time
+
 if [ "$1" = "--help" ]; then
     echo "Usage: ./post-install-global.sh"
     echo "Performs global system setup: installs packages, configures networking/hardware, builds tools."
@@ -138,6 +149,21 @@ cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.sh /etc/profile.d
 chmod +x /etc/profile.d/opencode.sh
 
 echo "*****************************************************"
+echo "INKSCAPE (disabled by default)"
+echo "*****************************************************"
+
+# Inkscape install (specifically the final inkscape part) is a bit time-consuming so it is disabled by default.
+# It is included here mostly for reference though in practice it may make sense to do these steps manually:
+
+# echo "Installing PreReqs (should be quick)..."
+# sbopkg -B -i dos2unix
+# sbopkg -B -i double-conversion
+# sbopkg -B -i potrace
+
+# echo "Installing Inkscape (this takes a while)..."
+# sbopkg -B -i inkscape
+
+echo "*****************************************************"
 echo "SUCKLESS DWM/DMENU/ST"
 echo "*****************************************************"
 
@@ -148,7 +174,7 @@ for tool in dwm dmenu st; do
     echo "Installing Suckless ${tool}..."
     git clone https://git.suckless.org/${tool}
     cd ${tool}
-    #copy out existing config file into place
+    # Copy out existing config file into place
     cp -f /root/slackware-installer-for-rs/dotfiles/suckless/${tool}/config.h config.h
     # Build and install (requires root for 'install' step)
     sudo make clean install
