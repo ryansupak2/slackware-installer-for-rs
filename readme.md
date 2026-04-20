@@ -5,10 +5,22 @@ A, AP, D, L, N, X, XAP
 
 ***
 
+First, you'll need to manually create an SSH key locally (this will need to be done per-user in order to pull down the Repo):
+
+```
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "MyPassphrase" -C "MyUser@MyEmail.com"
+
+eval "$(ssh-agent -s)"
+
+ssh-add ~/.ssh/id_ed25519
+```
+
+***
+
 Pull the code down to root on the target machine:
 ```
 cd ~
-git -c http.sslVerify=false clone https://YOUR_PAT@github.com/ryansupak2/slackware-installer-for-rs.git
+git -c http.sslVerify=false clone https://@github.com/ryansupak2/slackware-installer-for-rs.git
 ```
 *(Notice that this bypasses SSL just for this one instance; this is to temporarily sidestep a required Cert upgrade that running post-install.sh handles later).*
 
