@@ -10,7 +10,7 @@ This documentation won't go into full detail on how to install Slackware except 
 
 * The Hard Drive on the destination must have the following partitions before you start the install:
 
-    - 512 MB - EFI
+    - 512 MB - EFI Boot
 
     - 32 GB - Linux Swap
 
