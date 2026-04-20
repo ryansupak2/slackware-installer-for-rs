@@ -54,6 +54,23 @@ nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID"
 nmcli connection modify "$WIFI_SSID" connection.autoconnect yes
 
 echo "*****************************************************"
+echo "AUDIO HARDWARE"
+echo "*****************************************************"
+
+cd ~
+wget https://github.com/thesofproject/sof-bin/releases/download/v2025.12.2/sof-bin-2025.12.2.tar.gz
+tar -xzf sof-bin-2025.12.2.tar.gz
+mkdir /lib/firmware/intel/sof/
+
+cp -r sof-bin-2025.12.2/sof /lib/firmware/intel/sof
+cp -r sof-bin-2025.12.2/sof-tplg /lib/firmware/intel/sof-tplg
+
+echo 0000:00:1f.3 > /sys/bus/pci/drivers/sof-audio-pci-intel-cnl/unbind
+echo 0000:00:1f.3 > /sys/bus/pci/drivers/sof-audio-pci-intel-cnl/bind
+
+rm -rf sof*
+
+echo "*****************************************************"
 echo "INPUT HARDWARE                                       "
 echo "*****************************************************"
 
