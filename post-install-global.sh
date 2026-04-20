@@ -1,6 +1,14 @@
 #!/bin/bash
 
-# TODO set up git push (SSH?)
+# post-install-global.sh - Global system setup for Slackware installer
+# Run once as root after ISO install.
+
+if [ "$1" = "--help" ]; then
+    echo "Usage: ./post-install-global.sh"
+    echo "Performs global system setup: installs packages, configures networking/hardware, builds tools."
+    echo "Must be run as root. Run post-install-user.sh afterward for per-user configs."
+    exit 0
+fi
 
 echo "*****************************************************"
 echo "INITIALIZATION"
@@ -9,10 +17,7 @@ echo "*****************************************************"
 echo "First of all, setting a reasonable Font Size..."
 setfont ter-v32b
 
-echo "Copying User Preferences..."
-cp /root/slackware-installer-for-rs/dotfiles/bashrc /root/.bashrc
-
-echo "Copying rc.font..."
+echo "Copying rc.font to make font change permanent..."
 cp /root/slackware-installer-for-rs/dotfiles/rc.font /etc/rc.d/rc.font
 chmod +x /etc/rc.d/rc.font
 
@@ -43,7 +48,6 @@ else
     echo "Power Management Parameters already exist in $ELILO_PATH"
 fi
 
-
 echo "Setting Permissions for and then Starting Network Manager..."
 chmod +x /etc/rc.d/rc.networkmanager
 /etc/rc.d/rc.networkmanager start
@@ -52,23 +56,6 @@ cp /root/slackware-installer-for-rs/dotfiles/rc.local /etc/rc.d/rc.local
 echo "Configuring WiFi for $WIFI_SSID..."
 nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID"
 nmcli connection modify "$WIFI_SSID" connection.autoconnect yes
-
-echo "*****************************************************"
-echo "AUDIO HARDWARE"
-echo "*****************************************************"
-
-cd ~
-wget https://github.com/thesofproject/sof-bin/releases/download/v2025.12.2/sof-bin-2025.12.2.tar.gz
-tar -xzf sof-bin-2025.12.2.tar.gz
-mkdir /lib/firmware/intel/sof/
-
-cp -r sof-bin-2025.12.2/sof /lib/firmware/intel/sof
-cp -r sof-bin-2025.12.2/sof-tplg /lib/firmware/intel/sof-tplg
-
-echo 0000:00:1f.3 > /sys/bus/pci/drivers/sof-audio-pci-intel-cnl/unbind
-echo 0000:00:1f.3 > /sys/bus/pci/drivers/sof-audio-pci-intel-cnl/bind
-
-rm -rf sof*
 
 echo "*****************************************************"
 echo "INPUT HARDWARE                                       "
@@ -124,9 +111,6 @@ make -j$(nproc)
 sudo make install
 rm -rf vim
 
-echo "Updating Config..."
-cp /root/slackware-installer-for-rs/dotfiles/vimrc /root/.vimrc
-
 echo "*****************************************************"
 echo "GOOGLE CHROME                                        "
 echo "*****************************************************"
@@ -153,17 +137,6 @@ export PATH=/root/.opencode/bin:$PATH
 cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.sh /etc/profile.d/opencode.sh
 chmod +x /etc/profile.d/opencode.sh
 
-echo "Configuring OpenCode..."
-mkdir -p ~/.config/opencode
-#TODO: replace keys in file with keys from memory of same name
-cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.json ~/.config/opencode/opencode.json
-chmod 600 ~/.config/opencode/opencode.json
-
-mkdir -p ~/.local/share/opencode
-#TODO: replace keys in file with keys from memory of same name
-cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.json ~/.local/share/opencode/auth.json
-chmod 600 ~/.local/share/opencode/auth.json
-
 echo "*****************************************************"
 echo "SUCKLESS DWM/DMENU/ST"
 echo "*****************************************************"
@@ -182,5 +155,4 @@ for tool in dwm dmenu st; do
     cd ..
 done
 
-echo "Configuring startx..."
-cp /root/slackware-installer-for-rs/dotfiles/.xinitrc ~/.xinitrc
+echo "Global setup complete. Run post-install-user.sh for per-user configs."
