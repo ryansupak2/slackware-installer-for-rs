@@ -74,6 +74,7 @@ echo "*****************************************************"
 echo "INPUT HARDWARE                                       "
 echo "*****************************************************"
 
+echo "Disabling Touchscreen..."
 cp /root/slackware-installer-for-rs/dotfiles/99-disable-touchscreen.conf /etc/X11/xorg.conf.d/99-disable-touchscreen.conf
 
 echo "*****************************************************"
