@@ -5,6 +5,9 @@ colorscheme pablo
 
 set clipboard=unnamedplus
 
-set nobackup
-set noswapfile
-set noundofile
+set backup
+set backupdir=~/.vim/backup
+set swapfile
+set directory=~/.vim/swap
+set undofile
+set undodir=~/.vim/undo
