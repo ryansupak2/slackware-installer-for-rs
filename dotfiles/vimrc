@@ -5,9 +5,6 @@ colorscheme pablo
 
 set clipboard=unnamedplus
 
-"nnoremap <C-S-c> <Nop>
-"vnoremap <C-S-c> <Nop>
-"inoremap <C-S-c> <Nop>
-"nnoremap <C-S-v> <Nop>
-"vnoremap <C-S-v> <Nop>
-"inoremap <C-S-v> <Nop>
+set nobackup
+set noswapfile
+set noundofile
