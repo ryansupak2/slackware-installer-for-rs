@@ -14,6 +14,8 @@
 
 # TODO: alter dwm to show Brightness, Kbd Light, Volume for 2 seconds, replacing BAT and Date but not Time
 
+# TODO: add slock, others to get Password Lockout on Wake
+
 if [ "$1" = "--help" ]; then
     echo "Usage: ./post-install-global.sh"
     echo "Performs global system setup: installs packages, configures networking/hardware, builds tools."

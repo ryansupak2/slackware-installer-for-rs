@@ -1,10 +1,10 @@
 #!/bin/sh
-selected=$( (echo -e "WEB\nEDITOR\nFILES\nNETWORK/WIFI\nSOUND/AUDIO"; dmenu_path) | dmenu "$@" | tr '[:upper:]' '[:lower:]' )
+selected=$( (echo -e "WEB\nEDITOR\nFILES\nNETWORK/WIFI\nSOUND/AUDIO"; bash -c 'source ~/.bashrc && alias' | cut -d'=' -f1 | sed 's/alias //' ; dmenu_path) | dmenu "$@" | tr '[:upper:]' '[:lower:]' )
 case $selected in
     web) google-chrome-stable --no-sandbox --force-dark-mode --force-device-scale-factor=1.5 & ;;
     editor) st -e vim & ;;
     files) st -e mc & ;;
     network/wifi|nmtui) st -e nmtui & ;;
     sound/audio) st -e alsamixer & ;;
-    *) [ -n "$selected" ] && $selected & ;;
+    *) [ -n "$selected" ] && bash -c "shopt -s expand_aliases; source ~/.bashrc; $selected" & ;;
 esac

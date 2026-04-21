@@ -1,8 +1,8 @@
 alias vi='vim'
+alias inkscape='GDK_DPI_SCALE=1.5 inkscape'
 
 # console prompt =  user@current relative directory
 export PS1='\[\e[32m\]\u@\[\e[38;5;153m\]\W\[\e[0m\]\$ '
 
-# start gui
-startx
-
+# to make inkscape font a readable size
+export GDK_DPI_SCALE=1.5
