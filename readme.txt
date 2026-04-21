@@ -11,7 +11,7 @@ This documentation won't go into full detail on how to install Slackware except 
 * The Hard Drive on the destination must have the following partitions before you start the install:
 
     - 512 MB - EFI Boot
-
+ 
     - 32 GB - Linux Swap
 
     - Remainder - Linux Filesystem
@@ -74,9 +74,6 @@ cd ~i
 
 git clone git@github.com:ryansupak2/slackware-installer-for-rs.git
 
-##### git -c http.sslVerify=false clone https://@github.com/ryansupak2/slackware-installer-for-rs.git
-##### (Notice that this bypasses SSL just for this one instance; this is to temporarily sidestep a required Cert upgrade that running post-install.sh handles later).
-
     - Gather required items and paste them in setup.keys:
 
 WIFI_SSID=MyWifiNetworkName
@@ -100,8 +97,10 @@ chmod +x /root/slackware-installer-for-rs/post-install-user.sh
     - Copy the directory to /usr/local/share
 
 mkdir /usr/local/share
-cp ~/slackware-installer-for-us
+cp ~/slackware-installer-for-us /usr/local/share
 
-    - Run the User Script for any users that need it
+    - Login as other users as needed, copy the directory over from
+      /usr/local/share, and run the User Script for any users that need it
 
+cp /usr/local/share ~
 /root/slackware-installer-for-rs/post-install-user.sh
