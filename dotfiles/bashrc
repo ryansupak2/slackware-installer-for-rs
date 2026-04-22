@@ -6,3 +6,6 @@ export PS1='\[\e[32m\]\u@\[\e[38;5;153m\]\W\[\e[0m\]\$ '
 
 # to make inkscape font a readable size
 export GDK_DPI_SCALE=1.5
+
+#node (not part of core install)
+export PATH=/usr/local/node/bin:$PATH
