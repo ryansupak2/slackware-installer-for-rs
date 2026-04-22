@@ -1,6 +1,9 @@
 alias vi='vim'
 alias inkscape='GDK_DPI_SCALE=1.5 inkscape'
 
+# kbd backlight on low
+echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness
+
 # console prompt =  user@current relative directory
 export PS1='\[\e[32m\]\u@\[\e[38;5;153m\]\W\[\e[0m\]\$ '
 

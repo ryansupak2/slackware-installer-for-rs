@@ -1,6 +1,18 @@
 while true; do
-    xsetroot -name "BAT: $(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo 'N/A')% $(status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown'); case $status in Charging|'Not charging') echo "($status)" ;; *) echo "" ;; esac) | $(date +'%a, %d %b %Y | %T')"
+    cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo 'N/A')
+    bat_part="BAT: ${cap}% "
+    status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown')
+    if [ "$status" = "Charging" ]; then
+        bat_part="${bat_part}(Charging) "
+    fi
+    if [ "$cap" != "N/A" ] && [ "$cap" -le 10 ]; then
+        bat_part="${bat_part}(Charge ASAP!) "
+    fi
+    xsetroot -name "${bat_part}| $(date +'%a, %d %b %Y | %T')"
     sleep 1
 done &
+
+
+echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness
 
 exec dwm
