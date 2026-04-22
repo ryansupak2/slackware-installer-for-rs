@@ -1,5 +1,5 @@
 alias vi='vim'
-alias inkscape='GDK_DPI_SCALE=1.5 inkscape'
+alias inkscape='inkscape'
 alias op='opencode'
 alias chrome='google-chrome-stable --no-sandbox --force-dark-mode --force-device-scale-factor=1.5'
 
