@@ -858,6 +858,23 @@ focusstack(const Arg *arg)
 	}
 	if (c) {
 		focus(c);
+		if (selmon->lt[selmon->sellt]->arrange == monocle) {
+			unsigned int n = 0, current = 0;
+			Client *cc;
+			for (cc = selmon->clients; cc; cc = cc->next)
+				if (ISVISIBLE(cc))
+					n++;
+			if (n == 0) {
+				snprintf(selmon->ltsymbol, sizeof selmon->ltsymbol, "[0]");
+			} else {
+				for (cc = nexttiled(selmon->clients), current = 1; cc; cc = nexttiled(cc->next), current++)
+					if (cc == selmon->sel)
+						break;
+				if (current > n)
+					current = n;
+				snprintf(selmon->ltsymbol, sizeof selmon->ltsymbol, "[%d/%d]", current, n);
+			}
+		}
 		restack(selmon);
 	}
 }
