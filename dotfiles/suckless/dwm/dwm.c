@@ -1115,14 +1115,22 @@ maprequest(XEvent *e)
 void
 monocle(Monitor *m)
 {
-	unsigned int n = 0;
+	unsigned int n = 0, current = 0;
 	Client *c;
 
 	for (c = m->clients; c; c = c->next)
 		if (ISVISIBLE(c))
 			n++;
-	if (n > 0) /* override layout symbol */
-		snprintf(m->ltsymbol, sizeof m->ltsymbol, "[%d]", n);
+	if (n == 0) {
+		snprintf(m->ltsymbol, sizeof m->ltsymbol, "[0]");
+	} else {
+		for (c = nexttiled(m->clients), current = 1; c; c = nexttiled(c->next), current++)
+			if (c == m->sel)
+				break;
+		if (current > n)
+			current = n;  // Fallback if focus not found
+		snprintf(m->ltsymbol, sizeof m->ltsymbol, "[%d/%d]", current, n);
+	}
 	for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
 		resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
 }

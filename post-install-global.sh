@@ -178,6 +178,10 @@ for tool in dwm dmenu st; do
     cd ${tool}
     # Copy out existing config file into place
     cp -f /root/slackware-installer-for-rs/dotfiles/suckless/${tool}/config.h config.h
+    # For dwm, also copy the modified dwm.c
+    if [ "${tool}" = "dwm" ]; then
+        cp -f /root/slackware-installer-for-rs/dotfiles/suckless/dwm/dwm.c dwm.c
+    fi
     # Build and install (requires root for 'install' step)
     sudo make clean install
     cd ..
