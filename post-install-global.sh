@@ -125,6 +125,13 @@ sudo make install
 rm -rf vim
 
 echo "*****************************************************"
+echo "NEOFETCH                                             "
+echo "*****************************************************"
+
+echo "Configuring Neofetch..."
+cp /root/slackware_installer_for_rs/dotfiles/neofetch/* /root/.config/neofetch
+
+echo "*****************************************************"
 echo "GOOGLE CHROME                                        "
 echo "*****************************************************"
 
