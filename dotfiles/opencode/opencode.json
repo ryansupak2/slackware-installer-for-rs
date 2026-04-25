@@ -1,3 +1,4 @@
 {
-  "model": "$OPENCODE_PROVIDER/$OPENCODE_MODEL_NAME"
+	"$schema": "https://opencode.ai/config.json",
+	"default_agent": "plan"
 }

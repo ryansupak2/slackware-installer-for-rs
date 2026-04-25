@@ -28,14 +28,13 @@ cp /root/slackware-installer-for-rs/dotfiles/vimrc $HOME/.vimrc
 
 echo "Configuring OpenCode..."
 mkdir -p ~/.config/opencode
-#TODO: replace keys in file with keys from memory of same name
 cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.json ~/.config/opencode/opencode.json
 chmod 600 ~/.config/opencode/opencode.json
 
 mkdir -p ~/.local/share/opencode
 #TODO: replace keys in file with keys from memory of same name
-cp /root/slackware-installer-for-rs/dotfiles/opencode/opencode.json ~/.local/share/opencode/auth.json
-chmod 600 ~/.local/share/opencode/auth.json
+cp /root/slackware-installer-for-rs/setup.keys ~/.local/share/opencode/setup.keys
+chmod 600 ~/.local/share/opencode/setup.keys
 
 echo "Configuring startx..."
 cp /root/slackware-installer-for-rs/dotfiles/.xinitrc ~/.xinitrc
