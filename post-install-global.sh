@@ -16,6 +16,12 @@
 
 # TODO: add slock, others to get Password Lockout on Wake
 
+# TODO: put Berkeley Mono font in github
+# sudo mkdir -p /usr/local/share/fonts/TTF
+# root@TX-02-YLJR4PM5# cp * /usr/local/share/fonts/TTF
+#  sudo fc-cache -fv
+#  fc-list | grep "Berk"
+
 if [ "$1" = "--help" ]; then
     echo "Usage: ./post-install-global.sh"
     echo "Performs global system setup: installs packages, configures networking/hardware, builds tools."
