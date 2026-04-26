@@ -3,8 +3,6 @@
 # post-install-global.sh - Global system setup for Slackware installer
 # Run once as root after ISO install.
 
-# TODO: disable Fn + F7-F12
-
 # TODO: put Berkeley Mono font in github
 # sudo mkdir -p /usr/local/share/fonts/TTF
 # root@TX-02-YLJR4PM5# cp * /usr/local/share/fonts/TTF
