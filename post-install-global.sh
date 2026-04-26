@@ -102,11 +102,18 @@ echo "*****************************************************"
 echo "SCREEN LOCKING                                       "
 echo "*****************************************************"
 
-echo "Configuring xlock..."
-sudo cp dotfiles/lockscreen/lid-close /etc/acpi/events/
-sudo cp dotfiles/lockscreen/lock-screen.sh /usr/local/bin/
-sudo chmod +x /usr/local/bin/lock-screen.sh
-sudo /etc/rc.d/rc.acpid restart
+echo "Configuring Hardware to Lock on Laptop Reopen..."
+
+cp ~/slackware-installer-for-rs/dotfiles/lockscreen/lid-close /etc/acpi/events/lid-close
+cp ~/slackware-installer-for-rs/dotfiles/lockscreen/lock-screen.sh /usr/local/bin/lock-screen.sh
+chmod +x /usr/local/bin/lock-screen.sh
+/etc/rc.d/rc.acpid restart
+
+echo "Configuring xlock preferences..."
+
+cd ~
+cp /root-slackware-installer-for-rs/dotfiles/xdefaults ~/.Xdefaults
+xrdb merge ~/.Xdefaults
 
 echo "*****************************************************"
 echo "AUDIO/VOLUME					   "
