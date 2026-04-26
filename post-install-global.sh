@@ -3,7 +3,7 @@
 # post-install-global.sh - Global system setup for Slackware installer
 # Run once as root after ISO install.
 
-# TODO: alter dwm to disable all other Fn+F combinations
+# TODO: disable Fn + F7-F12
 
 # TODO: add slock, others to get Password Lockout on Wake
 

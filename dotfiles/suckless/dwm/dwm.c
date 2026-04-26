@@ -207,6 +207,8 @@ static void showhide(Client *c);
 static void spawn(const Arg *arg);
 static void tag(const Arg *arg);
 static void tagmon(const Arg *arg);
+static void tagnext(const Arg *arg);
+static void tagprev(const Arg *arg);
 static void tile(Monitor *m);
 static void togglebar(const Arg *arg);
 static void togglefloating(const Arg *arg);
@@ -234,6 +236,9 @@ static int xerror(Display *dpy, XErrorEvent *ee);
 static int xerrordummy(Display *dpy, XErrorEvent *ee);
 static int xerrorstart(Display *dpy, XErrorEvent *ee);
 static void zoom(const Arg *arg);
+
+/* configuration, allows nested code to access above variables */
+#include "config.h"
 
 /* variables */
 static const char broken[] = "broken";
@@ -270,7 +275,6 @@ static Monitor *mons, *selmon;
 static Window root, wmcheckwin;
 
 /* configuration, allows nested code to access above variables */
-#include "config.h"
 
 /* compile-time check if all tags fit into an unsigned int bit array. */
 struct NumTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
@@ -2107,6 +2111,24 @@ viewprev(const Arg *arg)
 	int curidx = __builtin_ffs(curtag) - 1;  /* Get index of lowest set bit (0-based) */
 	if (curidx > 0)
 		view(&((Arg){ .ui = 1 << (curidx - 1) }));
+}
+
+void
+tagnext(const Arg *arg)
+{
+	unsigned int curtag = selmon->tagset[selmon->seltags];
+	int curidx = __builtin_ffs(curtag) - 1;  /* Get index of lowest set bit (0-based) */
+	if (curidx >= 0 && curidx < LENGTH(tags) - 1)
+		tag(&((Arg){ .ui = 1 << (curidx + 1) }));
+}
+
+void
+tagprev(const Arg *arg)
+{
+	unsigned int curtag = selmon->tagset[selmon->seltags];
+	int curidx = __builtin_ffs(curtag) - 1;  /* Get index of lowest set bit (0-based) */
+	if (curidx > 0)
+		tag(&((Arg){ .ui = 1 << (curidx - 1) }));
 }
 
 Client *
