@@ -7,7 +7,8 @@ XLock.mode: blank
 !XLock.erasemode: no_fade
 XLock.erasedelay: 400
 !XLock.font: *8x16*
-XLock.font: -b&h-lucida-medium-r-normal-sans-24-*-*-*-*-*-iso8859-1
+XLock.font: -*-courier-medium-r-normal--14-*-*-*-*-*-iso8859-1
+!XLock.font: -b&h-lucida-medium-r-normal-sans-24-*-*-*-*-*-iso8859-1
 !XLock.font: -*-times-*-*-*-*-18-*-*-*-*-*-*-*
 !XLock.background: White
 !XLock.foreground: Black

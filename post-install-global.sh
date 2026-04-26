@@ -3,12 +3,6 @@
 # post-install-global.sh - Global system setup for Slackware installer
 # Run once as root after ISO install.
 
-# TODO: put Berkeley Mono font in github
-# sudo mkdir -p /usr/local/share/fonts/TTF
-# root@TX-02-YLJR4PM5# cp * /usr/local/share/fonts/TTF
-#  sudo fc-cache -fv
-#  fc-list | grep "Berk"
-
 if [ "$1" = "--help" ]; then
     echo "Usage: ./post-install-global.sh"
     echo "Performs global system setup: installs packages, configures networking/hardware, builds tools."
@@ -159,6 +153,15 @@ echo "*****************************************************"
 
 echo "Configuring Neofetch..."
 cp /root/slackware_installer_for_rs/dotfiles/neofetch/* /root/.config/neofetch
+
+echo "*****************************************************"
+echo "ADDITIONAL FONTS                                     "
+echo "*****************************************************"
+
+echo "Installing Additional Fonts..."
+mkdir -p /usr/share/fonts/TTF
+cp ~/slackware/installer-for-rs/fonts/BerkeleyMono-*.ttf /usr/share/fonts/TTF/
+fc-cache -fv
 
 echo "*****************************************************"
 echo "GOOGLE CHROME                                        "
