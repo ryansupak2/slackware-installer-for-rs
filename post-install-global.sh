@@ -3,15 +3,7 @@
 # post-install-global.sh - Global system setup for Slackware installer
 # Run once as root after ISO install.
 
-# TODO: alter dwm to control screen brightness with Fn+F5 anf Fn+F6
-# echo 24242 > /sys/class/backlight/intel_backlight/brightness
-#
-# TODO: alter dwm to control keyboard brightness with Shift+Fn+F5 and Shift+Fn+F6
-# echo 0 > /sys/class/leds/tpacpi::kbd_backlight/brightness
-
 # TODO: alter dwm to disable all other Fn+F combinations
-
-# TODO: alter dwm to show Brightness, Kbd Light, Volume for 2 seconds, replacing BAT and Date but not Time
 
 # TODO: add slock, others to get Password Lockout on Wake
 
@@ -126,6 +118,9 @@ echo "*****************************************************"
 cd ~
 sudo cp /root/slackware-installer-for-rs/dotfiles/brightness/* /usr/local/bin/
 sudo chmod 755 /usr/local/bin/brightness_*.sh
+
+sudo cp /root/slackware-installer-for-rs/dotfiles/kbd_backlight/* /usr/local/bin/
+sudo chmod 755 /usr/local/bin/kbd_backlight_*.sh
 
 echo "*****************************************************"
 echo "CLIPBOARD                                            "
