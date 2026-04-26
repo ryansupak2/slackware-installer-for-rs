@@ -8,12 +8,17 @@ while true; do
     if [ "$cap" != "N/A" ] && [ "$cap" -le 10 ]; then
         bat_part="${bat_part}(Charge ASAP!) "
     fi
+    wifi_prefix=""
+    wifi_status=$(nmcli radio wifi 2>/dev/null || echo "unknown")
+    if [ "$wifi_status" = "disabled" ]; then
+        wifi_prefix="[WiFi Off - use Fn+F8] "
+    fi
     if [ -f /tmp/status_msg ] && [ $(date +%s) -lt $(cat /tmp/status_end 2>/dev/null || echo 0) ]; then
         msg=$(cat /tmp/status_msg)
-        xsetroot -name "$msg | $(date +'%T')"
+        xsetroot -name "$wifi_prefix$msg | $(date +'%T')"
     else
         rm -f /tmp/status_msg /tmp/status_end
-        xsetroot -name "${bat_part}| $(date +'%a, %d %b %Y | %T')"
+        xsetroot -name "$wifi_prefix${bat_part}| $(date +'%a, %d %b %Y | %T')"
     fi
     sleep 0.1
 done &

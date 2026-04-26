@@ -5,8 +5,6 @@
 
 # TODO: disable Fn + F7-F12
 
-# TODO: add slock, others to get Password Lockout on Wake
-
 # TODO: put Berkeley Mono font in github
 # sudo mkdir -p /usr/local/share/fonts/TTF
 # root@TX-02-YLJR4PM5# cp * /usr/local/share/fonts/TTF
