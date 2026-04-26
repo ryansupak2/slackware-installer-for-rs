@@ -105,6 +105,8 @@ static const Key keys[] = {
 	{ 0,                            XF86XK_AudioLowerVolume, spawn, {.v = (const char*[]){"/usr/local/bin/volume_down.sh", NULL} } },
 	{ 0,                            XF86XK_AudioRaiseVolume, spawn, {.v = (const char*[]){"/usr/local/bin/volume_up.sh", NULL} } },
 	{ 0,                            XF86XK_AudioMute,        spawn, {.v = (const char*[]){"/usr/local/bin/volume_mute.sh", NULL} } },
+	{ 0,                            XF86XK_MonBrightnessDown, spawn, {.v = (const char*[]){"/usr/local/bin/brightness_down.sh", NULL} } },
+	{ 0,                            XF86XK_MonBrightnessUp, spawn, {.v = (const char*[]){"/usr/local/bin/brightness_up.sh", NULL} } },
 };
 
 /* button definitions */
