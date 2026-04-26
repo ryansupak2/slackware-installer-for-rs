@@ -103,6 +103,13 @@ echo "Syncing sbopkg to Repository..."
 sbopkg -r
 
 echo "*****************************************************"
+echo "SCREEN LOCKING                                       "
+echo "*****************************************************"
+
+echo "Installing and Configuring slock..."
+sbopkg -B -i slock
+
+echo "*****************************************************"
 echo "AUDIO/VOLUME					   "
 echo "*****************************************************"
 
