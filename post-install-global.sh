@@ -106,8 +106,11 @@ echo "*****************************************************"
 echo "SCREEN LOCKING                                       "
 echo "*****************************************************"
 
-echo "Installing and Configuring slock..."
-sbopkg -B -i slock
+echo "Configuring xlock..."
+sudo cp dotfiles/lockscreen/lid-close /etc/acpi/events/
+sudo cp dotfiles/lockscreen/lock-screen.sh /usr/local/bin/
+sudo chmod +x /usr/local/bin/lock-screen.sh
+sudo /etc/rc.d/rc.acpid restart
 
 echo "*****************************************************"
 echo "AUDIO/VOLUME					   "
