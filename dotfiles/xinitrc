@@ -8,8 +8,14 @@ while true; do
     if [ "$cap" != "N/A" ] && [ "$cap" -le 10 ]; then
         bat_part="${bat_part}(Charge ASAP!) "
     fi
-    xsetroot -name "${bat_part}| $(date +'%a, %d %b %Y | %T')"
-    sleep 1
+    if [ -f /tmp/status_msg ] && [ $(date +%s) -lt $(cat /tmp/status_end 2>/dev/null || echo 0) ]; then
+        msg=$(cat /tmp/status_msg)
+        xsetroot -name "$msg | $(date +'%T')"
+    else
+        rm -f /tmp/status_msg /tmp/status_end
+        xsetroot -name "${bat_part}| $(date +'%a, %d %b %Y | %T')"
+    fi
+    sleep 0.1
 done &
 
 

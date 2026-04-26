@@ -102,9 +102,9 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_Left,   viewprev,       {0} },
 	{ MODKEY,                       XK_Right,  viewnext,       {0} },
 	{ MODKEY|ShiftMask,             XK_q,      quit,           {0} },
-	{ 0,                            XF86XK_AudioLowerVolume, spawn, {.v = (const char*[]){"amixer", "set", "Master", "10%-", NULL} } },
-	{ 0,                            XF86XK_AudioRaiseVolume, spawn, {.v = (const char*[]){"amixer", "set", "Master", "10%+", NULL} } },
-	{ 0,                            XF86XK_AudioMute,        spawn, {.v = (const char*[]){"amixer", "set", "Master", "toggle", NULL} } },
+	{ 0,                            XF86XK_AudioLowerVolume, spawn, {.v = (const char*[]){"/usr/local/bin/volume_down.sh", NULL} } },
+	{ 0,                            XF86XK_AudioRaiseVolume, spawn, {.v = (const char*[]){"/usr/local/bin/volume_up.sh", NULL} } },
+	{ 0,                            XF86XK_AudioMute,        spawn, {.v = (const char*[]){"/usr/local/bin/volume_mute.sh", NULL} } },
 };
 
 /* button definitions */

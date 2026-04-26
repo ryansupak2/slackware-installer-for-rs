@@ -1,0 +1,10 @@
+#!/bin/sh
+amixer set Master 10%-
+vol=$(amixer get Master | grep -o '[0-9]*%' | head -1)
+muted=$(amixer get Master | grep -o '\[on\]' || echo 'muted')
+if [ "$muted" = "muted" ]; then
+    echo "Volume: $vol (muted)" > /tmp/status_msg
+else
+    echo "Volume: $vol" > /tmp/status_msg
+fi
+echo $(($(date +%s) + 3)) > /tmp/status_end

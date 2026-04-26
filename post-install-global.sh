@@ -6,8 +6,7 @@
 # TODO: alter dwm to control screen brightness with Fn+F5 anf Fn+F6
 # echo 24242 > /sys/class/backlight/intel_backlight/brightness
 #
-# TODO: alter dwm to control audio volume with Fn+F1, Fn+F2, and Fn+F3
-#
+# TODO: alter dwm/add scripts to /usr/local/bin to handle status writes and show
 #
 #
 # TODO: alter dwm to control keyboard brightness with Shift+Fn+F5 and Shift+Fn+F6
@@ -115,6 +114,15 @@ echo "Syncing sbopkg to Repository..."
 sbopkg -r
 
 echo "*****************************************************"
+echo "AUDIO/VOLUME					   "
+echo "*****************************************************"
+
+echo "Copying Volume Scripts..."
+cd ~
+sudo cp /root/slackware_-nstaller-for-rs/dotfiles/volume/* /usr/local/bin/
+sudo chmod 755 /usr/local/bin/volume_*.sh
+
+echo "*****************************************************"
 echo "CLIPBOARD                                            "
 echo "*****************************************************"
 
@@ -175,6 +183,14 @@ echo "*****************************************************"
 
 # echo "Installing Inkscape (this takes a while)..."
 # sbopkg -B -i inkscape
+
+echo "*****************************************************"
+echo "XINITRC                                              "
+echo "*****************************************************"
+
+cd ~
+cp /root/slackware-installer-for-rs/dotfiles/xinitrc /root/.xinitrc
+chmod +x /root/.xinitrc
 
 echo "*****************************************************"
 echo "SUCKLESS DWM/DMENU/ST"
