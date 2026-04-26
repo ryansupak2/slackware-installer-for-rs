@@ -7,6 +7,9 @@
 # echo 24242 > /sys/class/backlight/intel_backlight/brightness
 #
 # TODO: alter dwm to control audio volume with Fn+F1, Fn+F2, and Fn+F3
+#
+#
+#
 # TODO: alter dwm to control keyboard brightness with Shift+Fn+F5 and Shift+Fn+F6
 # echo 0 > /sys/class/leds/tpacpi::kbd_backlight/brightness
 

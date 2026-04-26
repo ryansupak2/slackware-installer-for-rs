@@ -1,5 +1,9 @@
 /* See LICENSE file for copyright and license details. */
 
+#include <X11/XF86keysym.h>
+
+#include <X11/XF86keysym.h>
+
 /* appearance */
 static const unsigned int borderpx  = 1;        /* border pixel of windows */
 static const unsigned int snap      = 32;       /* snap pixel */
@@ -98,6 +102,9 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_Left,   viewprev,       {0} },
 	{ MODKEY,                       XK_Right,  viewnext,       {0} },
 	{ MODKEY|ShiftMask,             XK_q,      quit,           {0} },
+	{ 0,                            XF86XK_AudioLowerVolume, spawn, {.v = (const char*[]){"amixer", "set", "Master", "10%-", NULL} } },
+	{ 0,                            XF86XK_AudioRaiseVolume, spawn, {.v = (const char*[]){"amixer", "set", "Master", "10%+", NULL} } },
+	{ 0,                            XF86XK_AudioMute,        spawn, {.v = (const char*[]){"amixer", "set", "Master", "toggle", NULL} } },
 };
 
 /* button definitions */
