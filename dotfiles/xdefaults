@@ -6,8 +6,8 @@ XLock.mode: blank
 !XLock.mode: life
 !XLock.erasemode: no_fade
 XLock.erasedelay: 400
-XLock.font: *8x16*
-!XLock.font: -b&h-lucida-medium-r-normal-sans-24-*-*-*-*-*-iso8859-1
+!XLock.font: *8x16*
+XLock.font: -b&h-lucida-medium-r-normal-sans-24-*-*-*-*-*-iso8859-1
 !XLock.font: -*-times-*-*-*-*-18-*-*-*-*-*-*-*
 !XLock.background: White
 !XLock.foreground: Black
@@ -22,15 +22,15 @@ XLock.mono: off
 XLock.allowaccess: off
 XLock.vtlock: off
 XLock.allowroot: off
-XLock.description: on
-XLock.echokeys: off
+XLock.description: off
+XLock.echokeys: on
 XLock.enablesaver: on
 XLock.resetsaver: on
 XLock.grabmouse: on
 XLock.install: on
 XLock.mousemotion: off
 XLock.sound: off
-XLock.showdate: on
+XLock.showdate: off
 XLock.timeelapsed: off
 XLock.usefirst: on
 XLock.verbose: off
@@ -38,7 +38,7 @@ XLock.nice: 10
 XLock.lockdelay: 0
 XLock.unlockdelay: 0
 XLock.timeout: 30
-XLock.echokey: ?
+XLock.echokey: *
 
 !XLock.geometry: 64x64
 !XLock.icongeometry: 4x4

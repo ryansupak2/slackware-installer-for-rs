@@ -110,7 +110,6 @@ chmod +x /usr/local/bin/lock-screen.sh
 /etc/rc.d/rc.acpid restart
 
 echo "Configuring xlock preferences..."
-
 cd ~
 cp /root-slackware-installer-for-rs/dotfiles/xdefaults ~/.Xdefaults
 xrdb merge ~/.Xdefaults
