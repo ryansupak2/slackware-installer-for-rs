@@ -3,6 +3,8 @@
 # post-install-global.sh - Global system setup for Slackware installer
 # Run once as root after ISO install.
 
+# TODO: fix audio recording
+
 if [ "$1" = "--help" ]; then
     echo "Usage: ./post-install-global.sh"
     echo "Performs global system setup: installs packages, configures networking/hardware, builds tools."
