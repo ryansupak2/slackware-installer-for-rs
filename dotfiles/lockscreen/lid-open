@@ -1,2 +1,0 @@
-event=button/lid LID open
-action=pkill -f lid-timer.sh

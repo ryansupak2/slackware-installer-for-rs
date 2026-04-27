@@ -102,6 +102,8 @@ echo "Configuring Hardware to Lock on Laptop Reopen..."
 
 cp ~/slackware-installer-for-rs/dotfiles/lockscreen/lid-close /etc/acpi/events/lid-close
 cp ~/slackware-installer-for-rs/dotfiles/lockscreen/lock-screen.sh /usr/local/bin/lock-screen.sh
+cp ~/slackware-installer-for-rs/dotfiles/lockscreen/lid-timer.sh /usr/local/bin/lid-timer.sh
+
 chmod +x /usr/local/bin/lock-screen.sh
 /etc/rc.d/rc.acpid restart
 
