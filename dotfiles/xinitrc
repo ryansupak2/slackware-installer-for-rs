@@ -1,3 +1,5 @@
+prev_kbd_brightness=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || echo 0)
+
 while true; do
     cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo 'N/A')
     bat_part="BAT: ${cap}% "
@@ -12,6 +14,14 @@ while true; do
     wifi_status=$(nmcli radio wifi 2>/dev/null || echo "unknown")
     if [ "$wifi_status" = "disabled" ]; then
         wifi_prefix="[WiFi Off - use Fn+F8] "
+    fi
+    current_kbd=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || echo 0)
+    if [ "$current_kbd" != "$prev_kbd_brightness" ]; then
+        max=$(cat /sys/class/leds/tpacpi::kbd_backlight/max_brightness 2>/dev/null || echo 1)
+        percent=$((current_kbd * 100 / max))
+        echo "Keyboard Brightness: $percent%" > /tmp/status_msg
+        echo $(($(date +%s) + 3)) > /tmp/status_end
+        prev_kbd_brightness=$current_kbd
     fi
     if [ -f /tmp/status_msg ] && [ $(date +%s) -lt $(cat /tmp/status_end 2>/dev/null || echo 0) ]; then
         msg=$(cat /tmp/status_msg)
