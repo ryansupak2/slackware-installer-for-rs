@@ -4,6 +4,7 @@
 # Run once as root after ISO install.
 
 # TODO: fix audio recording
+# TODO: create/use/script non-root user
 
 if [ "$1" = "--help" ]; then
     echo "Usage: ./post-install-global.sh"
