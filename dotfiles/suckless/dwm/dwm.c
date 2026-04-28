@@ -129,6 +129,7 @@ struct Monitor {
 	Monitor *next;
 	Window barwin;
 	const Layout *lt[2];
+	const Layout *taglt[9];
 };
 
 typedef struct {
@@ -398,12 +399,29 @@ arrange(Monitor *m)
 		arrangemon(m);
 }
 
+const Layout *
+getlayout(Monitor *m)
+{
+	unsigned int tagset = m->tagset[m->seltags];
+	if (tagset == TAGMASK)
+		return m->taglt[0];
+	int primary = 0;
+	while (!(tagset & (1 << primary)))
+		primary++;
+	return m->taglt[primary];
+}
+
 void
 arrangemon(Monitor *m)
 {
-	strncpy(m->ltsymbol, m->lt[m->sellt]->symbol, sizeof m->ltsymbol);
-	if (m->lt[m->sellt]->arrange)
-		m->lt[m->sellt]->arrange(m);
+	const Layout *lt = getlayout(m);
+	if (lt->arrange == monocle) {
+		lt->arrange(m);
+	} else {
+		strncpy(m->ltsymbol, lt->symbol, sizeof m->ltsymbol);
+		if (lt->arrange)
+			lt->arrange(m);
+	}
 }
 
 void
@@ -648,6 +666,8 @@ createmon(void)
 	m->topbar = topbar;
 	m->lt[0] = &layouts[0];
 	m->lt[1] = &layouts[1 % LENGTH(layouts)];
+	for (int i = 0; i < LENGTH(tags); i++)
+		m->taglt[i] = &layouts[0];
 	arrangemon(m);
 	return m;
 }
@@ -864,7 +884,7 @@ focusstack(const Arg *arg)
 	}
 	if (c) {
 		focus(c);
-		if (selmon->lt[selmon->sellt]->arrange == monocle) {
+		if (getlayout(selmon)->arrange == monocle) {
 			unsigned int n = 0, current = 0;
 			Client *cc;
 			for (cc = selmon->clients; cc; cc = cc->next)
@@ -880,6 +900,7 @@ focusstack(const Arg *arg)
 					current = n;
 				snprintf(selmon->ltsymbol, sizeof selmon->ltsymbol, "[%d/%d]", current, n);
 			}
+			drawbars();
 		}
 		restack(selmon);
 	}
@@ -1156,6 +1177,7 @@ monocle(Monitor *m)
 	}
 	for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
 		resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
+	// XSync(dpy, False);
 }
 
 void
@@ -1543,15 +1565,29 @@ setfullscreen(Client *c, int fullscreen)
 void
 setlayout(const Arg *arg)
 {
-	if (!arg || !arg->v || arg->v != selmon->lt[selmon->sellt])
+	const Layout *newlt;
+	unsigned int tagset = selmon->tagset[selmon->seltags];
+	int primary = 0;
+	if (tagset != TAGMASK) {
+		while (!(tagset & (1 << primary)))
+			primary++;
+	}
+	if (!arg || !arg->v) {
 		selmon->sellt ^= 1;
-	if (arg && arg->v)
-		selmon->lt[selmon->sellt] = (Layout *)arg->v;
-	strncpy(selmon->ltsymbol, selmon->lt[selmon->sellt]->symbol, sizeof selmon->ltsymbol);
-	if (selmon->sel)
-		arrange(selmon);
-	else
-		drawbar(selmon);
+		newlt = selmon->lt[selmon->sellt];
+	} else {
+		newlt = (Layout *)arg->v;
+		selmon->lt[selmon->sellt] = newlt;
+	}
+	if (tagset == TAGMASK) {
+		for (int i = 0; i < 9; i++)
+			selmon->taglt[i] = newlt;
+	} else {
+		selmon->taglt[primary] = newlt;
+	}
+	strncpy(selmon->ltsymbol, newlt->symbol, sizeof selmon->ltsymbol);
+	arrangemon(selmon);
+	drawbars();
 }
 
 /* arg > 1.0 will set mfact absolutely */
@@ -2093,6 +2129,7 @@ view(const Arg *arg)
 		selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
 	focus(NULL);
 	arrange(selmon);
+	drawbars();
 }
 
 void
