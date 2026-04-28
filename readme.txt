@@ -30,11 +30,11 @@ Overall, here are the steps that will transpire:
 
     - Perform the manual "boot-strapping" steps below. You will have to transcribe them as there is no connection to GitHub on this machine yet to download the files. You will also need a PAT token to get to this repo. The minimum required scopes are 'repo', 'read:org', 'admin:public_key'.
     
-    - Run ~/post-install-global.sh as root.
+    - Run ~/post-install-global.sh as root (automatically copies repo to /usr/local/share, excluding sensitive setup.keys).
     
-    - root user copies the contents of this folder to /usr/local/share so that other users can access it, and copy it to their own /root/ and use it.
-    
-    - Run ~/post-install-user.sh for each user who will actually use the system.
+    - For each user: Root copies setup.keys to ~user/.local/share/opencode/. Then, as the user, run /usr/local/share/slackware-installer-for-rs/post-install-user.sh (prompts for overwrites to prevent data loss).
+
+* SAFETY NOTES: User script prompts Y/N before overwriting files. setup.keys is excluded from shared repo for security—root must pre-copy it to user dirs.
 
 ***********************************************
 * BOOTSTRAPPING                               *
@@ -70,37 +70,30 @@ gh auth login
 
     - Pull the code down to root on the target machine:
 
-cd ~i
+ cd ~
 
-git clone git@github.com:ryansupak2/slackware-installer-for-rs.git
+ git clone git@github.com:ryansupak2/slackware-installer-for-rs.git
 
     - Gather required items and paste them in setup.keys:
 
 WIFI_SSID=MyWifiNetworkName
 WIFI_PASS=MyWifiPassword
 XAI_API_KEY=MyXaiAPIKey
+NORD_TOKEN=YourNordVPNAccessTokenFromWebsite
 
     (Notice that the format is strict: KEY=VALUE with no spaces or bounding quotes, etc...)*
+
+    - For NordVPN with 2FA: Generate an access token from https://nordaccount.com/ (Services > NordVPN > Access Token) and use it for NORD_TOKEN.
 
     - Grant execute permissions for the installer script:
 
 chmod +x /root/slackware-installer-for-rs/post-install-global.sh
 chmod +x /root/slackware-installer-for-rs/post-install-user.sh
 
-    - run the scripts (:
+    - run the scripts:
 
-/root/slackware-installer-for-rs/post-install-global.sh
-/root/slackware-installer-for-rs/post-install-user.sh
-    
-    (Running the User Script is optional for root)
+ /root/slackware-installer-for-rs/post-install-global.sh (run as root; handles /usr/local/share copy).
 
-    - Copy the directory to /usr/local/share
+ For users: As root, cp /root/slackware-installer-for-rs/setup.keys ~user/.local/share/opencode/.
 
-mkdir /usr/local/share
-cp ~/slackware-installer-for-us /usr/local/share
-
-    - Login as other users as needed, copy the directory over from
-      /usr/local/share, and run the User Script for any users that need it
-
-cp /usr/local/share ~
-/root/slackware-installer-for-rs/post-install-user.sh
+ Then, as user: /usr/local/share/slackware-installer-for-rs/post-install-user.sh (interactive prompts for safe overwrites).

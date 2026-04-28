@@ -110,7 +110,7 @@ chmod +x /usr/local/bin/lock-screen.sh
 
 echo "Configuring xlock preferences..."
 cd ~
-cp /root-slackware-installer-for-rs/dotfiles/xdefaults ~/.Xdefaults
+cp /root/slackware-installer-for-rs/dotfiles/xdefaults ~/.Xdefaults
 xrdb merge ~/.Xdefaults
 
 echo "*****************************************************"
@@ -157,7 +157,7 @@ echo "NEOFETCH                                             "
 echo "*****************************************************"
 
 echo "Configuring Neofetch..."
-cp /root/slackware_installer_for_rs/dotfiles/neofetch/* /root/.config/neofetch
+cp /root/slackware-installer-for-rs/dotfiles/neofetch/* /root/.config/neofetch
 
 echo "*****************************************************"
 echo "ADDITIONAL FONTS                                     "
@@ -165,7 +165,7 @@ echo "*****************************************************"
 
 echo "Installing Additional Fonts..."
 mkdir -p /usr/share/fonts/TTF
-cp ~/slackware/installer-for-rs/fonts/BerkeleyMono-*.ttf /usr/share/fonts/TTF/
+cp ~/slackware-installer-for-rs/fonts/BerkeleyMono-*.ttf /usr/share/fonts/TTF/
 fc-cache -fv
 
 echo "*****************************************************"
@@ -173,7 +173,7 @@ echo "GOOGLE CHROME                                        "
 echo "*****************************************************"
 
 echo "Installing Required Utilities..."
-sbokpg -i -B alien
+sbopkg -i -B alien
 
 echo "Installing Browser..."
 cd /root
@@ -181,6 +181,29 @@ wget https//dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 alien -t google-chrome-stable_current_amd64.deb
 rm https//dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 rm google-chrome-stable-147.0.7727.101-x86_64-1_alien.tgz
+
+echo "*****************************************************"
+echo "NORDVPN SETUP                                       "
+echo "*****************************************************"
+
+echo "Installing NordVPN..."
+cd ~
+wget -q https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/nordvpn_3.17.4_amd64.deb
+alien -t nordvpn_3.17.4_amd64.deb
+installpkg nordvpn-3.17.4-1_amd64_alien.txz
+rm nordvpn_3.17.4_amd64.deb nordvpn-3.17.4-1_amd64_alien.txz
+
+# Login (use token for 2FA; token from setup.keys)
+if [ -n "$NORD_TOKEN" ]; then
+    nordvpn login --token "$NORD_TOKEN"
+else
+    echo "NordVPN token not found in setup.keys. Run 'nordvpn login' manually."
+fi
+
+# Connect to a default server (e.g., US)
+nordvpn connect US
+
+echo "NordVPN setup complete."
 
 echo "*****************************************************"
 echo "OPENCODE"
@@ -235,3 +258,4 @@ for tool in dwm dmenu st; do
 done
 
 echo "Global setup complete. Run post-install-user.sh for per-user configs."
+rsync -av --exclude=setup.keys /root/slackware-installer-for-rs/ /usr/local/share/slackware-installer-for-rs/
