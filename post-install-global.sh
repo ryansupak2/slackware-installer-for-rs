@@ -273,8 +273,9 @@ setup_nordvpn() {
 
         # Install NordVPN management script
         mkdir -p /usr/local/bin
-        cp /root/slackware-installer-for-rs/dotfiles/nordvpn-run.sh /usr/local/bin/
+        cp /root/slackware-installer-for-rs/dotfiles/vpn/nordvpn-run.sh /usr/local/bin/
         chmod 755 /usr/local/bin/nordvpn-run.sh
+        cp /root/slackware-installer-for-rs/dotfiles/vpn/rc.nordvpn /etc/rc.d/rc.nordvpn
     fi
 }
 
