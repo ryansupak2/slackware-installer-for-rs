@@ -5,6 +5,16 @@
 
 DEFAULT_COUNTRY="Mexico"
 
+# Ensure NordVPN service is running
+if ! nordvpn status > /dev/null 2>&1; then
+    echo "Starting NordVPN service..."
+    pkill -f nordvpnd || true  # Kill any stale processes
+    rm -f /run/nordvpn.pid     # Remove stale PID file
+    chmod +x /etc/rc.d/rc.nordvpn
+    /etc/rc.d/rc.nordvpn start
+    sleep 2  # Brief wait for service to initialize
+fi
+
 # Function to get VPN status
 get_status() {
     nordvpn status | grep "Status:" | awk '{print $2}'
