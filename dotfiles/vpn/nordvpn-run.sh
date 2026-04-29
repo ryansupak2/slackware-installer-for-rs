@@ -14,7 +14,7 @@ get_status() {
 status=$(get_status)
 
 if [ "$status" = "Connected" ]; then
-    current_country=$(nordvpn status | grep "Country:" | awk '{print $2}')
+    current_country=$(nordvpn status | grep "Country:" | awk '{sub(/^Country: /, ""); print}')
     echo "NordVPN is currently connected to $current_country."
     PS3="Choose an option: "
     options=("Disconnect" "Exit")

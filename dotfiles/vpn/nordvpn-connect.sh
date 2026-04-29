@@ -12,6 +12,12 @@ fi
 
 # Connect to the specified country or default
 country="${1:-Mexico}"
+
+# Handle common country aliases
+case "$country" in
+  "USA"|"usa"|"America"|"america"|"United States"|"united states") country="United_States" ;;
+  # Add more aliases here if needed
+esac
 echo "Connecting to $country..."
 setsid nordvpn connect "$country" >/dev/null 2>&1 &
 sleep 3
