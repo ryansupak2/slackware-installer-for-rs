@@ -45,6 +45,6 @@ done &
 
 echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness
 
-st -e sh -c 'neofetch && echo -e "\nNeed Help? Try typing '\''help'\''" && exec $SHELL' &
+st -e sh -c 'neofetch && echo -e "\nNeed Help? Try the Following: help" && exec $SHELL' &
 
 exec dwm
