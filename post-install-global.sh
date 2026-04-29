@@ -187,11 +187,7 @@ echo "NORDVPN SETUP                                       "
 echo "*****************************************************"
 
 echo "Installing NordVPN..."
-cd ~
-wget -q https://repo.nordvpn.com/deb/nordvpn/debian/pool/main/nordvpn_3.17.4_amd64.deb
-alien -t nordvpn_3.17.4_amd64.deb
-installpkg nordvpn-3.17.4-1_amd64_alien.txz
-rm nordvpn_3.17.4_amd64.deb nordvpn-3.17.4-1_amd64_alien.txz
+sbopkg -B -i nordvpn
 
 # Login (use token for 2FA; token from setup.keys)
 if [ -n "$NORD_TOKEN" ]; then
@@ -204,6 +200,11 @@ fi
 nordvpn connect US
 
 echo "NordVPN setup complete."
+
+# Install NordVPN management script
+mkdir -p /usr/local/bin
+cp /root/slackware-installer-for-rs/dotfiles/nordvpn-run.sh /usr/local/bin/
+chmod 755 /usr/local/bin/nordvpn-run.sh
 
 echo "*****************************************************"
 echo "OPENCODE"
@@ -251,6 +252,10 @@ for tool in dwm dmenu st; do
     # For dwm, also copy the modified dwm.c
     if [ "${tool}" = "dwm" ]; then
         cp -f /root/slackware-installer-for-rs/dotfiles/suckless/dwm/dwm.c dwm.c
+    fi
+    # For dmenu, also copy the modified dmenu_run
+    if [ "${tool}" = "dmenu" ]; then
+        cp -f /root/slackware-installer-for-rs/dotfiles/suckless/dmenu/dmenu_run dmenu_run
     fi
     # Build and install (requires root for 'install' step)
     sudo make clean install
