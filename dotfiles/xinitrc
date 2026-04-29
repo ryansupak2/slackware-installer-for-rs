@@ -1,4 +1,5 @@
 prev_kbd_brightness=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || echo 0)
+vpn_status=""
 
 while true; do
     cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo 'N/A')
@@ -23,12 +24,20 @@ while true; do
         echo $(($(date +%s) + 3)) > /tmp/status_end
         prev_kbd_brightness=$current_kbd
     fi
+    vpn_status=$(cat /tmp/vpn_status 2>/dev/null || echo "")
+    if [ "$(( $(date +%s) % 10 ))" -eq 0 ]; then
+        if nordvpn status 2>/dev/null | grep -q "Status: Connected"; then
+            echo "[VPN] " > /tmp/vpn_status
+        else
+            echo "" > /tmp/vpn_status
+        fi
+    fi
     if [ -f /tmp/status_msg ] && [ $(date +%s) -lt $(cat /tmp/status_end 2>/dev/null || echo 0) ]; then
         msg=$(cat /tmp/status_msg)
-        xsetroot -name "$wifi_prefix$msg | $(date +'%T')"
+        xsetroot -name "$wifi_prefix$vpn_status$msg | $(date +'%T')"
     else
         rm -f /tmp/status_msg /tmp/status_end
-        xsetroot -name "$wifi_prefix${bat_part}| $(date +'%a, %d %b %Y | %T')"
+        xsetroot -name "$wifi_prefix$vpn_status${bat_part}| $(date +'%a, %d %b %Y | %T')"
     fi
     sleep 0.1
 done &

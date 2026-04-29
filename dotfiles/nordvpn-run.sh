@@ -17,6 +17,7 @@ connect_country() {
     nordvpn connect "$country"
     if [ $? -eq 0 ]; then
         echo "Connected successfully."
+        echo "[VPN] " > /tmp/vpn_status
         echo "This Window Will Close in 10 Seconds..."
         sleep 10
         return 0
@@ -32,11 +33,14 @@ disconnect_vpn() {
     nordvpn disconnect
     if [ $? -eq 0 ]; then
         echo "Disconnected successfully."
+        echo "" > /tmp/vpn_status
+        echo "This Window Will Close in 10 Seconds..."
+        sleep 10
     else
         echo "Disconnection failed."
+        echo "This Window Will Close in 10 Seconds..."
+        sleep 10
     fi
-    echo "This Window Will Close in 10 Seconds..."
-    sleep 10
 }
 
 # Main logic
