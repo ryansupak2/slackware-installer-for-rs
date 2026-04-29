@@ -5,7 +5,12 @@
 # Interactive menu by default; use --non-interactive for full run.
 
 # TODO: fix audio recording
-# TODO: create/use/script non-root user
+
+# TODO: fix user issues
+#	- backlight
+#	- chrome
+#	- vpn
+#	- more...
 
 # Argument parsing
 INTERACTIVE=true
