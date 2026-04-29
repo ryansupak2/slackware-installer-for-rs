@@ -17,8 +17,12 @@ connect_country() {
     nordvpn connect "$country"
     if [ $? -eq 0 ]; then
         echo "Connected successfully."
+        echo "This Window Will Close in 10 Seconds..."
+        sleep 10
+        return 0
     else
         echo "Connection failed."
+        return 1
     fi
 }
 
@@ -31,13 +35,16 @@ disconnect_vpn() {
     else
         echo "Disconnection failed."
     fi
+    echo "This Window Will Close in 10 Seconds..."
+    sleep 10
 }
 
 # Main logic
 status=$(get_status)
 
 if [ "$status" = "Connected" ]; then
-    echo "NordVPN is currently connected."
+    current_country=$(nordvpn status | grep "Country:" | awk '{print $2}')
+    echo "NordVPN is currently connected to $current_country."
     PS3="Choose an option: "
     options=("Disconnect" "Exit")
     select opt in "${options[@]}"
@@ -62,28 +69,35 @@ else
         # Argument provided, connect directly
         connect_country "$1"
     else
-        PS3="Choose an option: "
-        options=("Connect to $DEFAULT_COUNTRY" "Connect to Custom Country" "Exit")
-        select opt in "${options[@]}"
-        do
-            case $opt in
-                "Connect to $DEFAULT_COUNTRY")
-                    connect_country "$DEFAULT_COUNTRY"
-                    break
-                    ;;
-                "Connect to Custom Country")
-                    read -p "Enter country name: " country
-                    connect_country "$country"
-                    break
-                    ;;
-                "Exit")
-                    echo "Exiting."
-                    break
-                    ;;
-                *)
-                    echo "Invalid option. Please choose 1, 2, or 3."
-                    ;;
-        esac
+        while true; do
+            PS3="Choose an option: "
+            options=("Connect to $DEFAULT_COUNTRY" "Connect to Custom Country" "Exit")
+            select opt in "${options[@]}"
+            do
+                case $opt in
+                    "Connect to $DEFAULT_COUNTRY")
+                        if connect_country "$DEFAULT_COUNTRY"; then
+                            exit 0
+                        fi
+                        break
+                        ;;
+                    "Connect to Custom Country")
+                        read -p "Enter country name: " country
+                        if connect_country "$country"; then
+                            exit 0
+                        fi
+                        break
+                        ;;
+                    "Exit")
+                        echo "Exiting."
+                        exit 0
+                        ;;
+                    *)
+                        echo "Invalid option. Please choose 1, 2, or 3."
+                        break
+                        ;;
+                esac
+            done
         done
     fi
 fi
