@@ -306,7 +306,7 @@ setup_suckless() {
     mkdir -p ~/suckless
     cd ~/suckless
 
-    for tool in dwm dmenu st; do
+    for tool in dwm st; do
         echo "Installing Suckless ${tool}..."
         git clone https://git.suckless.org/${tool}
         cd ${tool}
@@ -316,10 +316,7 @@ setup_suckless() {
         if [ "${tool}" = "dwm" ]; then
             cp -f /root/slackware-installer-for-rs/dotfiles/suckless/dwm/dwm.c dwm.c
         fi
-        # For dmenu, also copy the modified dmenu_run
-        if [ "${tool}" = "dmenu" ]; then
-            cp -f /root/slackware-installer-for-rs/dotfiles/suckless/dmenu/dmenu_run dmenu_run
-        fi
+
         # Build and install (requires root for 'install' step)
         sudo make clean install
         cd ..
@@ -407,7 +404,7 @@ for section in "${selected[@]}"; do
         "NordVPN") setup_nordvpn ;;
         "OpenCode") setup_opencode ;;
         "Xinitrc") setup_xinitrc ;;
-        "Suckless (dwm/dmenu/st)") setup_suckless ;;
+        "Suckless (dwm/st)") setup_suckless ;;
     esac
 done
 

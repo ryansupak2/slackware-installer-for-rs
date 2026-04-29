@@ -2,6 +2,11 @@ alias vi='vim'
 alias inkscape='inkscape'
 alias op='opencode'
 alias chrome='google-chrome-stable --no-sandbox --force-dark-mode --force-device-scale-factor=1.5'
+alias vpn='/usr/local/bin/nordvpn-run.sh'
+alias audio='alsamixer'
+alias sound='alsamixer'
+alias network='nmtui'
+alias wifi='nmtui'
 
 
 # kbd backlight on low
