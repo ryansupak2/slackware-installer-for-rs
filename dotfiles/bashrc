@@ -7,6 +7,7 @@ alias audio='alsamixer'
 alias sound='alsamixer'
 alias network='nmtui'
 alias wifi='nmtui'
+alias help='/usr/local/bin/help.sh'
 
 
 # kbd backlight on low

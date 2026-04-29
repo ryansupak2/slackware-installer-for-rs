@@ -298,9 +298,19 @@ setup_xinitrc() {
     chmod +x /root/.xinitrc
 }
 
+setup_help() {
+    echo "*****************************************************"
+    echo "HELP SCRIPT"
+    echo "*****************************************************"
+
+    echo "Copying help script..."
+    cp /root/slackware-installer-for-rs/dotfiles/help.sh /usr/local/bin/
+    chmod +x /usr/local/bin/help.sh
+}
+
 setup_suckless() {
     echo "*****************************************************"
-    echo "SUCKLESS DWM/DMENU/ST"
+    echo "SUCKLESS DWM/ST"
     echo "*****************************************************"
 
     mkdir -p ~/suckless
@@ -316,7 +326,6 @@ setup_suckless() {
         if [ "${tool}" = "dwm" ]; then
             cp -f /root/slackware-installer-for-rs/dotfiles/suckless/dwm/dwm.c dwm.c
         fi
-
         # Build and install (requires root for 'install' step)
         sudo make clean install
         cd ..
@@ -404,6 +413,7 @@ for section in "${selected[@]}"; do
         "NordVPN") setup_nordvpn ;;
         "OpenCode") setup_opencode ;;
         "Xinitrc") setup_xinitrc ;;
+        "Help Script") setup_help ;;
         "Suckless (dwm/st)") setup_suckless ;;
     esac
 done

@@ -45,6 +45,6 @@ done &
 
 echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness
 
-st -e sh -c 'neofetch && echo -e "\nSuper + R: Launch Run Menu\nSuper + Shift + Enter: Open New Terminal\nSuper + Arrow Keys: Navigate Tags \nSuper + Shift + C: Close Window\nSuper + Shift + Q: Quit GUI\n(Full list in config.h)" && exec $SHELL' &
+st -e sh -c 'neofetch && echo -e "\nNeed Help? Try typing '\''help'\''" && exec $SHELL' &
 
 exec dwm
