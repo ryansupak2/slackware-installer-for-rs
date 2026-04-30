@@ -224,14 +224,20 @@ setup_chrome() {
     echo "*****************************************************"
 
     echo "Installing Required Utilities..."
-    sbopkg -i -B alien
+    sbopkg -i alien
 
     echo "Installing Browser..."
-    cd /root
-    wget https//dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+    cd /tmp
+    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
     alien -t google-chrome-stable_current_amd64.deb
-    rm https//dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-    rm google-chrome-stable-147.0.7727.101-x86_64-1_alien.tgz
+    installpkg google-chrome-stable-*.tgz
+    rm google-chrome-stable_current_amd64.deb google-chrome-stable-*.tgz
+
+    echo "Installing xdg-desktop-portal-gtk..."
+    sbopkg -i xdg-desktop-portal-gtk
+
+    echo "Installing yad..."
+    sbopkg -i yad
 }
 
 setup_nordvpn() {

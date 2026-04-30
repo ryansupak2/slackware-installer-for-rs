@@ -8,6 +8,7 @@ alias audio='alsamixer'
 alias sound='alsamixer'
 alias network='nmtui'
 alias wifi='nmtui'
+alias yf='yad --file & exit'
 alias help='/usr/local/bin/help.sh'
 alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'
 
