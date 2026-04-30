@@ -243,6 +243,7 @@ setup_nordvpn() {
     sbopkg -b nordvpn
 
     echo "Modifying doinst.sh to avoid hanging restart..."
+    # Comment out the automatic restart in doinst.sh to prevent installation hangs or failures
     PKG_FILE=$(find /tmp -name "nordvpn-*.tgz" | head -1)
     if [ -z "$PKG_FILE" ]; then
         echo "NordVPN package not found. Skipping NordVPN setup."
@@ -275,6 +276,7 @@ setup_nordvpn() {
         mkdir -p /usr/local/bin
         cp /root/slackware-installer-for-rs/dotfiles/vpn/nordvpn-run.sh /usr/local/bin/
         chmod 755 /usr/local/bin/nordvpn-run.sh
+        # Replace the default rc.nordvpn from the NordVPN package with a custom version that uses 'pgrep' for reliable process detection (instead of PID file checks), includes improved error handling (e.g., terminating failed daemon starts and better logging), and ensures better Slackware compatibility.
         cp /root/slackware-installer-for-rs/dotfiles/vpn/rc.nordvpn /etc/rc.d/rc.nordvpn
     fi
 }
