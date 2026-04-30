@@ -47,4 +47,8 @@ echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness
 
 st -e sh -c 'neofetch && echo -e "\nNeed Help? Try the Following: help" && exec $SHELL' &
 
+xmodmap -e "clear lock"
+xmodmap -e "keysym Caps_Lock = Super_L"
+xmodmap -e "add mod4 = Super_L"
+
 exec dwm
