@@ -198,6 +198,20 @@ setup_vim() {
     rm -rf vim
 }
 
+setup_git_lfs() {
+    echo "*****************************************************"
+    echo "GIT LARGE FILE STORAGE (GIT LFS)"
+    echo "*****************************************************"
+
+    echo "Installing Git LFS..."
+    sbopkg -B -i git-lfs
+
+    echo "Setting up Git LFS globally..."
+    git lfs install
+
+    echo "Git LFS setup complete."
+}
+
 setup_neofetch() {
     echo "*****************************************************"
     echo "NEOFETCH                                             "
@@ -394,7 +408,9 @@ setup_suckless() {
 # Interactive menu
 if $INTERACTIVE; then
     echo "Select sections to run (enter numbers separated by commas, or 'all' for everything, 'exit' to quit):"
-    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "Vim Editor" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Lxappearance (GTK theme manager)" "GTK Preferences" "Google Chrome" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
+    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "Vim Editor" "Git LFS" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Lxappearance (GTK theme manager)" "GTK Preferences" "Google Chrome" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
+    all_num=$(( ${#options[@]} + 1 ))
+    exit_num=$(( ${#options[@]} + 2 ))
     selected=()
 
     PS3="Enter your choice (or 'done' to proceed): "
@@ -403,16 +419,16 @@ if $INTERACTIVE; then
         for i in "${!options[@]}"; do
             echo "$((i+1)). ${options[$i]}"
         done
-        echo "17. All"
-        echo "18. Exit"
+        echo "$all_num. All"
+        echo "$exit_num. Exit"
 
         read -p "$PS3" choice
         case $choice in
-            all|All|ALL|17)
+            all|All|ALL|$all_num)
                 selected=("${options[@]}")
                 break
                 ;;
-            exit|Exit|EXIT|18)
+            exit|Exit|EXIT|$exit_num)
                 exit 0
                 ;;
             done|Done|DONE)
@@ -421,17 +437,17 @@ if $INTERACTIVE; then
             [0-9]*,*[0-9]*)
                 IFS=',' read -ra nums <<< "$choice"
                 for num in "${nums[@]}"; do
-                    if [ "$num" = "17" ]; then
+                    if [ "$num" = "$all_num" ]; then
                         selected=("${options[@]}")
                         break 2
-                    elif [ "$num" = "18" ]; then
+                    elif [ "$num" = "$exit_num" ]; then
                         exit 0
                     elif [ $num -ge 1 ] && [ $num -le ${#options[@]} ]; then
                         selected+=("${options[$((num-1))]}")
                     fi
                 done
                 ;;
-        [1-9]|1[0-6])
+        [1-9]|1[0-9]|2[0-0])
             num=$((choice-1))
             selected+=("${options[$num]}")
             break
@@ -466,6 +482,7 @@ for section in "${selected[@]}"; do
         "Brightness") setup_brightness ;;
         "Clipboard (xclip)") setup_clipboard ;;
         "Vim Editor") setup_vim ;;
+        "Git LFS") setup_git_lfs ;;
         "Neofetch") setup_neofetch ;;
         "Additional Fonts") setup_fonts ;;
         "Yad (dialog tool)") setup_yad ;;
