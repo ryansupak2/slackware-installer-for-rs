@@ -218,6 +218,57 @@ setup_fonts() {
     fc-cache -fv
 }
 
+setup_yad() {
+    echo "*****************************************************"
+    echo "YAD (DIALOG TOOL)"
+    echo "*****************************************************"
+
+    echo "Installing yad in batch mode..."
+    sbopkg -B -i yad || echo "Warning: yad install failed"
+}
+
+setup_lxappearance() {
+    echo "*****************************************************"
+    echo "LXAPPEARANCE (GTK THEME MANAGER)"
+    echo "*****************************************************"
+
+    echo "Installing lxappearance in batch mode..."
+    sbopkg -B -i lxappearance || echo "Warning: lxappearance install failed"
+}
+
+setup_gtk_prefs() {
+    echo "*****************************************************"
+    echo "GTK PREFERENCES"
+    echo "*****************************************************"
+
+    echo "Applying GTK preferences after fonts..."
+    # Ensure lxappearance is available (though installed earlier)
+    if ! command -v lxappearance >/dev/null 2>&1; then
+        echo "Error: lxappearance not found, skipping GTK prefs"
+        return 1
+    fi
+    # Copy to /etc/skel for new users
+    mkdir -p /etc/skel/.config/gtk-3.0
+    if [ -f /root/slackware-installer-for-rs/dotfiles/gtk/.gtkrc-2.0 ]; then
+        cp /root/slackware-installer-for-rs/dotfiles/gtk/.gtkrc-2.0 /etc/skel/.gtkrc-2.0
+    else
+        echo "Warning: /root/slackware-installer-for-rs/dotfiles/gtk/.gtkrc-2.0 not found, skipping GTK2 prefs"
+    fi
+    if [ -f /root/slackware-installer-for-rs/dotfiles/gtk/settings.ini ]; then
+        cp /root/slackware-installer-for-rs/dotfiles/gtk/settings.ini /etc/skel/.config/gtk-3.0/settings.ini
+    else
+        echo "Warning: /root/slackware-installer-for-rs/dotfiles/gtk/settings.ini not found, skipping GTK3 prefs"
+    fi
+    # Apply immediately to root (current user)
+    mkdir -p ~/.config/gtk-3.0
+    cp /etc/skel/.gtkrc-2.0 ~/.gtkrc-2.0 2>/dev/null || true
+    cp /etc/skel/.config/gtk-3.0/settings.ini ~/.config/gtk-3.0/settings.ini 2>/dev/null || true
+    # Force GTK to reload settings
+    gtk-query-immodules-2.0 --update-cache 2>/dev/null || true
+    gtk-query-immodules-3.0 --update-cache 2>/dev/null || true
+    echo "GTK preferences applied globally and to root"
+}
+
 setup_chrome() {
     echo "*****************************************************"
     echo "GOOGLE CHROME                                        "
@@ -237,7 +288,7 @@ setup_chrome() {
     sbopkg -i xdg-desktop-portal-gtk
 
     echo "Installing yad..."
-    sbopkg -i yad
+    sbopkg -B -i yad
 }
 
 setup_nordvpn() {
@@ -343,7 +394,7 @@ setup_suckless() {
 # Interactive menu
 if $INTERACTIVE; then
     echo "Select sections to run (enter numbers separated by commas, or 'all' for everything, 'exit' to quit):"
-    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "Vim Editor" "Neofetch" "Additional Fonts" "Google Chrome" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
+    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "Vim Editor" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Lxappearance (GTK theme manager)" "GTK Preferences" "Google Chrome" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
     selected=()
 
     PS3="Enter your choice (or 'done' to proceed): "
@@ -417,6 +468,9 @@ for section in "${selected[@]}"; do
         "Vim Editor") setup_vim ;;
         "Neofetch") setup_neofetch ;;
         "Additional Fonts") setup_fonts ;;
+        "Yad (dialog tool)") setup_yad ;;
+        "Lxappearance (GTK theme manager)") setup_lxappearance ;;
+        "GTK Preferences") setup_gtk_prefs ;;
         "Google Chrome") setup_chrome ;;
         "NordVPN") setup_nordvpn ;;
         "OpenCode") setup_opencode ;;
