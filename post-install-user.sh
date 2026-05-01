@@ -149,8 +149,13 @@ setup_opencode() {
 setup_ssh() {
     echo "Setting up SSH Agent for GitHub..."
     if [ -f "$HOME_TARGET/.ssh/id_ed25519" ]; then
-        echo 'eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519' >> "$HOME_TARGET/.bashrc"
-        echo "SSH agent setup added to $HOME_TARGET/.bashrc"
+        if command -v keychain >/dev/null 2>&1; then
+            echo 'eval `keychain --eval --quiet ~/.ssh/id_ed25519`' >> "$HOME_TARGET/.bashrc"
+            echo "SSH keychain setup added to $HOME_TARGET/.bashrc"
+        else
+            echo 'eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519' >> "$HOME_TARGET/.bashrc"
+            echo "SSH agent setup added to $HOME_TARGET/.bashrc (keychain not available)"
+        fi
     else
         echo "SSH key not found at $HOME_TARGET/.ssh/id_ed25519. Skipping SSH setup."
     fi

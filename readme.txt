@@ -50,9 +50,7 @@ The purpose of this step is to pull down the repo for this installer from Github
 
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "MyPassphrase" -C "MyUser@MyEmail.com"
 
-eval "$(ssh-agent -s)"
-
-ssh-add ~/.ssh/id_ed25519
+eval `keychain --eval ~/.ssh/id_ed25519`
 
     - Install sbopkg and github-cli in that order. (sbopkg is a Slackware package manager, and github-cli allows us to push our SSL key up to github with no web browser):
 
@@ -61,6 +59,8 @@ wget https://github.com/sbopkg/sbopkg/releases/download/0.38.3/sbopkg-0.38.3-noa
 installpkg sbopkg-0.38.3-noarch-1_wsr.tgz
 
 sbopkg -B -i github-cli
+
+sbopkg -B -i keychain
 
     - Run the GitHub login:
 

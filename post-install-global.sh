@@ -241,6 +241,15 @@ setup_yad() {
     sbopkg -B -i yad || echo "Warning: yad install failed"
 }
 
+setup_keychain() {
+    echo "*****************************************************"
+    echo "KEYCHAIN (SSH AGENT MANAGER)"
+    echo "*****************************************************"
+
+    echo "Installing keychain..."
+    sbopkg -B -i keychain || echo "Warning: keychain install failed"
+}
+
 setup_lxappearance() {
     echo "*****************************************************"
     echo "LXAPPEARANCE (GTK THEME MANAGER)"
@@ -408,7 +417,7 @@ setup_suckless() {
 # Interactive menu
 if $INTERACTIVE; then
     echo "Select sections to run (enter numbers separated by commas, or 'all' for everything, 'exit' to quit):"
-    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "Vim Editor" "Git LFS" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Lxappearance (GTK theme manager)" "GTK Preferences" "Google Chrome" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
+    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "Vim Editor" "Git LFS" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Keychain" "Lxappearance (GTK theme manager)" "GTK Preferences" "Google Chrome" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
     all_num=$(( ${#options[@]} + 1 ))
     exit_num=$(( ${#options[@]} + 2 ))
     selected=()
@@ -447,7 +456,7 @@ if $INTERACTIVE; then
                     fi
                 done
                 ;;
-        [1-9]|1[0-9]|2[0-0])
+        [1-9]|1[0-9]|2[0-1])
             num=$((choice-1))
             selected+=("${options[$num]}")
             break
@@ -486,6 +495,7 @@ for section in "${selected[@]}"; do
         "Neofetch") setup_neofetch ;;
         "Additional Fonts") setup_fonts ;;
         "Yad (dialog tool)") setup_yad ;;
+        "Keychain") setup_keychain ;;
         "Lxappearance (GTK theme manager)") setup_lxappearance ;;
         "GTK Preferences") setup_gtk_prefs ;;
         "Google Chrome") setup_chrome ;;
