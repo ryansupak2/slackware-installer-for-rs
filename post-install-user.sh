@@ -146,6 +146,16 @@ setup_opencode() {
     fi
 }
 
+setup_ssh() {
+    echo "Setting up SSH Agent for GitHub..."
+    if [ -f "$HOME_TARGET/.ssh/id_ed25519" ]; then
+        echo 'eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519' >> "$HOME_TARGET/.bashrc"
+        echo "SSH agent setup added to $HOME_TARGET/.bashrc"
+    else
+        echo "SSH key not found at $HOME_TARGET/.ssh/id_ed25519. Skipping SSH setup."
+    fi
+}
+
 setup_startx() {
     echo "Configuring startx..."
     target="$HOME_TARGET/.xinitrc"
@@ -211,7 +221,7 @@ echo "*****************************************************"
 
 # Interactive menu
 if $INTERACTIVE; then
-    options=("Bashrc" "Vim" "OpenCode" "StartX" "Neofetch")
+    options=("Bashrc" "Vim" "OpenCode" "SSH Agent" "StartX" "Neofetch")
     selected=()
 
     PS3="Enter your choice (or 'done' to proceed): "
@@ -276,6 +286,7 @@ for section in "${selected[@]}"; do
         "Bashrc") setup_bashrc ;;
         "Vim") setup_vim ;;
         "OpenCode") setup_opencode ;;
+        "SSH Agent") setup_ssh ;;
         "StartX") setup_startx ;;
         "Neofetch") setup_neofetch ;;
     esac
