@@ -312,6 +312,11 @@ setup_chrome() {
 
     echo "Installing yad..."
     sbopkg -B -i yad
+
+    echo "Copying Chrome wrapper script to fix file picker font..."
+    mkdir -p /usr/local/bin
+    cp /root/slackware-installer-for-rs/dotfiles/chrome/chrome-wrapper.sh /usr/local/bin/
+    chmod +x /usr/local/bin/chrome-wrapper.sh
 }
 
 setup_nordvpn() {
