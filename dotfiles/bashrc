@@ -1,13 +1,11 @@
 alias vi='vim'
 alias inkscape='inkscape & exit'
 alias op='opencode'
-alias chrome='google-chrome-stable --no-sandbox --force-dark-mode --force-device-scale-factor=1.5 & exit'
-alias ch='google-chrome-stable --no-sandbox --force-dark-mode --force-device-scale-factor=1.5 & exit'
-alias chrome-safemode='google-chrome-stable --no-sandbox --force-dark-mode --force-device-scale-factor=1.5 --disable-gpu --use-gl=swiftshader & exit'
+alias chrome='/usr/local/bin/chrome-wrapper.sh & exit'
+alias ch='/usr/local/bin/chrome-wrapper.sh & exit'
 alias files='yad --file & exit'
 alias help='/usr/local/bin/help.sh'
 alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'
-
 
 # kbd backlight on low
 echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness
