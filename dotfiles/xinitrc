@@ -51,4 +51,6 @@ xmodmap -e "clear lock"
 xmodmap -e "keysym Caps_Lock = Super_L"
 xmodmap -e "add mod4 = Super_L"
 
+eval $(dbus-launch --sh-syntax)
+
 exec dwm
