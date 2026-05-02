@@ -450,6 +450,9 @@ setup_llm() {
     cp /root/slackware-installer-for-rs/dotfiles/llm/llm-wrapper.sh /usr/local/bin/llm-wrapper.sh
     chmod +x /usr/local/bin/llm-wrapper.sh
 
+    echo "Copying llm system prompt..."
+    cp /root/slackware-installer-for-rs/dotfiles/llm/llm-system-prompt ~/.llm-system-prompt
+
     echo "LLM setup complete."
 }
 
