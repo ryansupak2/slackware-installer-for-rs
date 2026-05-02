@@ -497,7 +497,7 @@ setup_suckless() {
         if [ "${tool}" = "st" ]; then
             cp /root/slackware-installer-for-rs/dotfiles/suckless/st/st.c st.c
             cp /root/slackware-installer-for-rs/dotfiles/suckless/st/st.h st.h
-            cp /root/slackware-installer-for-rs/dotfiles/suckless/st/config.def.h config.def.h
+            cp /root/suckless/st/config.def.h config.def.h
         fi
         # Build and install (requires root for 'install' step)
         sudo make clean install

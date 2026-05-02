@@ -201,7 +201,31 @@ static Shortcut shortcuts[] = {
 	{ TERMMOD,              XK_Y,           selpaste,       {.i =  0} },
 	{ ShiftMask,            XK_Insert,      selpaste,       {.i =  0} },
 	{ TERMMOD,              XK_Num_Lock,    numlock,        {.i =  0} },
+	{ ShiftMask,            XK_Page_Up,     kscrollup,      {.i = -1} },
+	{ ShiftMask,            XK_Page_Down,   kscrolldown,    {.i = -1} },
+	{ ShiftMask,            XK_Up,          kscrollup,      {.i =  1} },
+	{ ShiftMask,            XK_Down,        kscrolldown,    {.i =  1} },
 };
+
+/*
+ * Selection types' masks.
+ * Use the same masks as usual.
+ * Button1Mask is always unset, to make masks match between ButtonPress.
+ * ButtonRelease and MotionNotify.
+ * If no match is found, regular selection is used.
+ */
+static uint selmasks[] = {
+	[SEL_RECTANGULAR] = Mod1Mask,
+};
+
+/*
+ * Printable characters in ASCII, used to estimate the advance width
+ * of single wide characters.
+ */
+static char ascii_printable[] =
+	" !\"#$%&'()*+,-./0123456789:;<=>?"
+	"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
+	"`abcdefghijklmnopqrstuvwxyz{|}~";
 
 /*
  * Special keys (change & recompile st.info accordingly)
@@ -212,7 +236,7 @@ static Shortcut shortcuts[] = {
  * appkey value:
  * * 0: no value
  * * > 0: keypad application mode enabled
- * *   = 2: term.numlock = 1
+ *   = 2: term.numlock = 1
  * * < 0: keypad application mode disabled
  * appcursor value:
  * * 0: no value
@@ -223,19 +247,16 @@ static Shortcut shortcuts[] = {
  * this table sequentially, so any XK_ANY_MOD must be in the last
  * position for a key.
  */
-
 /*
  * If you want keys other than the X11 function keys (0xFD00 - 0xFFFF)
  * to be mapped below, add them to this array.
  */
 static KeySym mappedkeys[] = { -1 };
-
 /*
  * State bits to ignore when matching key or button events.  By default,
  * numlock (Mod2Mask) and keyboard layout (XK_SWITCH_MOD) are ignored.
  */
 static uint ignoremod = Mod2Mask|XK_SWITCH_MOD;
-
 /*
  * This is the huge key array which defines all compatibility to the Linux
  * world. Please decide about changes wisely.
@@ -453,23 +474,3 @@ static Key key[] = {
 	{ XK_F34,           XK_NO_MOD,      "\033[21;5~",    0,    0},
 	{ XK_F35,           XK_NO_MOD,      "\033[23;5~",    0,    0},
 };
-
-/*
- * Selection types' masks.
- * Use the same masks as usual.
- * Button1Mask is always unset, to make masks match between ButtonPress.
- * ButtonRelease and MotionNotify.
- * If no match is found, regular selection is used.
- */
-static uint selmasks[] = {
-	[SEL_RECTANGULAR] = Mod1Mask,
-};
-
-/*
- * Printable characters in ASCII, used to estimate the advance width
- * of single wide characters.
- */
-static char ascii_printable[] =
-	" !\"#$%&'()*+,-./0123456789:;<=>?"
-	"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
-	"`abcdefghijklmnopqrstuvwxyz{|}~";
