@@ -1,8 +1,7 @@
 alias vi='vim'
 alias inkscape='inkscape & exit'
 alias op='opencode'
-alias chrome='/usr/local/bin/chromium-wrapper.sh & exit'
-alias ch='/usr/local/bin/chromium-wrapper.sh & exit'
+alias web='/usr/local/bin/chromium-wrapper.sh & exit'
 alias files='yad --file & exit'
 alias help='/usr/local/bin/help.sh'
 alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'
@@ -23,3 +22,5 @@ export PATH=/root/.opencode/bin:$PATH
 
 #node (not part of core install)
 export PATH=/usr/local/node/bin:$PATH
+
+alias z='zoxide'
