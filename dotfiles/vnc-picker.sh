@@ -5,8 +5,8 @@
 # Maps server names to host:port and password file paths.
 
 declare -A servers=(
-    ["tv"]="10.0.1.14:5900 $HOME/.vnc/passwd"
-    # Add more: ["name"]="ip:port $HOME/.vnc/other.passwd"
+    ["tv"]="10.0.1.14:5900"
+    # Add more: ["name"]="ip:port"
 )
 
 prompt_creds() {
@@ -20,15 +20,10 @@ if [[ $# -eq 1 ]]; then
     # Direct connect mode
     name="$1"
     if [[ -n "${servers[$name]}" ]]; then
-        details="${servers[$name]}"
-        IFS=' ' read -r host_port passwd_file <<< "$details"
-        if [[ ! -f "$passwd_file" ]]; then
-            echo "Password file not found: $passwd_file"
-            exit 1
-        fi
+        host_port="${servers[$name]}"
         prompt_creds
         echo "Connecting to $name ($host_port)..."
-        vncviewer -passwd "$passwd_file" "$host_port"
+        vncviewer "$host_port"
     else
         echo "Unknown server: $name"
         exit 1
@@ -63,18 +58,11 @@ else
     
 connect_to_server() {
     local name="$1"
-    local details="${servers[$name]}"
-    local host_port passwd_file
-    IFS=' ' read -r host_port passwd_file <<< "$details"
-    
-    if [[ ! -f "$passwd_file" ]]; then
-        echo "Password file not found: $passwd_file"
-        return 1
-    fi
+    local host_port="${servers[$name]}"
     
     prompt_creds
     echo "Connecting to $name ($host_port)..."
-    vncviewer -passwd "$passwd_file" "$host_port"
+    vncviewer "$host_port"
 }
     
     echo "VNC Server Picker"

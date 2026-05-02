@@ -201,14 +201,6 @@ setup_vnc() {
         sbopkg -B -i tigervnc || echo "TigerVNC install failed"
     }
 
-    echo ""
-
-    # Prompt for VNC password and create encrypted file
-    echo "Setting up VNC password..."
-    mkdir -p ~/.vnc
-    vncpasswd ~/.vnc/passwd  # Interactive prompt for password
-    chmod 600 ~/.vnc/passwd
-
     # Copy and install VNC picker script as global command
     echo "Installing VNC picker script..."
     cp /root/slackware-installer-for-rs/dotfiles/vnc-picker.sh /usr/local/bin/vnc-picker.sh
@@ -218,7 +210,7 @@ setup_vnc() {
     echo "Notes:"
     echo "  - Use 'vnc tv' to connect to television-computer, or 'vnc' for server menu."
     echo "  - Use 'vncviewer host:display' to connect manually (e.g., vncviewer 192.168.1.100:5901)."
-    echo "  - Start server: 'vncserver :1' (sets password first with 'vncpasswd')."
+    echo "  - Start server: 'vncserver :1' (sets password with 'vncpasswd' if needed)."
     echo "  - Scan network: 'nmap -p 5900-5909 192.168.1.0/24' or 'avahi-browse -r _rfb._tcp'."
     echo "  - Secure with TLS/passwords; avoid default port exposure."
 }
@@ -258,6 +250,15 @@ setup_neofetch() {
 
     echo "Configuring Neofetch..."
     cp /root/slackware-installer-for-rs/dotfiles/neofetch/* /root/.config/neofetch
+}
+
+setup_zoxide() {
+    echo "*****************************************************"
+    echo "ZOXIDE                                               "
+    echo "*****************************************************"
+
+    echo "Installing zoxide..."
+    sbopkg -B -i zoxide || echo "Warning: zoxide install failed"
 }
 
 setup_fonts() {
@@ -468,57 +469,105 @@ setup_suckless() {
     done
 }
 
+# Category definitions
+system_infra=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup")
+hardware_config=("Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)")
+security_access=("Keychain" "NordVPN")
+dev_tools=("VNC" "Vim Editor" "Git LFS" "OpenCode")
+ui_appearance=("Neofetch" "Additional Fonts" "Yad (dialog tool)" "Lxappearance (GTK theme manager)" "GTK Preferences" "Xinitrc" "Suckless (dwm/dmenu/st)")
+applications=("Chromium")
+utilities=("Help Script" "Zoxide")
+
+categories=("System Infrastructure" "Hardware Configuration" "Security & Access" "Development Tools" "User Interface & Appearance" "Applications" "Utilities")
+
+# Flatten all options for non-interactive and case statement
+options=("${system_infra[@]}" "${hardware_config[@]}" "${security_access[@]}" "${dev_tools[@]}" "${ui_appearance[@]}" "${applications[@]}" "${utilities[@]}")
+
 # Interactive menu
 if $INTERACTIVE; then
-    echo "Select sections to run (enter numbers separated by commas, or 'all' for everything, 'exit' to quit):"
-    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "VNC" "Vim Editor" "Git LFS" "Zoxide" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Keychain" "Lxappearance (GTK theme manager)" "GTK Preferences" "Chromium" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
-    all_num=$(( ${#options[@]} + 1 ))
-    exit_num=$(( ${#options[@]} + 2 ))
+    echo "Select categories and items to run. You can select from multiple categories."
     selected=()
 
-    PS3="Enter your choice (or 'done' to proceed): "
     while true; do
-        echo "Available sections:"
-        for i in "${!options[@]}"; do
-            echo "$((i+1)). ${options[$i]}"
+        echo "Available categories:"
+        for i in "${!categories[@]}"; do
+            echo "$((i+1)). ${categories[$i]}"
         done
-        echo "$all_num. All"
-        echo "$exit_num. Exit"
+        echo "$(( ${#categories[@]} + 1 )). All sections"
+        echo "$(( ${#categories[@]} + 2 )). Exit"
 
-        read -p "$PS3" choice
-        case $choice in
-            all|All|ALL|$all_num)
+        read -p "Enter category number, 'all' for everything, or 'done' to proceed: " cat_choice
+        case $cat_choice in
+            all|All|ALL|$(( ${#categories[@]} + 1 )))
                 selected=("${options[@]}")
                 break
                 ;;
-            exit|Exit|EXIT|$exit_num)
+            exit|Exit|EXIT|$(( ${#categories[@]} + 2 )))
                 exit 0
                 ;;
             done|Done|DONE)
                 break
                 ;;
-            [0-9]*,*[0-9]*)
-                IFS=',' read -ra nums <<< "$choice"
-                for num in "${nums[@]}"; do
-                    if [ "$num" = "$all_num" ]; then
-                        selected=("${options[@]}")
-                        break 2
-                    elif [ "$num" = "$exit_num" ]; then
-                        exit 0
-                    elif [ $num -ge 1 ] && [ $num -le ${#options[@]} ]; then
-                        selected+=("${options[$((num-1))]}")
-                    fi
-                done
+            [1-9]|10)
+                cat_index=$((cat_choice - 1))
+                if [ $cat_index -ge 0 ] && [ $cat_index -lt ${#categories[@]} ]; then
+                    category="${categories[$cat_index]}"
+                    # Get submenu array
+                    case $category in
+                        "System Infrastructure") submenu=("${system_infra[@]}") ;;
+                        "Hardware Configuration") submenu=("${hardware_config[@]}") ;;
+                        "Security & Access") submenu=("${security_access[@]}") ;;
+                        "Development Tools") submenu=("${dev_tools[@]}") ;;
+                        "User Interface & Appearance") submenu=("${ui_appearance[@]}") ;;
+                        "Applications") submenu=("${applications[@]}") ;;
+                        "Utilities") submenu=("${utilities[@]}") ;;
+                    esac
+
+                    echo "Select items in $category (numbers separated by commas, 'all' for category, 'back' to return):"
+                    echo "Available items:"
+                    for i in "${!submenu[@]}"; do
+                        echo "$((i+1)). ${submenu[$i]}"
+                    done
+                    echo "$(( ${#submenu[@]} + 1 )). All in $category"
+                    echo "$(( ${#submenu[@]} + 2 )). Back"
+
+                    read -p "Enter your choice: " item_choice
+                    case $item_choice in
+                        all|All|ALL|$(( ${#submenu[@]} + 1 )))
+                            for item in "${submenu[@]}"; do
+                                selected+=("$item")
+                            done
+                            ;;
+                        back|Back|BACK|$(( ${#submenu[@]} + 2 )))
+                            ;;
+                        [0-9]*,*[0-9]*)
+                            IFS=',' read -ra nums <<< "$item_choice"
+                            for num in "${nums[@]}"; do
+                                if [ $num -ge 1 ] && [ $num -le ${#submenu[@]} ]; then
+                                    selected+=("${submenu[$((num-1))]}")
+                                fi
+                            done
+                            ;;
+                        [1-9]|1[0-9]|2[0-9])
+                            num=$((item_choice-1))
+                            selected+=("${submenu[$num]}")
+                            ;;
+                        *)
+                            echo "Invalid choice. Try again."
+                            ;;
+                    esac
+                else
+                    echo "Invalid category. Try again."
+                fi
                 ;;
-        [1-9]|1[0-9]|2[0-1])
-            num=$((choice-1))
-            selected+=("${options[$num]}")
-            break
-            ;;
             *)
                 echo "Invalid choice. Try again."
                 ;;
         esac
+
+        if [ ${#selected[@]} -gt 0 ]; then
+            echo "Selected so far: ${selected[*]}"
+        fi
     done
 
     if [ ${#selected[@]} -eq 0 ]; then
