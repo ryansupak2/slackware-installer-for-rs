@@ -303,6 +303,18 @@ setup_chromium() {
     installpkg chromium-147.0.7727.116-x86_64-1alien.txz
     rm chromium-147.0.7727.116-x86_64-1alien.txz
 
+    echo "Installing Widevine CDM for DRM support..."
+    cd /tmp
+    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+    ar x google-chrome-stable_current_amd64.deb
+    tar -xf data.tar.xz
+    mkdir -p /usr/lib64/chromium/WidevineCdm/_platform_specific/linux_x64/
+    cp opt/google/chrome/WidevineCdm/_platform_specific/linux_x64/libwidevinecdm.so /usr/lib64/chromium/WidevineCdm/_platform_specific/linux_x64/
+    cp opt/google/chrome/WidevineCdm/manifest.json /usr/lib64/chromium/WidevineCdm/
+    chmod 755 /usr/lib64/chromium/WidevineCdm/_platform_specific/linux_x64/libwidevinecdm.so
+    rm -rf google-chrome-stable_current_amd64.deb data.tar.xz control.tar.xz debian-binary opt
+    echo "Widevine CDM installed."
+
     echo "Installing xdg-desktop-portal-gtk..."
     sbopkg -B -i xdg-desktop-portal-gtk
 
