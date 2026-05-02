@@ -490,6 +490,10 @@ setup_suckless() {
         if [ "${tool}" = "dwm" ]; then
             cp -f /root/slackware-installer-for-rs/dotfiles/suckless/dwm/dwm.c dwm.c
         fi
+        # For st, apply the scrollback patch
+        if [ "${tool}" = "st" ]; then
+            patch -p1 < /root/slackware-installer-for-rs/dotfiles/suckless/st/scrollback_complete.diff
+        fi
         # Build and install (requires root for 'install' step)
         sudo make clean install
         cd ..

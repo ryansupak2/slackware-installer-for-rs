@@ -9,6 +9,7 @@ alias wifi='nmcli device wifi rescan && nmtui'
 alias sound='alsamixer'
 alias vnc='/usr/local/bin/vnc-picker.sh'
 alias llm='/usr/local/bin/llm-wrapper.sh'
+alias vpn='/usr/local/bin/nordvpn-run.sh'
 
 # kbd backlight on low
 echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness
