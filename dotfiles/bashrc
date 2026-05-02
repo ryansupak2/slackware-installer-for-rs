@@ -22,5 +22,3 @@ export PATH=/root/.opencode/bin:$PATH
 
 #node (not part of core install)
 export PATH=/usr/local/node/bin:$PATH
-
-alias z='zoxide'

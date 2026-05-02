@@ -237,23 +237,6 @@ setup_git_lfs() {
     echo "Git LFS setup complete."
 }
 
-setup_zoxide() {
-    echo "*****************************************************"
-    echo "ZOXIDE (SMART CD COMMAND)"
-    echo "*****************************************************"
-
-    echo "Installing zoxide..."
-    sbopkg -B -i zoxide || {
-        echo "sbopkg failed; trying cargo install..."
-        cargo install zoxide --locked || echo "Zoxide install failed"
-    }
-
-    echo "Zoxide installed. Add 'eval \"\$(zoxide init bash)\"' to your ~/.bashrc manually if needed."
-
-    echo "Zoxide setup complete."
-    echo "Usage: 'z dir' to jump to dirs; 'zi' for interactive. Run 'zoxide --help' for more."
-}
-
 setup_neofetch() {
     echo "*****************************************************"
     echo "NEOFETCH                                             "
@@ -548,7 +531,6 @@ for section in "${selected[@]}"; do
         "VNC") setup_vnc ;;
         "Vim Editor") setup_vim ;;
         "Git LFS") setup_git_lfs ;;
-        "Zoxide") setup_zoxide ;;
         "Neofetch") setup_neofetch ;;
         "Additional Fonts") setup_fonts ;;
         "Yad (dialog tool)") setup_yad ;;
