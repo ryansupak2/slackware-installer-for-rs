@@ -1108,6 +1108,7 @@ def chat(
                 except:
                     pass
             click.echo(f"Resuming Session from {formatted_date}:")
+            click.echo("Type /help for help.")
             # Print full conversation history
             for resp in conversation.responses:
                 click.echo(f"\033[33mgrok-4-1-fast>\033[0m {resp.prompt.prompt}")
@@ -1168,18 +1169,18 @@ def chat(
 
     if conversation is None:
         click.echo("Chatting with {}".format(model.model_id))
-        click.echo("Type '!exit' or '!quit' to exit")
-        click.echo("Type '!multi' to enter multiple lines, then '!end' to finish")
-        click.echo("Type '!edit' to open your default editor and modify the prompt")
+        click.echo("Type '/exit' or '/quit' to exit")
+        click.echo("Type '/multi' to enter multiple lines, then '/end' to finish")
+        click.echo("Type '/edit' to open your default editor and modify the prompt")
         click.echo(
-            "Type '!fragment <my_fragment> [<another_fragment> ...]' to insert one or more fragments"
+            "Type '/fragment <my_fragment> [<another_fragment> ...]' to insert one or more fragments"
         )
     in_multi = False
 
     accumulated = []
     accumulated_fragments = []
     accumulated_attachments = []
-    end_token = "!end"
+    end_token = "/end"
     while True:
         prompt = click.prompt("", prompt_suffix=f"\033[33m{model.model_id}>\033[0m " if not in_multi else "")
         fragments = []
@@ -1191,13 +1192,13 @@ def chat(
         if argument_attachments:
             attachments = argument_attachments
             argument_attachments = []
-        if prompt.strip().startswith("!multi"):
+        if prompt.strip().startswith("/multi"):
             in_multi = True
             bits = prompt.strip().split()
             if len(bits) > 1:
-                end_token = "!end {}".format(" ".join(bits[1:]))
+                end_token = "/end {}".format(" ".join(bits[1:]))
             continue
-        if prompt.strip() == "!edit":
+        if prompt.strip() == "/edit":
             edited_prompt = click.edit()
             if edited_prompt is None:
                 click.echo("Editor closed without saving.", err=True)
@@ -1236,8 +1237,18 @@ def chat(
                     prompt = f"{template_prompt}\n{prompt}"
                 else:
                     prompt = template_prompt
-        if prompt.strip() in ("!exit", "!quit"):
+        if prompt.strip() in ("/exit", "/quit"):
             break
+        if prompt.strip() == "/help":
+            click.echo("Available commands:")
+            click.echo("  /usage - Show session pricing")
+            click.echo("  /exit or /quit - Exit the chat")
+            click.echo("  /multi - Enter multiple lines, end with /end")
+            click.echo("  /edit - Open editor to modify prompt")
+            click.echo("  /fragment <frag> - Insert fragments")
+            continue
+        if prompt.strip() == "/usage":
+            prompt = "!usage"
 
         response = conversation.chain(
             prompt,

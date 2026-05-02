@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Type !usage for session pricing."
+echo "Type /help for help."
 # Optional system prompt file
 SYSTEM_FILE="$HOME/.llm-system-prompt"
 EXTRA_ARGS=""
