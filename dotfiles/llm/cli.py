@@ -1094,9 +1094,25 @@ def chat(
         conversation.model = model
         # Announce resuming
         if conversation.responses:
-            first_response = conversation.responses[0]
-            subject = conversation.name or first_response.prompt[:50]
-            click.echo(f"Resuming conversation from {first_response.datetime_utc} - {subject}")
+            from datetime import datetime
+            import subprocess
+            import os
+            db_path = os.path.expanduser("~/.config/io.datasette.llm/logs.db")
+            result = subprocess.run(['sqlite3', db_path, f"SELECT MIN(datetime_utc) FROM responses WHERE conversation_id = '{conversation.id}'"], capture_output=True, text=True)
+            formatted_date = "Unknown Date"
+            if result.returncode == 0 and result.stdout.strip():
+                dt_str = result.stdout.strip()
+                try:
+                    dt = datetime.fromisoformat(dt_str)
+                    formatted_date = dt.strftime("%a, %d %b %Y - %H:%M")
+                except:
+                    pass
+            click.echo(f"Resuming Session from {formatted_date}:")
+            # Print full conversation history
+            for resp in conversation.responses:
+                click.echo(f"\033[33mgrok-4-1-fast>\033[0m {resp.prompt.prompt}")
+                if resp.text:
+                    click.echo(f"{resp.text()}")
 
     if tools_debug:
         conversation.after_call = _debug_tool_call
@@ -1150,13 +1166,14 @@ def chat(
     except FragmentNotFound as ex:
         raise click.ClickException(str(ex))
 
-    click.echo("Chatting with {}".format(model.model_id))
-    click.echo("Type '!exit' or '!quit' to exit")
-    click.echo("Type '!multi' to enter multiple lines, then '!end' to finish")
-    click.echo("Type '!edit' to open your default editor and modify the prompt")
-    click.echo(
-        "Type '!fragment <my_fragment> [<another_fragment> ...]' to insert one or more fragments"
-    )
+    if conversation is None:
+        click.echo("Chatting with {}".format(model.model_id))
+        click.echo("Type '!exit' or '!quit' to exit")
+        click.echo("Type '!multi' to enter multiple lines, then '!end' to finish")
+        click.echo("Type '!edit' to open your default editor and modify the prompt")
+        click.echo(
+            "Type '!fragment <my_fragment> [<another_fragment> ...]' to insert one or more fragments"
+        )
     in_multi = False
 
     accumulated = []
