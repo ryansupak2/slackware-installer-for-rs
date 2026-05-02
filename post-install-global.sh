@@ -92,6 +92,9 @@ setup_input() {
 
     echo "Disabling Touchscreen..."
     cp /root/slackware-installer-for-rs/dotfiles/99-disable-touchscreen.conf /etc/X11/xorg.conf.d/99-disable-touchscreen.conf
+
+    echo "Configuring Touchpad (disable tap-to-click and right-click areas)..."
+    cp /root/slackware-installer-for-rs/dotfiles/70-synaptics.conf /etc/X11/xorg.conf.d/70-synaptics.conf
 }
 
 setup_packaging() {
