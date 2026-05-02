@@ -184,6 +184,31 @@ setup_clipboard() {
     sbopkg -B -i xclip
 }
 
+setup_vnc() {
+    echo "*****************************************************"
+    echo "VNC (VIRTUAL NETWORK COMPUTING)"
+    echo "*****************************************************"
+
+    echo "Installing FLTK (required library for vncviewer GUI)..."
+    slackpkg -batch=on -default_answer=y install fltk || {
+        echo "slackpkg failed; trying sbopkg..."
+        sbopkg -B -i fltk || echo "FLTK install failed"
+    }
+
+    echo "Installing TigerVNC (client and server)..."
+    slackpkg -batch=on -default_answer=y install tigervnc || {
+        echo "slackpkg failed; trying sbopkg..."
+        sbopkg -B -i tigervnc || echo "TigerVNC install failed"
+    }
+
+    echo "VNC setup complete."
+    echo "Notes:"
+    echo "  - Use 'vncviewer host:display' to connect (e.g., vncviewer 192.168.1.100:5901)."
+    echo "  - Start server: 'vncserver :1' (sets password first with 'vncpasswd')."
+    echo "  - Scan network: 'nmap -p 5900-5909 192.168.1.0/24' or 'avahi-browse -r _rfb._tcp'."
+    echo "  - Secure with TLS/passwords; avoid default port exposure."
+}
+
 setup_vim() {
     echo "*****************************************************"
     echo "VI TEXT EDITOR                                       "
@@ -430,7 +455,7 @@ setup_suckless() {
 # Interactive menu
 if $INTERACTIVE; then
     echo "Select sections to run (enter numbers separated by commas, or 'all' for everything, 'exit' to quit):"
-    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "Vim Editor" "Git LFS" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Keychain" "Lxappearance (GTK theme manager)" "GTK Preferences" "Chromium" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
+    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "VNC" "Vim Editor" "Git LFS" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Keychain" "Lxappearance (GTK theme manager)" "GTK Preferences" "Chromium" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
     all_num=$(( ${#options[@]} + 1 ))
     exit_num=$(( ${#options[@]} + 2 ))
     selected=()
@@ -503,6 +528,7 @@ for section in "${selected[@]}"; do
         "Audio/Volume") setup_audio ;;
         "Brightness") setup_brightness ;;
         "Clipboard (xclip)") setup_clipboard ;;
+        "VNC") setup_vnc ;;
         "Vim Editor") setup_vim ;;
         "Git LFS") setup_git_lfs ;;
         "Neofetch") setup_neofetch ;;
