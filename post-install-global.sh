@@ -211,8 +211,8 @@ setup_vnc() {
 
     # Copy and install VNC picker script as global command
     echo "Installing VNC picker script..."
-    cp /root/slackware-installer-for-rs/scripts/vnc-picker.sh /usr/local/bin/vnc
-    chmod +x /usr/local/bin/vnc
+    cp /root/slackware-installer-for-rs/dotfiles/vnc-picker.sh /usr/local/bin/vnc-picker.sh
+    chmod +x /usr/local/bin/vnc-picker.sh
 
     echo "VNC setup complete."
     echo "Notes:"
