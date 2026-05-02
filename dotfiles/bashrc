@@ -8,7 +8,14 @@ alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'
 alias wifi='nmcli device wifi rescan && nmtui'
 alias sound='alsamixer'
 alias vnc='/usr/local/bin/vnc-picker.sh'
-alias llm='/usr/local/bin/llm-wrapper.sh'
+llm() {
+  if [ "$1" = "s" ]; then
+    shift
+    /usr/local/bin/llm-select-chat.sh "$@"
+  else
+    /usr/local/bin/llm-wrapper.sh "$@"
+  fi
+}
 alias vpn='/usr/local/bin/nordvpn-run.sh'
 
 # kbd backlight on low

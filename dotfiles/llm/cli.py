@@ -1092,6 +1092,11 @@ def chat(
     else:
         # Ensure it can see the API key
         conversation.model = model
+        # Announce resuming
+        if conversation.responses:
+            first_response = conversation.responses[0]
+            subject = conversation.name or first_response.prompt[:50]
+            click.echo(f"Resuming conversation from {first_response.datetime_utc} - {subject}")
 
     if tools_debug:
         conversation.after_call = _debug_tool_call

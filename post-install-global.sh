@@ -434,6 +434,9 @@ setup_llm() {
     echo "Installing llm via pip..."
     pip3 install llm
 
+    echo "Installing jq for log parsing..."
+    sbopkg -B -i jq
+
     echo "Copying modified cli.py..."
     cp /root/slackware-installer-for-rs/dotfiles/llm/cli.py /usr/lib64/python3.9/site-packages/llm/cli.py
 
@@ -452,6 +455,14 @@ setup_llm() {
     echo "Copying llm wrapper script..."
     cp /root/slackware-installer-for-rs/dotfiles/llm/llm-wrapper.sh /usr/local/bin/llm-wrapper.sh
     chmod +x /usr/local/bin/llm-wrapper.sh
+
+    echo "Copying llm chat handler script..."
+    cp /root/slackware-installer-for-rs/dotfiles/llm/llm-chat-handler.py /usr/local/bin/llm-chat-handler.py
+    chmod +x /usr/local/bin/llm-chat-handler.py
+
+    echo "Copying llm select chat script..."
+    cp /root/slackware-installer-for-rs/dotfiles/llm/llm-select-chat.sh /usr/local/bin/llm-select-chat.sh
+    chmod +x /usr/local/bin/llm-select-chat.sh
 
     echo "Copying llm system prompt..."
     cp /root/slackware-installer-for-rs/dotfiles/llm/llm-system-prompt ~/.llm-system-prompt
