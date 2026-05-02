@@ -1246,9 +1246,14 @@ def chat(
             click.echo("  /multi - Enter multiple lines, end with /end")
             click.echo("  /edit - Open editor to modify prompt")
             click.echo("  /fragment <frag> - Insert fragments")
+            click.echo("  /sessions - Select and resume chat sessions")
             continue
         if prompt.strip() == "/usage":
             prompt = "!usage"
+        if prompt.strip() == "/sessions":
+            import subprocess
+            subprocess.run(['/usr/local/bin/llm-select-chat.sh'])
+            break
 
         response = conversation.chain(
             prompt,
