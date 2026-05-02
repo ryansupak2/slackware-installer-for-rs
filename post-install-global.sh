@@ -434,6 +434,9 @@ setup_llm() {
     echo "Installing llm via pip..."
     pip3 install llm
 
+    echo "Copying modified cli.py..."
+    cp /root/slackware-installer-for-rs/dotfiles/llm/cli.py /usr/lib64/python3.9/site-packages/llm/cli.py
+
     echo "Installing llm-grok plugin..."
     llm install llm-grok
 
