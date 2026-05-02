@@ -434,6 +434,9 @@ setup_llm() {
     echo "Installing llm via pip..."
     pip3 install llm
 
+    echo "Installing rich for formatting..."
+    pip3 install rich
+
     echo "Installing llm-grok plugin..."
     llm install llm-grok
 
@@ -449,6 +452,10 @@ setup_llm() {
     echo "Copying llm wrapper script..."
     cp /root/slackware-installer-for-rs/dotfiles/llm/llm-wrapper.sh /usr/local/bin/llm-wrapper.sh
     chmod +x /usr/local/bin/llm-wrapper.sh
+
+    echo "Copying llm chat formatter script..."
+    cp /root/slackware-installer-for-rs/dotfiles/llm/llm-chat-formatter.py /usr/local/bin/llm-chat-formatter.py
+    chmod +x /usr/local/bin/llm-chat-formatter.py
 
     echo "LLM setup complete."
 }
