@@ -8,6 +8,7 @@ alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'
 alias wifi='nmcli device wifi rescan && nmtui'
 alias sound='alsamixer'
 alias vnc='/usr/local/bin/vnc-picker.sh'
+alias llm='/usr/local/bin/llm-wrapper.sh'
 
 # kbd backlight on low
 echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness

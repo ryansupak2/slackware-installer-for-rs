@@ -423,6 +423,33 @@ setup_opencode() {
     curl -fsSL https://opencode.ai/install | bash
 }
 
+setup_llm() {
+    echo "*****************************************************"
+    echo "LLM (LANGUAGE MODEL CLI)"
+    echo "*****************************************************"
+
+    echo "Installing llm via pip..."
+    pip3 install llm
+
+    echo "Installing llm-grok plugin..."
+    llm install llm-grok
+
+    echo "Setting up Grok API key..."
+    llm keys set grok --value "$XAI_API_KEY_CHAT"
+
+    echo "Setting default model to grok-4-1-fast..."
+    llm models default grok-4-1-fast
+
+    echo "Copying modified llm_grok plugin..."
+    cp /root/slackware-installer-for-rs/dotfiles/llm/llm_grok.py /usr/lib64/python3.9/site-packages/llm_grok.py
+
+    echo "Copying llm wrapper script..."
+    cp /root/slackware-installer-for-rs/dotfiles/llm/llm-wrapper.sh /usr/local/bin/llm-wrapper.sh
+    chmod +x /usr/local/bin/llm-wrapper.sh
+
+    echo "LLM setup complete."
+}
+
 setup_xinitrc() {
     echo "*****************************************************"
     echo "XINITRC                                              "
@@ -473,7 +500,7 @@ setup_suckless() {
 system_infra=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup")
 hardware_config=("Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)")
 security_access=("Keychain" "NordVPN")
-dev_tools=("VNC" "Vim Editor" "Git LFS" "OpenCode")
+dev_tools=("VNC" "Vim Editor" "Git LFS" "OpenCode" "LLM")
 ui_appearance=("Neofetch" "Additional Fonts" "Yad (dialog tool)" "Lxappearance (GTK theme manager)" "GTK Preferences" "Xinitrc" "Suckless (dwm/dmenu/st)")
 applications=("Chromium")
 utilities=("Help Script" "Zoxide")
@@ -605,6 +632,7 @@ for section in "${selected[@]}"; do
         "Chromium") setup_chromium ;;
         "NordVPN") setup_nordvpn ;;
         "OpenCode") setup_opencode ;;
+        "LLM") setup_llm ;;
         "Xinitrc") setup_xinitrc ;;
         "Help Script") setup_help ;;
         "Suckless (dwm/st)") setup_suckless ;;
