@@ -292,31 +292,27 @@ setup_gtk_prefs() {
     echo "GTK preferences applied globally and to root"
 }
 
-setup_chrome() {
+setup_chromium() {
     echo "*****************************************************"
-    echo "GOOGLE CHROME                                        "
+    echo "CHROMIUM                                             "
     echo "*****************************************************"
-
-    echo "Installing Required Utilities..."
-    sbopkg -i alien
 
     echo "Installing Browser..."
     cd /tmp
-    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-    alien -t google-chrome-stable_current_amd64.deb
-    installpkg google-chrome-stable-*.tgz
-    rm google-chrome-stable_current_amd64.deb google-chrome-stable-*.tgz
+    wget https://slackware.nl/people/alien/slackbuilds/chromium/pkg64/15.0/chromium-147.0.7727.116-x86_64-1alien.txz
+    installpkg chromium-147.0.7727.116-x86_64-1alien.txz
+    rm chromium-147.0.7727.116-x86_64-1alien.txz
 
     echo "Installing xdg-desktop-portal-gtk..."
-    sbopkg -i xdg-desktop-portal-gtk
+    sbopkg -B -i xdg-desktop-portal-gtk
 
     echo "Installing yad..."
     sbopkg -B -i yad
 
-    echo "Copying Chrome wrapper script to fix file picker font..."
+    echo "Copying Chromium wrapper script..."
     mkdir -p /usr/local/bin
-    cp /root/slackware-installer-for-rs/dotfiles/chrome/chrome-wrapper.sh /usr/local/bin/
-    chmod +x /usr/local/bin/chrome-wrapper.sh
+    cp /root/slackware-installer-for-rs/dotfiles/chromium/chromium-wrapper.sh /usr/local/bin/chromium-wrapper.sh
+    chmod +x /usr/local/bin/chromium-wrapper.sh
 }
 
 setup_nordvpn() {
@@ -422,7 +418,7 @@ setup_suckless() {
 # Interactive menu
 if $INTERACTIVE; then
     echo "Select sections to run (enter numbers separated by commas, or 'all' for everything, 'exit' to quit):"
-    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "Vim Editor" "Git LFS" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Keychain" "Lxappearance (GTK theme manager)" "GTK Preferences" "Google Chrome" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
+    options=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup" "Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)" "Vim Editor" "Git LFS" "Neofetch" "Additional Fonts" "Yad (dialog tool)" "Keychain" "Lxappearance (GTK theme manager)" "GTK Preferences" "Chromium" "NordVPN" "OpenCode" "Xinitrc" "Suckless (dwm/dmenu/st)")
     all_num=$(( ${#options[@]} + 1 ))
     exit_num=$(( ${#options[@]} + 2 ))
     selected=()
@@ -503,7 +499,7 @@ for section in "${selected[@]}"; do
         "Keychain") setup_keychain ;;
         "Lxappearance (GTK theme manager)") setup_lxappearance ;;
         "GTK Preferences") setup_gtk_prefs ;;
-        "Google Chrome") setup_chrome ;;
+        "Chromium") setup_chromium ;;
         "NordVPN") setup_nordvpn ;;
         "OpenCode") setup_opencode ;;
         "Xinitrc") setup_xinitrc ;;
