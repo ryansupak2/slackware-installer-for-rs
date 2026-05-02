@@ -201,9 +201,23 @@ setup_vnc() {
         sbopkg -B -i tigervnc || echo "TigerVNC install failed"
     }
 
+    echo ""
+
+    # Prompt for VNC password and create encrypted file
+    echo "Setting up VNC password..."
+    mkdir -p ~/.vnc
+    vncpasswd ~/.vnc/passwd  # Interactive prompt for password
+    chmod 600 ~/.vnc/passwd
+
+    # Copy and install VNC picker script as global command
+    echo "Installing VNC picker script..."
+    cp /root/slackware-installer-for-rs/scripts/vnc-picker.sh /usr/local/bin/vnc
+    chmod +x /usr/local/bin/vnc
+
     echo "VNC setup complete."
     echo "Notes:"
-    echo "  - Use 'vncviewer host:display' to connect (e.g., vncviewer 192.168.1.100:5901)."
+    echo "  - Use 'vnc tv' to connect to television-computer, or 'vnc' for server menu."
+    echo "  - Use 'vncviewer host:display' to connect manually (e.g., vncviewer 192.168.1.100:5901)."
     echo "  - Start server: 'vncserver :1' (sets password first with 'vncpasswd')."
     echo "  - Scan network: 'nmap -p 5900-5909 192.168.1.0/24' or 'avahi-browse -r _rfb._tcp'."
     echo "  - Secure with TLS/passwords; avoid default port exposure."
@@ -416,6 +430,8 @@ setup_xinitrc() {
     cd ~
     cp /root/slackware-installer-for-rs/dotfiles/xinitrc /root/.xinitrc
     chmod +x /root/.xinitrc
+
+    cp /root/slackware-installer-for-rs/dotfiles/bashrc ~/.bashrc
 }
 
 setup_help() {

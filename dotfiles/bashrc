@@ -2,11 +2,12 @@ alias vi='vim'
 alias inkscape='inkscape & exit'
 alias op='opencode'
 alias web='/usr/local/bin/chromium-wrapper.sh & exit'
-alias files='yad --file & exit'
+alias f='yad --file & exit'
 alias help='/usr/local/bin/help.sh'
 alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'
 alias wifi='nmcli device wifi rescan && nmtui'
 alias sound='alsamixer'
+alias vnc='/usr/local/bin/vnc-picker.sh'
 
 # kbd backlight on low
 echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness
