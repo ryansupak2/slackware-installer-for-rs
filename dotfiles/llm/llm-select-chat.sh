@@ -38,6 +38,7 @@ if [ "$SELECTION" = "0" ]; then
       subject: .[0].prompt
     } | select(.id != null and .id != "")) | sort_by(.datetime) | reverse
   ')
+  ALL_CHAT_IDS=($(echo "$ALL_CHATS" | jq -r '.[] .id'))
   count=1
   ALL_CHAT_IDS=()
   while IFS=$'\t' read -r dt subject id; do
