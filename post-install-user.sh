@@ -20,7 +20,7 @@ if [ "$1" = "--help" ]; then
     echo "  $0 --user bob --wheel                     # Create/setup bob with sudo access"
     echo "  $0 --user alice --non-interactive         # Non-interactive setup for alice"
     echo ""
-    echo "Prerequisites: Root must copy setup.keys to ~user/.local/share/opencode/ first."
+    echo "Prerequisites: Run from the slackware-installer-for-rs repo directory."
     exit 0
 fi
 
@@ -75,6 +75,14 @@ setup_user() {
 
 setup_user
 HOME_TARGET=$(eval echo ~$TARGET_USER)
+
+# Auto-copy setup.keys for universal access
+if [ -f "/root/slackware-installer-for-rs/setup.keys" ]; then
+    cp "/root/slackware-installer-for-rs/setup.keys" "$HOME_TARGET/.setup.keys"
+    chmod 600 "$HOME_TARGET/.setup.keys"
+else
+    echo "Warning: setup.keys not found in repo; some setups may fail."
+fi
 
 # Function definitions
 setup_bashrc() {
@@ -220,13 +228,37 @@ setup_neofetch() {
     fi
 }
 
+setup_llm() {
+    echo "Setting up LLM for $TARGET_USER..."
+
+    # Source keys
+    if [ -f "$HOME_TARGET/.setup.keys" ]; then
+        source "$HOME_TARGET/.setup.keys"
+    fi
+
+    # Copy system prompt
+    cp /root/slackware-installer-for-rs/dotfiles/llm/llm-system-prompt "$HOME_TARGET/.llm-system-prompt"
+
+    # Set Grok API key (assumes XAI_API_KEY_CHAT in setup.keys, copied to user)
+    if [ -n "$XAI_API_KEY_CHAT" ]; then
+        su - "$TARGET_USER" -c "llm keys set grok --value '$XAI_API_KEY_CHAT'"
+    else
+        echo "Warning: XAI_API_KEY_CHAT not set; LLM keys not configured."
+    fi
+
+    # Set default model
+    su - "$TARGET_USER" -c "llm models default grok-4-1-fast"
+
+    echo "LLM setup complete for $TARGET_USER."
+}
+
 echo "*****************************************************"
 echo "USER-SPECIFIC SETUP FOR $TARGET_USER"
 echo "*****************************************************"
 
 # Interactive menu
 if $INTERACTIVE; then
-    options=("Bashrc" "Vim" "OpenCode" "SSH Agent" "StartX" "Neofetch")
+    options=("Bashrc" "Vim" "OpenCode" "SSH Agent" "StartX" "Neofetch" "LLM")
     selected=()
 
     PS3="Enter your choice (or 'done' to proceed): "
@@ -263,7 +295,7 @@ if $INTERACTIVE; then
                     fi
                 done
                 ;;
-            [1-5])
+            [1-7])
                 num=$((choice-1))
                 selected+=("${options[$num]}")
                 ;;
@@ -294,10 +326,11 @@ for section in "${selected[@]}"; do
         "SSH Agent") setup_ssh ;;
         "StartX") setup_startx ;;
         "Neofetch") setup_neofetch ;;
+        "LLM") setup_llm ;;
     esac
 done
 
 # Set ownership for user directories (always run)
-chown -R "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.config/opencode" "$HOME_TARGET/.local/share/opencode" "$HOME_TARGET/.config/neofetch"
+chown -R "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.config/opencode" "$HOME_TARGET/.local/share/opencode" "$HOME_TARGET/.config/neofetch" "$HOME_TARGET/.config/io.datasette.llm"
 
 echo "Per-user setup complete for $TARGET_USER."
