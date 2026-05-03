@@ -1270,10 +1270,9 @@ def chat(
         system = None
         argument_system_fragments = []
         for chunk in response:
-            print(chunk, end="")
-            sys.stdout.flush()
+            click.echo(chunk, nl=False)
         response.log_to_db(db)
-        print("")
+        click.echo("")
 
 
 def load_conversation(
