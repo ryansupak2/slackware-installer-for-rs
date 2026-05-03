@@ -1,1 +1,2 @@
-setup.keys
+setup.keys*
+!setup.keys.example
