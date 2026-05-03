@@ -42,7 +42,7 @@ echo "First of all, setting a reasonable Font Size..."
 setfont ter-v32b
 
 echo "Copying rc.font to make font change permanent..."
-cp /root/slackware-installer-for-rs/dotfiles/rc.font /etc/rc.d/rc.font
+cp /root/slackware-installer-for-rs/dotfiles/system/rc.font /etc/rc.d/rc.font
 chmod +x /etc/rc.d/rc.font
 
 echo "Reading Keys from setup.keys..."
@@ -59,10 +59,10 @@ setup_networking() {
     echo "*****************************************************"
 
     echo "Copying Wifi Power Management Settings (to prevent random WiFi dropouts)..."
-    cp /root/slackware-installer-for-rs/dotfiles/wifi-powersave-off.conf /etc/NetworkManager/conf.d/wifi-powersave-off.conf
+    cp /root/slackware-installer-for-rs/dotfiles/configs/wifi-powersave-off.conf /etc/NetworkManager/conf.d/wifi-powersave-off.conf
     chmod 600 /etc/NetworkManager/conf.d/wifi-powersave-off.conf
 
-    cp /root/slackware-installer-for-rs/dotfiles/iwlwifi.conf /etc/modprobe.d/iwlwifi.conf
+    cp /root/slackware-installer-for-rs/dotfiles/configs/iwlwifi.conf /etc/modprobe.d/iwlwifi.conf
     chmod 600 /etc/modprobe.d/iwlwifi.conf
 
     ELILO_PATH="/boot/efi/EFI/Slackware/elilo.conf"
@@ -78,7 +78,7 @@ setup_networking() {
     echo "Setting Permissions for and then Starting Network Manager..."
     chmod +x /etc/rc.d/rc.networkmanager
     /etc/rc.d/rc.networkmanager start
-    cp /root/slackware-installer-for-rs/dotfiles/rc.local /etc/rc.d/rc.local
+    cp /root/slackware-installer-for-rs/dotfiles/system/rc.local /etc/rc.d/rc.local
 
     echo "Configuring WiFi for $WIFI_SSID..."
     nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID"
@@ -91,10 +91,10 @@ setup_input() {
     echo "*****************************************************"
 
     echo "Disabling Touchscreen..."
-    cp /root/slackware-installer-for-rs/dotfiles/99-disable-touchscreen.conf /etc/X11/xorg.conf.d/99-disable-touchscreen.conf
+    cp /root/slackware-installer-for-rs/dotfiles/configs/99-disable-touchscreen.conf /etc/X11/xorg.conf.d/99-disable-touchscreen.conf
 
     echo "Configuring Touchpad (disable tap-to-click and right-click areas)..."
-    cp /root/slackware-installer-for-rs/dotfiles/70-synaptics.conf /etc/X11/xorg.conf.d/70-synaptics.conf
+    cp /root/slackware-installer-for-rs/dotfiles/configs/70-synaptics.conf /etc/X11/xorg.conf.d/70-synaptics.conf
 }
 
 setup_packaging() {
@@ -145,7 +145,7 @@ setup_locking() {
 
     echo "Configuring xlock preferences..."
     cd ~
-    cp /root/slackware-installer-for-rs/dotfiles/xdefaults ~/.Xdefaults
+    cp /root/slackware-installer-for-rs/dotfiles/x11/xdefaults ~/.Xdefaults
     xrdb merge ~/.Xdefaults
 }
 
@@ -206,7 +206,7 @@ setup_vnc() {
 
     # Copy and install VNC picker script as global command
     echo "Installing VNC picker script..."
-    cp /root/slackware-installer-for-rs/dotfiles/vnc-picker.sh /usr/local/bin/vnc-picker.sh
+    cp /root/slackware-installer-for-rs/dotfiles/scripts/vnc-picker.sh /usr/local/bin/vnc-picker.sh
     chmod +x /usr/local/bin/vnc-picker.sh
 
     echo "VNC setup complete."
@@ -476,10 +476,10 @@ setup_xinitrc() {
     echo "*****************************************************"
 
     cd ~
-    cp /root/slackware-installer-for-rs/dotfiles/xinitrc /root/.xinitrc
+    cp /root/slackware-installer-for-rs/dotfiles/x11/xinitrc /root/.xinitrc
     chmod +x /root/.xinitrc
 
-    cp /root/slackware-installer-for-rs/dotfiles/bashrc ~/.bashrc
+    cp /root/slackware-installer-for-rs/dotfiles/shell/bashrc ~/.bashrc
 }
 
 setup_help() {
@@ -488,7 +488,7 @@ setup_help() {
     echo "*****************************************************"
 
     echo "Copying help script..."
-    cp /root/slackware-installer-for-rs/dotfiles/help.sh /usr/local/bin/
+    cp /root/slackware-installer-for-rs/dotfiles/scripts/help.sh /usr/local/bin/
     chmod +x /usr/local/bin/help.sh
 }
 

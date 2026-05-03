@@ -84,14 +84,14 @@ setup_bashrc() {
         if [ -t 0 ]; then
             read -p "Overwrite $target? (y/n): " choice
             case "$choice" in
-                y|Y) cp ./dotfiles/bashrc "$target"; echo "Overwritten $target" ;;
+                y|Y) cp ./dotfiles/shell/bashrc "$target"; echo "Overwritten $target" ;;
                 *) echo "Skipped $target (safety: no overwrite)" ;;
             esac
         else
             echo "Non-interactive mode: Skipped $target (safety: no overwrite)"
         fi
     else
-        cp ./dotfiles/bashrc "$target"
+        cp ./dotfiles/shell/bashrc "$target"
         echo "Copied to $target"
     fi
 }
@@ -107,14 +107,14 @@ setup_vim() {
         if [ -t 0 ]; then
             read -p "Overwrite $target? (y/n): " choice
             case "$choice" in
-                y|Y) cp ./dotfiles/vimrc "$target"; echo "Overwritten $target" ;;
+                y|Y) cp ./dotfiles/editors/vimrc "$target"; echo "Overwritten $target" ;;
                 *) echo "Skipped $target (safety: no overwrite)" ;;
             esac
         else
             echo "Non-interactive mode: Skipped $target (safety: no overwrite)"
         fi
     else
-        cp ./dotfiles/vimrc "$target"
+        cp ./dotfiles/editors/vimrc "$target"
         echo "Copied to $target"
     fi
 }
@@ -168,14 +168,14 @@ setup_startx() {
         if [ -t 0 ]; then
             read -p "Overwrite $target? (y/n): " choice
             case "$choice" in
-                y|Y) cp ./dotfiles/xinitrc "$target"; echo "Overwritten $target" ;;
+                y|Y) cp ./dotfiles/x11/xinitrc "$target"; echo "Overwritten $target" ;;
                 *) echo "Skipped $target (safety: no overwrite)" ;;
             esac
         else
             echo "Non-interactive mode: Skipped $target (safety: no overwrite)"
         fi
     else
-        cp ./dotfiles/xinitrc "$target"
+        cp ./dotfiles/x11/xinitrc "$target"
         echo "Copied to $target"
     fi
 }
