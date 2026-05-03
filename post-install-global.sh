@@ -434,6 +434,9 @@ setup_llm() {
     echo "Installing llm via pip..."
     pip3 install llm
 
+    echo "Installing prompt-toolkit for enhanced prompts..."
+    pip3 install prompt-toolkit
+
     echo "Installing jq for log parsing..."
     sbopkg -B -i jq
 

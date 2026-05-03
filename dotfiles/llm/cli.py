@@ -79,7 +79,9 @@ from typing import cast, Dict, Optional, Iterable, List, Union, Tuple, Type, Any
 import warnings
 import yaml
 
-
+# Use prompt_toolkit for integrated prompts with colors and history
+from prompt_toolkit import PromptSession
+from prompt_toolkit.styles import Style
 
 warnings.simplefilter("ignore", ResourceWarning)
 
@@ -1038,19 +1040,17 @@ def chat(
     """
     Hold an ongoing chat with a model.
     """
-    # Left and right arrow keys to move cursor:
-    if sys.platform != "win32":
-        readline.parse_and_bind("\\e[D: backward-char")
-        readline.parse_and_bind("\\e[C: forward-char")
-        readline.parse_and_bind("\\e[H: beginning-of-line")  # Home key
-        readline.parse_and_bind("\\e[F: end-of-line")        # End key
-    else:
-        readline.parse_and_bind("bind -x '\\e[D: backward-char'")
-        readline.parse_and_bind("bind -x '\\e[C: forward-char'")
+
     log_path = pathlib.Path(database) if database else logs_db_path()
     (log_path.parent).mkdir(parents=True, exist_ok=True)
     db = sqlite_utils.Database(log_path)
     migrate(db)
+
+    # Set up prompt_toolkit session with styled prompt
+    prompt_style = Style.from_dict({
+        'prompt': 'yellow bold',
+    })
+    prompt_session = PromptSession(style=prompt_style)
 
     conversation = None
     if conversation_id or _continue:
@@ -1198,9 +1198,14 @@ def chat(
     end_token = "/end"
     while True:
         if not in_multi:
-            prompt = input(f"\033[33m{model.model_id}>\033[0m ")
+            prompt = prompt_session.prompt(f"{model.model_id}> ")
         else:
-            prompt = input("> ")
+            prompt = prompt_session.prompt("> ")
+        
+        # Skip blank inputs (whitespace-only)
+        if not prompt.strip():
+            continue
+        
         fragments = []
         attachments = []
         if argument_fragments:
