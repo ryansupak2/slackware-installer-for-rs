@@ -169,15 +169,15 @@ def process_fragments_in_chat(
     db: sqlite_utils.Database, prompt: str
 ) -> tuple[str, list[Fragment], list[Attachment]]:
     """
-    Process any !fragment commands in a chat prompt and return the modified prompt plus resolved fragments and attachments.
+    Process any /fragment commands in a chat prompt and return the modified prompt plus resolved fragments and attachments.
     """
     prompt_lines = []
     fragments = []
     attachments = []
     for line in prompt.splitlines():
-        if line.startswith("!fragment "):
+        if line.startswith("/fragment "):
             try:
-                fragment_strs = line.strip().removeprefix("!fragment ").split()
+                fragment_strs = line.strip().removeprefix("/fragment ").split()
                 fragments_and_attachments = resolve_fragments(
                     db, fragments=fragment_strs, allow_attachments=True
                 )
@@ -1115,6 +1115,17 @@ def chat(
                 if resp.text:
                     click.echo(f"{resp.text()}")
 
+    # Set initial window title
+    is_first_message = False
+    if conversation and conversation.responses:
+        # Resuming: use first prompt, do not update title further
+        first_prompt = conversation.responses[0].prompt.prompt
+        print(f"\033]0;llm: {first_prompt}\007", end='', flush=True)
+    else:
+        # Fresh: just "llm:", will update after first message
+        print("\033]0;llm:\007", end='', flush=True)
+        is_first_message = True
+
     if tools_debug:
         conversation.after_call = _debug_tool_call
     if tools_approve:
@@ -1204,7 +1215,7 @@ def chat(
                 click.echo("Editor closed without saving.", err=True)
                 continue
             prompt = edited_prompt.strip()
-        if prompt.strip().startswith("!fragment "):
+        if prompt.strip().startswith("/fragment "):
             prompt, fragments, attachments = process_fragments_in_chat(db, prompt)
 
         if in_multi:
@@ -1238,6 +1249,7 @@ def chat(
                 else:
                     prompt = template_prompt
         if prompt.strip() in ("/exit", "/quit"):
+            print("\033]0;\007", end='', flush=True)
             break
         if prompt.strip() == "/help":
             click.echo("Available commands:")
@@ -1249,9 +1261,10 @@ def chat(
             click.echo("  /sessions - Select and resume chat sessions")
             continue
         if prompt.strip() == "/usage":
-            prompt = "!usage"
+            prompt = "/usage"
         if prompt.strip() == "/sessions":
             import subprocess
+            print("\033]0;\007", end='', flush=True)
             subprocess.run(['/usr/local/bin/llm-select-chat.sh'])
             break
 
@@ -1273,6 +1286,11 @@ def chat(
             click.echo(chunk, nl=False)
         response.log_to_db(db)
         click.echo("")
+
+        # Update window title after first response in fresh conversation
+        if is_first_message and prompt:
+            print(f"\033]0;llm: {prompt}\007", end='', flush=True)
+            is_first_message = False
 
 
 def load_conversation(

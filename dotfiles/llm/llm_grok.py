@@ -281,9 +281,10 @@ class Grok(llm.KeyModel):
 
         conv_id = getattr(conversation, 'id', str(id(conversation)))
 
-        # Check for !usage command
+        # Check for /usage command
+
         prompt_text = prompt.prompt.strip()
-        if prompt_text.startswith('!usage'):
+        if prompt_text.startswith('/usage'):
             totals = session_usage.get(conv_id, {'input': 0, 'output': 0, 'total': 0, 'cost': 0})
             cost_usd = totals['cost'] / 10_000_000_000
             yield f"Session Usage: {totals['input']} input, {totals['output']} output ({totals['total']} total). Cost: ${cost_usd:.6f}"
