@@ -79,6 +79,8 @@ from typing import cast, Dict, Optional, Iterable, List, Union, Tuple, Type, Any
 import warnings
 import yaml
 
+
+
 warnings.simplefilter("ignore", ResourceWarning)
 
 DEFAULT_TEMPLATE = "prompt: "
@@ -1040,6 +1042,8 @@ def chat(
     if sys.platform != "win32":
         readline.parse_and_bind("\\e[D: backward-char")
         readline.parse_and_bind("\\e[C: forward-char")
+        readline.parse_and_bind("\\e[H: beginning-of-line")  # Home key
+        readline.parse_and_bind("\\e[F: end-of-line")        # End key
     else:
         readline.parse_and_bind("bind -x '\\e[D: backward-char'")
         readline.parse_and_bind("bind -x '\\e[C: forward-char'")
@@ -1193,7 +1197,10 @@ def chat(
     accumulated_attachments = []
     end_token = "/end"
     while True:
-        prompt = click.prompt("", prompt_suffix=f"\033[33m{model.model_id}>\033[0m " if not in_multi else "")
+        if not in_multi:
+            prompt = input(f"\033[33m{model.model_id}>\033[0m ")
+        else:
+            prompt = input("> ")
         fragments = []
         attachments = []
         if argument_fragments:
