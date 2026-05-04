@@ -4,8 +4,8 @@
 
 echo "Disconnecting..."
 sudo nordvpn disconnect
-sleep 2  # Allow disconnect to complete before stopping daemon
 if [ $? -eq 0 ]; then
+    sleep 2  # Allow disconnect to complete
     echo "Disconnected successfully."
     sudo /etc/rc.d/rc.nordvpn stop
     sleep 3  # Allow stop to complete fully
