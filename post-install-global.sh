@@ -4,13 +4,8 @@
 # Run once as root after ISO install.
 # Interactive menu by default; use --non-interactive for full run.
 
-# TODO: fix audio recording
-
-# TODO: fix user issues
-#	- backlight
-#	- chrome
-#	- vpn
-#	- more...
+# TODO: separate script for root and user for web
+# TODO: intermittent VPN fix
 
 # Argument parsing
 INTERACTIVE=true
