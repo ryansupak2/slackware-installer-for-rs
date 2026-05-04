@@ -1,1 +1,1 @@
-chromium --password-store=basic --no-sandbox --force-device-scale-factor=1.33
+chromium --password-store=basic --force-device-scale-factor=1.33
