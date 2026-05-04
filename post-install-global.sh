@@ -6,6 +6,7 @@
 
 # TODO: separate script for root and user for web
 # TODO: intermittent VPN fix
+# TODO: st a little less wide than chromium
 
 # Argument parsing
 INTERACTIVE=true
