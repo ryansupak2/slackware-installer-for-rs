@@ -3,11 +3,27 @@
 # Function to monitor D-Bus for initial scan completion
 wait_for_scan() {
     echo "Starting WiFi scan..."
-    python3 -c "
+    if [ "$(id -u)" -eq 0 ]; then
+        nmcli device wifi rescan
+        sleep 5
+        echo "WiFi scan completed"
+    else
+        python3 -c "
 import pydbus
 import time
+import os
+import gi.repository.GLib as GLib
 
-bus = pydbus.SystemBus()
+try:
+    bus = pydbus.SystemBus()
+except GLib.GError as e:
+    if 'LimitsExceeded' in str(e):
+        print('DBus connection limit exceeded, restarting messagebus...')
+        os.system('/etc/rc.d/rc.messagebus restart')
+        time.sleep(2)
+        bus = pydbus.SystemBus()
+    else:
+        raise
 nm = bus.get('org.freedesktop.NetworkManager')
 devices = nm.GetDevices()
 
@@ -43,18 +59,21 @@ if elapsed >= timeout:
 else:
     print('WiFi scan completed successfully')
 "
+    fi
 }
 
 # Ongoing rescan loop (runs while nmtui is open)
 rescan_loop() {
     while pgrep -x nmtui > /dev/null; do
-        nmcli device wifi rescan
+        sudo nmcli device wifi rescan
         sleep 10
     done
 }
 
 # Main flow
+pkill -f nmcli; pkill -f nmtui  # Clean up any hanging processes
 wait_for_scan  # Wait for initial scan via D-Bus
 echo "Launching nmtui..."
 rescan_loop &  # Start background rescans
 nmtui          # Launch nmtui synchronously
+pkill -f nmcli; pkill -f nmtui  # Clean up after exit

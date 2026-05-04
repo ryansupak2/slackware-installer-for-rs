@@ -1,7 +1,11 @@
 alias vi='vim'
 alias inkscape='inkscape & exit'
 alias op='opencode'
-alias web='/usr/local/bin/chromium-wrapper.sh & exit'
+if [ "$EUID" -eq 0 ]; then
+    alias web='/usr/local/bin/chromium-wrapper.sh --no-sandbox & exit'
+else
+    alias web='/usr/local/bin/chromium-wrapper.sh & exit'
+fi
 alias f='yad --file & exit'
 alias help='/usr/local/bin/help.sh'
 alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'

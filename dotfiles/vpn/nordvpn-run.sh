@@ -7,14 +7,14 @@ DEFAULT_COUNTRY="Mexico"
 
 # Function to get VPN status
 get_status() {
-    nordvpn status | grep "Status:" | awk '{print $2}'
+    sudo nordvpn status | grep "Status:" | awk '{print $2}'
 }
 
 # Main logic
 status=$(get_status)
 
 if [ "$status" = "Connected" ]; then
-    current_country=$(nordvpn status | grep "Country:" | awk '{sub(/^Country: /, ""); print}')
+    current_country=$(sudo nordvpn status | grep "Country:" | awk '{sub(/^Country: /, ""); print}')
     echo "NordVPN is currently connected to $current_country."
     PS3="Choose an option: "
     options=("Disconnect" "Exit")
@@ -22,7 +22,7 @@ if [ "$status" = "Connected" ]; then
     do
         case $opt in
             "Disconnect")
-                /usr/local/bin/nordvpn-disconnect.sh
+                sudo /usr/local/bin/nordvpn-disconnect.sh
 
                 break
                 ;;

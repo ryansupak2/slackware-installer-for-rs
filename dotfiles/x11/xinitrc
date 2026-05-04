@@ -12,8 +12,8 @@ while true; do
         bat_part="${bat_part}(Charge ASAP!) "
     fi
     wifi_prefix=""
-    wifi_status=$(nmcli radio wifi 2>/dev/null || echo "unknown")
-    if [ "$wifi_status" = "disabled" ]; then
+    wifi_status=$(rfkill list wlan 2>/dev/null | grep -o "blocked: yes" | head -1 || echo "enabled")
+    if [ "$wifi_status" = "blocked: yes" ]; then
         wifi_prefix="[WiFi Off - use Fn+F8] "
     fi
     current_kbd=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || echo 0)
@@ -24,12 +24,11 @@ while true; do
         echo $(($(date +%s) + 3)) > /tmp/status_end
         prev_kbd_brightness=$current_kbd
     fi
-    vpn_status=$(cat /tmp/vpn_status 2>/dev/null || echo "")
     if [ "$(( $(date +%s) % 10 ))" -eq 0 ]; then
         if nordvpn status 2>/dev/null | grep -q "Status: Connected"; then
-            echo "[VPN] " > /tmp/vpn_status
+            vpn_status="[VPN] "
         else
-            echo "" > /tmp/vpn_status
+            vpn_status=""
         fi
     fi
     if [ -f /tmp/status_msg ] && [ $(date +%s) -lt $(cat /tmp/status_end 2>/dev/null || echo 0) ]; then
@@ -43,7 +42,7 @@ while true; do
 done &
 
 
-echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness
+echo 1 > /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || true
 
 st -e sh -c 'neofetch && echo -e "\nNeed Help? Try the Following: help" && exec $SHELL' &
 

@@ -45,6 +45,10 @@ echo "Copying rc.font to make font change permanent..."
 cp /root/slackware-installer-for-rs/dotfiles/system/rc.font /etc/rc.d/rc.font
 chmod +x /etc/rc.d/rc.font
 
+echo "Configuring DBus connection limits..."
+cp /root/slackware-installer-for-rs/dotfiles/dbus/system-local.conf /etc/dbus-1/system-local.conf
+/etc/rc.d/rc.messagebus restart
+
 echo "Reading Keys from setup.keys..."
 KEY_FILE="/root/slackware-installer-for-rs/setup.keys"
 while IFS='=' read -r key value; do
@@ -230,6 +234,13 @@ setup_vim() {
     make -j$(nproc)
     sudo make install
     rm -rf vim
+
+    echo "Setting up vim config for root..."
+    mkdir -p /root/.vim/swap
+    mkdir -p /root/.vim/backup
+    mkdir -p /root/.vim/undo
+    cp /root/slackware-installer-for-rs/dotfiles/editors/vimrc /root/.vimrc
+    echo "Vim config set up for root."
 }
 
 setup_git_lfs() {
@@ -408,10 +419,14 @@ setup_nordvpn() {
 
         echo "NordVPN setup complete (service starts on demand)."
 
-        # Install NordVPN management script
+        # Install NordVPN management scripts
         mkdir -p /usr/local/bin
         cp /root/slackware-installer-for-rs/dotfiles/vpn/nordvpn-run.sh /usr/local/bin/
         chmod 755 /usr/local/bin/nordvpn-run.sh
+        cp /root/slackware-installer-for-rs/dotfiles/vpn/nordvpn-connect.sh /usr/local/bin/
+        cp /root/slackware-installer-for-rs/dotfiles/vpn/nordvpn-disconnect.sh /usr/local/bin/
+        chgrp wheel /usr/local/bin/nordvpn-connect.sh /usr/local/bin/nordvpn-disconnect.sh
+        chmod 750 /usr/local/bin/nordvpn-connect.sh /usr/local/bin/nordvpn-disconnect.sh
         # Replace the default rc.nordvpn from the NordVPN package with a custom version that uses 'pgrep' for reliable process detection (instead of PID file checks), includes improved error handling (e.g., terminating failed daemon starts and better logging), and ensures better Slackware compatibility.
         cp /root/slackware-installer-for-rs/dotfiles/vpn/rc.nordvpn /etc/rc.d/rc.nordvpn
     fi
@@ -424,6 +439,10 @@ setup_opencode() {
 
     echo "Installing OpenCode..."
     curl -fsSL https://opencode.ai/install | bash
+
+    echo "Setting up OpenCode API key..."
+    mkdir -p ~/.local/state ~/.local/share/opencode
+    echo "{\"xai\": {\"type\": \"api\", \"key\": \"$XAI_API_KEY_CODE\"}}" > ~/.local/share/opencode/auth.json
 }
 
 setup_llm() {
@@ -447,7 +466,9 @@ setup_llm() {
     llm install llm-grok
 
     echo "Setting up Grok API key..."
-    llm keys set grok --value "$XAI_API_KEY_CHAT"
+    mkdir -p /root/.config/io.datasette.llm
+    echo '{"grok": "'$XAI_API_KEY_CHAT'"}' > /root/.config/io.datasette.llm/keys.json
+    chmod 600 /root/.config/io.datasette.llm/keys.json
 
     echo "Setting default model to grok-4-1-fast..."
     llm models default grok-4-1-fast
