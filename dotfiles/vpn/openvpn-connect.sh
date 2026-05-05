@@ -40,6 +40,9 @@ fi
 country_code="$1"
 country_code=$(echo "$country_code" | tr '[:upper:]' '[:lower:]')
 
+country_upper=$(echo "$country_code" | tr '[:lower:]' '[:upper:]')
+dns_ip=$(grep "^${country_upper}:" ./nordvpn-dns-by-country.txt | cut -d: -f2 | xargs)
+
 # Check if already connected
 if "$STATUS_SCRIPT" > /dev/null; then
     echo "VPN is already connected" >&2
@@ -71,6 +74,9 @@ if grep -q "^auth-user-pass" "$temp_config"; then
 else
     echo "Warning: No auth-user-pass directive found in config" >&2
 fi
+
+echo "dhcp-option DNS $dns_ip" >> "$temp_config"
+echo "redirect-gateway ipv6" >> "$temp_config"
 
 # Verify auth file exists
 if [ ! -r "$AUTH_FILE" ]; then

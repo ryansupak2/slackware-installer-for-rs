@@ -433,6 +433,10 @@ setup_openvpn() {
         echo "Warning: /etc/rc.d/rc.openvpn not found. Service not enabled."
     fi
 
+    # Copy VPN files to /usr/local/bin
+    cp /root/slackware-installer-for-rs/dotfiles/vpn/* /usr/local/bin/
+    chmod +x /usr/local/bin/*.sh
+
     echo "OpenVPN setup complete."
 }
 
