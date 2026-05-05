@@ -39,9 +39,9 @@ while true; do
         echo $(($(date +%s) + 3)) > /tmp/status_end
         prev_kbd_brightness=$current_kbd
     fi
-    # Simplified VPN status check: poll directly every 10 seconds
+    # Simplified VPN status check: poll directly every 1 second
     current_time=$(date +%s)
-    if [ $((current_time - last_vpn_check)) -ge 10 ]; then
+    if [ $((current_time - last_vpn_check)) -ge 1 ]; then
         if /usr/local/bin/openvpn-checkconnectionstatus.sh | grep -q "1"; then
             vpn_status="[VPN] "
         else
