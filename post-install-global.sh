@@ -4,7 +4,6 @@
 # Run once as root after ISO install.
 # Interactive menu by default; use --non-interactive for full run.
 
-# TODO: separate script for root and user for web
 # TODO: intermittent VPN fix
 # TODO: st a little less wide than chromium
 
@@ -377,55 +376,64 @@ setup_chromium() {
     chmod +x /usr/local/bin/chromium-wrapper.sh
 }
 
-setup_nordvpn() {
+
+
+setup_openvpn() {
     echo "*****************************************************"
-    echo "NORDVPN SETUP                                       "
+    echo "OPENVPN SETUP                                       "
     echo "*****************************************************"
 
-    echo "Building NordVPN package..."
-    sbopkg -b nordvpn
-
-    echo "Modifying doinst.sh to avoid hanging restart..."
-    # Comment out the automatic restart in doinst.sh to prevent installation hangs or failures
-    PKG_FILE=$(find /tmp -name "nordvpn-*.tgz" | head -1)
-    if [ -z "$PKG_FILE" ]; then
-        echo "NordVPN package not found. Skipping NordVPN setup."
+    # Check if OpenVPN is installed
+    if ! command -v openvpn >/dev/null 2>&1; then
+        echo "OpenVPN not found. Installing..."
+        slackpkg -batch=on -default_answer=y install openvpn || {
+            echo "slackpkg failed; trying sbopkg..."
+            sbopkg -B -i openvpn || {
+                echo "OpenVPN installation failed. Skipping setup."
+                return 1
+            }
+        }
     else
-        mkdir -p /tmp/nordvpn_install
-        cd /tmp/nordvpn_install
-        tar -xzf "$PKG_FILE"
-        sed -i 's|/etc/rc.d/rc.nordvpn restart > /dev/null|# /etc/rc.d/rc.nordvpn restart > /dev/null|' install/doinst.sh
-        tar -czf /tmp/nordvpn-fixed.tgz .
-        cd /
-        rm -rf /tmp/nordvpn_install
-
-        echo "Installing modified NordVPN package..."
-        installpkg /tmp/nordvpn-fixed.tgz
-        rm /tmp/nordvpn-fixed.tgz "$PKG_FILE"
-
-        # Enable NordVPN service (but do not start automatically)
-        chmod +x /etc/rc.d/rc.nordvpn
-
-        # Login (use token for 2FA; token from setup.keys) - service will start when needed
-        if [ -n "$NORD_TOKEN" ]; then
-            nordvpn login --token "$NORD_TOKEN"
-        else
-            echo "NordVPN token not found in setup.keys. Run 'nordvpn login' manually."
-        fi
-
-        echo "NordVPN setup complete (service starts on demand)."
-
-        # Install NordVPN management scripts
-        mkdir -p /usr/local/bin
-        cp /root/slackware-installer-for-rs/dotfiles/vpn/nordvpn-run.sh /usr/local/bin/
-        chmod 755 /usr/local/bin/nordvpn-run.sh
-        cp /root/slackware-installer-for-rs/dotfiles/vpn/nordvpn-connect.sh /usr/local/bin/
-        cp /root/slackware-installer-for-rs/dotfiles/vpn/nordvpn-disconnect.sh /usr/local/bin/
-        chgrp wheel /usr/local/bin/nordvpn-connect.sh /usr/local/bin/nordvpn-disconnect.sh
-        chmod 750 /usr/local/bin/nordvpn-connect.sh /usr/local/bin/nordvpn-disconnect.sh
-        # Replace the default rc.nordvpn from the NordVPN package with a custom version that uses 'pgrep' for reliable process detection (instead of PID file checks), includes improved error handling (e.g., terminating failed daemon starts and better logging), and ensures better Slackware compatibility.
-        cp /root/slackware-installer-for-rs/dotfiles/vpn/rc.nordvpn /etc/rc.d/rc.nordvpn
+        echo "OpenVPN is already installed."
     fi
+
+    # Read credentials from setup.keys
+    if [ -z "$NORD_USER" ] || [ -z "$NORD_PASS" ]; then
+        echo "NORD_USER or NORD_PASS not found in setup.keys. Skipping OpenVPN setup."
+        return 1
+    fi
+
+    echo "Downloading NordVPN OpenVPN configs..."
+    mkdir -p /etc/openvpn/nordvpn
+    cd /etc/openvpn/nordvpn
+    wget -q https://downloads.nordcdn.com/configs/archives/servers/ovpn.zip || {
+        echo "Failed to download ovpn configs. Skipping."
+        return 1
+    }
+    unzip -q ovpn.zip
+    rm ovpn.zip
+
+    # Create auth file
+    echo "$NORD_USER" > auth.txt
+    echo "$NORD_PASS" >> auth.txt
+    chmod 600 auth.txt
+
+    # Modify ovpn files to use auth-user-pass
+    for ovpn in *.ovpn; do
+        if ! grep -q "auth-user-pass" "$ovpn"; then
+            echo "auth-user-pass /etc/openvpn/nordvpn/auth.txt" >> "$ovpn"
+        fi
+    done
+
+    # Enable OpenVPN service if rc script exists
+    if [ -f /etc/rc.d/rc.openvpn ]; then
+        chmod +x /etc/rc.d/rc.openvpn
+        echo "OpenVPN service enabled."
+    else
+        echo "Warning: /etc/rc.d/rc.openvpn not found. Service not enabled."
+    fi
+
+    echo "OpenVPN setup complete."
 }
 
 setup_opencode() {
@@ -545,7 +553,7 @@ setup_suckless() {
 # Category definitions
 system_infra=("Networking and WiFi" "Input Hardware" "Packaging and Security" "Sbopkg Setup")
 hardware_config=("Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)")
-security_access=("Keychain" "NordVPN")
+security_access=("Keychain" "OpenVPN")
 dev_tools=("VNC" "Vim Editor" "Git LFS" "OpenCode" "LLM")
 ui_appearance=("Neofetch" "Additional Fonts" "Yad (dialog tool)" "Lxappearance (GTK theme manager)" "GTK Preferences" "Xinitrc" "Suckless (dwm/dmenu/st)")
 applications=("Chromium")
@@ -673,10 +681,11 @@ for section in "${selected[@]}"; do
         "Additional Fonts") setup_fonts ;;
         "Yad (dialog tool)") setup_yad ;;
         "Keychain") setup_keychain ;;
+        "OpenVPN") setup_openvpn ;;
         "Lxappearance (GTK theme manager)") setup_lxappearance ;;
         "GTK Preferences") setup_gtk_prefs ;;
         "Chromium") setup_chromium ;;
-        "NordVPN") setup_nordvpn ;;
+
         "OpenCode") setup_opencode ;;
         "LLM") setup_llm ;;
         "Xinitrc") setup_xinitrc ;;

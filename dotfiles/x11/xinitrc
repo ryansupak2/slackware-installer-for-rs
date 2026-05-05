@@ -1,11 +1,12 @@
 prev_kbd_brightness=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || echo 0)
 vpn_status=""
+last_vpn_check=0
 
-trap '/usr/local/bin/nordvpn-disconnect.sh' EXIT INT TERM HUP
+trap '/usr/local/bin/openvpn-disconnect.sh' EXIT INT TERM HUP
 
 while true; do
     cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo 'N/A')
-    bat_part="BAT: ${cap}% "
+    bat_part="BAT:${cap}% "
     status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown')
     if [ "$status" = "Charging" ]; then
         bat_part="${bat_part}(Charging) "
@@ -26,13 +27,18 @@ while true; do
         echo $(($(date +%s) + 3)) > /tmp/status_end
         prev_kbd_brightness=$current_kbd
     fi
-    if [ "$(( $(date +%s) % 10 ))" -eq 0 ]; then
-        if nordvpn status 2>/dev/null | grep -q "Status: Connected"; then
+    # Simplified VPN status check: poll directly every 10 seconds
+    current_time=$(date +%s)
+    if [ $((current_time - last_vpn_check)) -ge 10 ]; then
+        if /usr/local/bin/openvpn-checkconnectionstatus.sh | grep -q "1"; then
             vpn_status="[VPN] "
         else
             vpn_status=""
         fi
+        last_vpn_check=$current_time
     fi
+    # Debug logging
+    echo "$(date +%s): vpn_status='$vpn_status'" >> /tmp/vpn_debug
     if [ -f /tmp/status_msg ] && [ $(date +%s) -lt $(cat /tmp/status_end 2>/dev/null || echo 0) ]; then
         msg=$(cat /tmp/status_msg)
         xsetroot -name "$wifi_prefix$vpn_status$msg | $(date +'%T')"
@@ -54,4 +60,4 @@ xmodmap -e "add mod4 = Super_L"
 
 eval $(dbus-launch --sh-syntax)
 
-dwm; /usr/local/bin/nordvpn-disconnect.sh
+dwm; /usr/local/bin/openvpn-disconnect.sh

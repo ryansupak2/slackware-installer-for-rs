@@ -48,24 +48,24 @@ setup_user() {
             else
                 usermod -aG wheel "$TARGET_USER"
                 echo "Added $TARGET_USER to wheel group."
-                usermod -aG nordvpn "$TARGET_USER"
-                echo "Added $TARGET_USER to nordvpn group."
+                usermod -aG openvpn "$TARGET_USER"
+                echo "Added $TARGET_USER to openvpn group."
             fi
         fi
 
-        # Add user to nordvpn group if not already
-        if groups "$TARGET_USER" | grep -q '\bnordvpn\b'; then
-            echo "User already in nordvpn group."
+        # Add user to openvpn group if not already
+        if groups "$TARGET_USER" | grep -q '\bopenvpn\b'; then
+            echo "User already in openvpn group."
         else
-            usermod -aG nordvpn "$TARGET_USER"
-            echo "Added $TARGET_USER to nordvpn group."
+            usermod -aG openvpn "$TARGET_USER"
+            echo "Added $TARGET_USER to openvpn group."
         fi
 
-        # Allow wheel users to run nordvpn and related commands without password
-        if [ ! -f /etc/sudoers.d/nordvpn ]; then
-            cp dotfiles/sudoers/nordvpn /etc/sudoers.d/nordvpn
-            chmod 440 /etc/sudoers.d/nordvpn
-            echo "Configured sudo for NordVPN and related commands."
+        # Allow wheel users to run openvpn and related commands without password
+        if [ ! -f /etc/sudoers.d/openvpn ]; then
+            cp dotfiles/sudoers/openvpn /etc/sudoers.d/openvpn
+            chmod 440 /etc/sudoers.d/openvpn
+            echo "Configured sudo for OpenVPN and related commands."
         fi
     else
         echo "User $TARGET_USER does not exist."
@@ -74,14 +74,14 @@ setup_user() {
             case "$choice" in
                 y|Y)
                     useradd -m "$TARGET_USER"
-                    if $ADD_WHEEL; then 
+                    if $ADD_WHEEL; then
                         usermod -aG wheel "$TARGET_USER"
-                        usermod -aG nordvpn "$TARGET_USER"
-                        echo "Added $TARGET_USER to nordvpn group."
-                        # Allow wheel users to run nordvpn and related commands without password
-                        cp dotfiles/sudoers/nordvpn /etc/sudoers.d/nordvpn
-                        chmod 440 /etc/sudoers.d/nordvpn
-                        echo "Configured sudo for NordVPN and related commands."
+                        usermod -aG openvpn "$TARGET_USER"
+                        echo "Added $TARGET_USER to openvpn group."
+                        # Allow wheel users to run openvpn and related commands without password
+                        cp dotfiles/sudoers/openvpn /etc/sudoers.d/openvpn
+                        chmod 440 /etc/sudoers.d/openvpn
+                        echo "Configured sudo for OpenVPN and related commands."
                     fi
                     passwd "$TARGET_USER"
                     echo "User $TARGET_USER created."
