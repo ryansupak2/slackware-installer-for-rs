@@ -5,14 +5,26 @@ last_vpn_check=0
 trap '/usr/local/bin/openvpn-disconnect.sh' EXIT INT TERM HUP
 
 while true; do
-    cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo 'N/A')
-    bat_part="BAT:${cap}% "
     status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown')
+    capacity=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo '0')
+
+    # Fixed icon
+    icon="ß"
+
+    # Determine indicator based on status
     if [ "$status" = "Charging" ]; then
-        bat_part="${bat_part}(Charging) "
+        indicator="+"
+    elif [ "$status" = "Full" ] || [ "$status" = "Not charging" ]; then
+        indicator="?"
+    else
+        indicator=""  # No indicator for discharging
     fi
-    if [ "$cap" != "N/A" ] && [ "$cap" -le 10 ]; then
-        bat_part="${bat_part}(Charge ASAP!) "
+
+    bat_part="${icon}: ${capacity}%${indicator} "
+
+    # Low Battery Warning: prepend if discharging and <=10%
+    if [ "$capacity" -le 10 ] && [ "$status" = "Discharging" ]; then
+        bat_part="(Low Battery!) ${bat_part}"
     fi
     wifi_prefix=""
     wifi_status=$(rfkill list wlan 2>/dev/null | grep -o "blocked: yes" | head -1 || echo "enabled")
