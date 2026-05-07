@@ -15,7 +15,7 @@ while true; do
     if [ "$status" = "Charging" ]; then
         indicator="+"
     elif [ "$status" = "Full" ] || [ "$status" = "Not charging" ]; then
-        indicator="?"
+        indicator="_"
     else
         indicator=""  # No indicator for discharging
     fi
