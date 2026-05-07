@@ -341,6 +341,23 @@ setup_gtk_prefs() {
     echo "GTK preferences applied globally and to root"
 }
 
+setup_nicotine_plus() {
+    echo "*****************************************************"
+    echo "SOULSEEK CLIENT (NICOTINE+)"
+    echo "*****************************************************"
+
+    echo "Installing required Python dependencies for nicotine+..."
+    pip3 install flit-core installer pyproject-hooks wheel build
+
+    echo "Installing nicotine+ via sbopkg..."
+    sbopkg -B -i nicotine+ || {
+        echo "sbopkg failed; trying pip fallback..."
+        pip3 install nicotine-plus
+    }
+
+    echo "Nicotine+ setup complete. Run 'nicotine' to start the GUI client."
+}
+
 setup_chromium() {
     echo "*****************************************************"
     echo "CHROMIUM                                             "
@@ -560,7 +577,7 @@ hardware_config=("Screen Locking" "Audio/Volume" "Brightness" "Clipboard (xclip)
 security_access=("Keychain" "OpenVPN")
 dev_tools=("VNC" "Vim Editor" "Git LFS" "OpenCode" "LLM")
 ui_appearance=("Neofetch" "Additional Fonts" "Yad (dialog tool)" "Lxappearance (GTK theme manager)" "GTK Preferences" "Xinitrc" "Suckless (dwm/dmenu/st)")
-applications=("Chromium")
+applications=("Chromium" "Soulseek Client (nicotine+)")
 utilities=("Help Script" "Zoxide")
 
 categories=("System Infrastructure" "Hardware Configuration" "Security & Access" "Development Tools" "User Interface & Appearance" "Applications" "Utilities")
@@ -689,6 +706,7 @@ for section in "${selected[@]}"; do
         "Lxappearance (GTK theme manager)") setup_lxappearance ;;
         "GTK Preferences") setup_gtk_prefs ;;
         "Chromium") setup_chromium ;;
+        "Soulseek Client (nicotine+)") setup_nicotine_plus ;;
 
         "OpenCode") setup_opencode ;;
         "LLM") setup_llm ;;

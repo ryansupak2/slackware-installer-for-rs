@@ -8,3 +8,8 @@
 # commands in there
 
 /etc/rc.d/rc.networkmanager start
+
+# Create soulseek-downloads symlink if it doesn't exist
+if [ ! -L /root/soulseek-downloads ]; then
+    ln -s /root/.local/share/nicotine/downloads/ /root/soulseek-downloads
+fi
