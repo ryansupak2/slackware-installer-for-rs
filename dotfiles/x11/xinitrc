@@ -9,15 +9,13 @@ while true; do
     capacity=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo '0')
 
     # Fixed icon
-    icon="ß"
+    icon="BAT"
 
     # Determine indicator based on status
     if [ "$status" = "Charging" ]; then
         indicator="+"
-    elif [ "$status" = "Full" ] || [ "$status" = "Not charging" ]; then
-        indicator="_"
     else
-        indicator=""  # No indicator for discharging
+        indicator=""  # No indicator for other statuses
     fi
 
     bat_part="${icon}: ${capacity}%${indicator} "
