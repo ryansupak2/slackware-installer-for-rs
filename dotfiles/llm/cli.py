@@ -82,6 +82,7 @@ import yaml
 # Use prompt_toolkit for integrated prompts with colors and history
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style
+from prompt_toolkit.formatted_text import ANSI
 
 warnings.simplefilter("ignore", ResourceWarning)
 
@@ -1045,6 +1046,7 @@ def chat(
     (log_path.parent).mkdir(parents=True, exist_ok=True)
     db = sqlite_utils.Database(log_path)
     migrate(db)
+    total_cost = 0.0
 
     # Set up prompt_toolkit session with styled prompt
     prompt_style = Style.from_dict({
@@ -1198,7 +1200,7 @@ def chat(
     end_token = "/end"
     while True:
         if not in_multi:
-            prompt = prompt_session.prompt(f"{model.model_id}> ")
+            prompt = prompt_session.prompt(ANSI(f"\033[33m{model.model_id}\033[0m|\033[32m${total_cost:.2f}\033[0m> "))
         else:
             prompt = prompt_session.prompt("> ")
         
@@ -1297,6 +1299,9 @@ def chat(
         for chunk in response:
             click.echo(chunk, nl=False)
         response.log_to_db(db)
+        # Accumulate cost using xAI API's cost_in_usd_ticks
+        cost_ticks = getattr(response._responses[-1].usage, 'cost_in_usd_ticks', 0) or 0
+        total_cost += cost_ticks / 10_000_000_000.0
         click.echo("")
 
         # Update window title after first response in fresh conversation
