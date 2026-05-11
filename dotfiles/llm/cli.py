@@ -1117,7 +1117,7 @@ def chat(
             click.echo("Type /help for help.")
             # Print full conversation history
             for resp in conversation.responses:
-                click.echo(f"\033[33mgrok-4-1-fast>\033[0m {resp.prompt.prompt}")
+                click.echo(f"\033[33m{model.model_id}>\033[0m {resp.prompt.prompt}")
                 if resp.text:
                     click.echo(f"{resp.text()}")
 
