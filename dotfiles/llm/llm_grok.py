@@ -1,4 +1,6 @@
 import json
+import os
+import sqlite3
 import sys
 import time
 from typing import Optional
@@ -16,6 +18,37 @@ console = Console()
 
 # Session usage tracking: {conversation_id: {'input': int, 'output': int, 'total': int, 'cost': int}}
 session_usage = {}
+
+def get_conversation_usage(db_path, conv_id):
+    """Query DB for total usage in a conversation (input, output, cost)."""
+    if not os.path.exists(db_path):
+        return 0, 0, 0
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        # Sum tokens
+        cursor.execute("""
+            SELECT SUM(input_tokens), SUM(output_tokens)
+            FROM responses
+            WHERE conversation_id = ?
+        """, (conv_id,))
+        token_result = cursor.fetchone()
+        input_total = token_result[0] or 0
+        output_total = token_result[1] or 0
+        # Sum cost from token_details JSON
+        cursor.execute("SELECT token_details FROM responses WHERE conversation_id = ?", (conv_id,))
+        cost_total = 0
+        for row in cursor.fetchall():
+            if row[0]:
+                try:
+                    details = json.loads(row[0])
+                    cost_total += details.get('cost_in_usd_ticks', 0)
+                except json.JSONDecodeError:
+                    pass
+        conn.close()
+        return input_total, output_total, cost_total
+    except sqlite3.Error:
+        return 0, 0, 0  # Fallback on DB error
 
 AVAILABLE_MODELS = [
     "grok-code-fast-1",
@@ -285,9 +318,22 @@ class Grok(llm.KeyModel):
 
         prompt_text = prompt.prompt.strip()
         if prompt_text.startswith('/usage'):
-            totals = session_usage.get(conv_id, {'input': 0, 'output': 0, 'total': 0, 'cost': 0})
-            cost_usd = totals['cost'] / 10_000_000_000
-            yield f"Session Usage: {totals['input']} input, {totals['output']} output ({totals['total']} total). Cost: ${cost_usd:.6f}"
+            # Get session totals
+            session_totals = session_usage.get(conv_id, {'input': 0, 'output': 0, 'total': 0, 'cost': 0})
+            session_input = session_totals['input']
+            session_output = session_totals['output']
+            session_total = session_totals['total']
+            session_cost_usd = session_totals['cost'] / 10_000_000_000
+
+            # Get conversation totals from DB
+            db_path = os.path.expanduser("~/.config/io.datasette.llm/logs.db")
+            conv_input, conv_output, conv_cost_ticks = get_conversation_usage(db_path, conv_id)
+            conv_total = conv_input + conv_output
+            conv_cost_usd = conv_cost_ticks / 10_000_000_000
+
+            # Yield combined output
+            yield f"Session Usage (Current): {session_input} input, {session_output} output ({session_total} total). Cost: ${session_cost_usd:.6f}\n" \
+                  f"Conversation Usage (Total): {conv_input} input, {conv_output} output ({conv_total} total). Cost: ${conv_cost_usd:.6f}"
             return
 
         if not hasattr(prompt, "options") or not isinstance(
@@ -458,6 +504,13 @@ class Grok(llm.KeyModel):
                                 output_text += content.get("text", "")
                     if output_text:
                         yield output_text
+
+                    # Populate response attributes for DB logging
+                    if 'usage' in response_data:
+                        u = response_data['usage']
+                        response.input_tokens = u.get('input_tokens', 0)
+                        response.output_tokens = u.get('output_tokens', 0)
+                        response.token_details = u
 
                     # Accumulate usage
                     if 'usage' in response_data:
