@@ -2,9 +2,9 @@ alias vi='vim'
 alias inkscape='inkscape & exit'
 alias op='opencode'
 if [ "$EUID" -eq 0 ]; then
-    alias web='/usr/local/bin/chromium-wrapper.sh --no-sandbox & exit'
+    alias w='/usr/local/bin/chromium-wrapper.sh --no-sandbox & exit'
 else
-    alias web='/usr/local/bin/chromium-wrapper.sh & exit'
+    alias w='/usr/local/bin/chromium-wrapper.sh & exit'
 fi
 alias f='yad --file & exit'
 alias help='/usr/local/bin/help.sh'
