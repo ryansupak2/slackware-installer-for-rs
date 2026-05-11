@@ -261,13 +261,21 @@ setup_neofetch() {
     cp /root/slackware-installer-for-rs/dotfiles/neofetch/* /root/.config/neofetch
 }
 
-setup_zoxide() {
+
+
+setup_mediainfo() {
     echo "*****************************************************"
-    echo "ZOXIDE                                               "
+    echo "MEDIAINFO                                            "
     echo "*****************************************************"
 
-    echo "Installing zoxide..."
-    sbopkg -B -i zoxide || echo "Warning: zoxide install failed"
+    echo "Installing libzen (mediainfo prerequisite)..."
+    sbopkg -B -i libzen || echo "Warning: libzen install failed"
+
+    echo "Installing libmediainfo..."
+    sbopkg -B -i libmediainfo || echo "Warning: libmediainfo install failed"
+
+    echo "Installing mediainfo..."
+    sbopkg -B -i mediainfo || echo "Warning: mediainfo install failed"
 }
 
 setup_fonts() {
@@ -578,7 +586,7 @@ security_access=("Keychain" "OpenVPN")
 dev_tools=("VNC" "Vim Editor" "Git LFS" "OpenCode" "LLM")
 ui_appearance=("Neofetch" "Additional Fonts" "Yad (dialog tool)" "Lxappearance (GTK theme manager)" "GTK Preferences" "Xinitrc" "Suckless (dwm/dmenu/st)")
 applications=("Chromium" "Soulseek Client (nicotine+)")
-utilities=("Help Script" "Zoxide")
+utilities=("Help Script" "MediaInfo")
 
 categories=("System Infrastructure" "Hardware Configuration" "Security & Access" "Development Tools" "User Interface & Appearance" "Applications" "Utilities")
 
@@ -707,6 +715,7 @@ for section in "${selected[@]}"; do
         "GTK Preferences") setup_gtk_prefs ;;
         "Chromium") setup_chromium ;;
         "Soulseek Client (nicotine+)") setup_nicotine_plus ;;
+        "MediaInfo") setup_mediainfo ;;
 
         "OpenCode") setup_opencode ;;
         "LLM") setup_llm ;;
@@ -715,6 +724,13 @@ for section in "${selected[@]}"; do
         "Suckless (dwm/st)") setup_suckless ;;
     esac
 done
+
+echo "Configuring mc to prevent hangs..."
+mkdir -p "$HOME/.mc"
+cp /usr/local/share/slackware-installer-for-rs/dotfiles/mc/ini "$HOME/.mc/ini"
+cp /usr/local/share/slackware-installer-for-rs/dotfiles/mc/mc.ext "$HOME/.mc/mc.ext"
+cp /usr/local/share/slackware-installer-for-rs/dotfiles/mc/sound.sh /usr/libexec/mc/ext.d/sound.sh
+cp /usr/local/share/slackware-installer-for-rs/dotfiles/mc/video.sh /usr/libexec/mc/ext.d/video.sh
 
 echo "Global setup complete. Run post-install-user.sh for per-user configs."
 rsync -av --exclude=setup.keys /root/slackware-installer-for-rs/ /usr/local/share/slackware-installer-for-rs/
