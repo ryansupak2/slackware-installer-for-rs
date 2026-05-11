@@ -1300,7 +1300,8 @@ def chat(
             click.echo(chunk, nl=False)
         response.log_to_db(db)
         # Accumulate cost using xAI API's cost_in_usd_ticks
-        cost_ticks = getattr(response._responses[-1].usage, 'cost_in_usd_ticks', 0) or 0
+        response_json = response._responses[-1].response_json
+        cost_ticks = response_json.get('usage', {}).get('cost_in_usd_ticks', 0) if response_json else 0
         total_cost += cost_ticks / 10_000_000_000.0
         click.echo("")
 
