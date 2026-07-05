@@ -50,9 +50,8 @@ export GDK_DPI_SCALE=1.5
 
 # Node.js + pi runtime (matches pi installer location)
 export PATH=/usr/local/node-v22.19.0-linux-x64/bin:$PATH
-
-# Auto-heal pi Kitty protocol flags after updates (idempotent, instant)
-/root/Development/slackware-installer-for-rs/lib/patch-pi-kitty-flags.sh 2>/dev/null &
-
 # screen locking: 'lock' works in dwl (wlock) and on TTY (physlock)
 alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (wlock in dwl, physlock on TTY)
+
+# System info on shell start (terminal is fully sized by now)
+neofetch

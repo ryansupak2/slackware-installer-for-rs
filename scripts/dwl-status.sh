@@ -18,19 +18,10 @@ done
 if [ ! -p "$FIFO" ]; then echo "$(date): FATAL - somebar FIFO never appeared" >&2; exit 1; fi
 echo "$(date): FIFO=$FIFO" >&2
 
-NET_STATUS_FILE="/tmp/net_status_$(id -u)"
-
 next_log=0
+next_ping=0
+net_status="DOWN"
 prev_kbd_brightness=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || echo 0)
-vnc_status=""
-last_vnc_check=0
-vpn_status=""
-last_vpn_check=0
-
-# Preserve existing net-watch status (don't blindly force DOWN on restart)
-if [ ! -f "$NET_STATUS_FILE" ]; then
-    echo "DOWN" > "$NET_STATUS_FILE" 2>/dev/null || true
-fi
 
 while true; do
     status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown')
@@ -90,9 +81,16 @@ while true; do
         last_vpn_check=$now
     fi
 
-    # No-internet prefix
+    # Ping check (every 5s, direct, no external process)
+    if [ $((now - next_ping)) -ge 0 ]; then
+        if ping -c1 -W2 1.1.1.1 >/dev/null 2>&1; then
+            net_status="UP"
+        else
+            net_status="DOWN"
+        fi
+        next_ping=$((now + 5))
+    fi
     no_internet_prefix=""
-    net_status=$(cat "$NET_STATUS_FILE" 2>/dev/null || echo "DOWN")
     if [ "$net_status" != "UP" ]; then
         no_internet_prefix="[No Internet] "
     fi
