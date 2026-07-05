@@ -15,7 +15,7 @@ ok=true
 
 # --- 1. Set mirror (MUST be first — slackpkg needs a mirror to reach) ---
 echo "Setting slackpkg mirror..."
-sed -i 's|^#http://mirrors.slackware.com/slackware/slackware64-15.0/|http://mirrors.slackware.com/slackware/slackware64-15.0/|' /etc/slackpkg/mirrors || ok=false
+sed -i 's|^# https://mirrors.slackware.com/slackware/slackware64-15.0/|https://mirrors.slackware.com/slackware/slackware64-15.0/|' /etc/slackpkg/mirrors || ok=false
 
 # --- 2. Update slackpkg ---
 if $ok; then

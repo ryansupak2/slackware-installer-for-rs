@@ -70,13 +70,6 @@ else
     echo "Warning: $KEY_FILE not found. No keys loaded."
 fi
 
-# Set timezone to Chicago (America/Chicago)
-if [ -f /usr/share/zoneinfo/America/Chicago ]; then
-    ln -sf /usr/share/zoneinfo/America/Chicago /etc/localtime
-    hwclock --hctosys 2>/dev/null || true
-    echo "Timezone set to America/Chicago"
-fi
-
 # Global counters for FINAL SUMMARY (tracking Core, Networking, Hardware, and others)
 success_count=0
 error_count=0
@@ -215,248 +208,248 @@ for section in "${selected[@]}"; do
     case $section in
         "slackpkg-setup")
             if ./steps/slackpkg-setup.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "console-font")
             if ./steps/console-font.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "ca-certificates")
             if ./steps/ca-certificates.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "wayland-base")
             if ./steps/wayland-base.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "wifi")
             if ./steps/wifi.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "openvpn")
             if ./steps/openvpn.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "vnc")
             if ./steps/vnc.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "remote-desktop")
             if ./steps/remote-desktop.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "input-hardware")
             if ./steps/input-hardware.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "screen-locking")
             if ./steps/screen-locking.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "audio-volume")
             if ./steps/audio-volume.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "brightness")
             if ./steps/brightness.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "clipboard-wayland")
             if ./steps/clipboard-wayland.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "acpi-wakeup")
             if ./steps/acpi-wakeup.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "vim")
             if ./steps/vim.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "git-lfs")
             if ./steps/git-lfs.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "neofetch")
             if ./steps/neofetch.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "additional-fonts")
             if ./steps/additional-fonts.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "root-ssh-key")
             if ./steps/root-ssh-key.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "keychain")
             if ./steps/keychain.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "github-ssh")
             if ./steps/github-ssh.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "firefox")
             firefox_ran=true
             if ./steps/firefox.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "inkscape")
             if ./steps/inkscape.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "yad")
             if ./steps/yad.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "root-shortcuts")
             if ./steps/user-surf-shortcuts.sh root; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "slskd")
             if ./steps/slskd.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "sox")
             if ./steps/sox.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "midnight-commander")
             if ./steps/midnight-commander.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "wifi-manager")
             if ./steps/wifi-manager.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "net-watch")
             if ./steps/net-watch.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "htop")
             if ./steps/htop.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "tmux")
             if ./steps/tmux.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "help")
             if ./steps/help.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "suckless-dwl")
             if ./steps/suckless-dwl.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
         "suckless-foot")
             if ./steps/suckless-foot.sh; then
-                success_count=$((success_count + 1))
+                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
-                error_count=$((error_count + 1))
+                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
     esac

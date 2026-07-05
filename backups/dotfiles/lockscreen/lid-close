@@ -1,2 +1,0 @@
-event=button/lid LID close
-action=/usr/local/bin/lock-screen.sh & /usr/local/bin/lid-timer.sh &

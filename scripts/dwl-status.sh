@@ -11,9 +11,11 @@ exec 2>>"$LOG"
 echo "$(date): dwl-status started (PID $$)" >&2
 
 # Wait for somebar to create its FIFO
-while [ ! -p "$FIFO" ]; do
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
     sleep 0.1
+    [ -p "$FIFO" ] && break
 done
+if [ ! -p "$FIFO" ]; then echo "$(date): FATAL - somebar FIFO never appeared" >&2; exit 1; fi
 echo "$(date): FIFO=$FIFO" >&2
 
 NET_STATUS_FILE="/tmp/net_status_$(id -u)"
@@ -25,8 +27,10 @@ last_vnc_check=0
 vpn_status=""
 last_vpn_check=0
 
-# Initial "DOWN" so the [No Internet] prefix shows until net-watch confirms
-echo "DOWN" > "$NET_STATUS_FILE" 2>/dev/null || true
+# Preserve existing net-watch status (don't blindly force DOWN on restart)
+if [ ! -f "$NET_STATUS_FILE" ]; then
+    echo "DOWN" > "$NET_STATUS_FILE" 2>/dev/null || true
+fi
 
 while true; do
     status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown')

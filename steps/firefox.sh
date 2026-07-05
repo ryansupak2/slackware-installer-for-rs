@@ -167,7 +167,7 @@ pkill -f '--headless.*--profile' 2>/dev/null || true
 pkill -f 'firefox.*--headless' 2>/dev/null || true
 sleep 1
 pkill -9 -f 'ff-drm-install-profile' 2>/dev/null || true
-pkill -9 -f 'firefox' 2>/dev/null || true
+pkill -9 -f '/usr/lib64/firefox/firefox' 2>/dev/null || true
 rm -rf /tmp/ff-drm-install-profile 2>/dev/null || true
 
 if $ok; then

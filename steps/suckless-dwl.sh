@@ -16,9 +16,9 @@ ok=true
 
 echo "Installing build deps for dwl + somebar..."
 # Official packages (D/X series — gcc/make come from D series)
-install_pkg "libinput libxkbcommon pkg-config cairo pango" || true
+install_pkg "libinput libxkbcommon pkg-config cairo pango"
 # SBo build dependencies
-install_sbo "wlroots scdoc samurai wtype" || true
+install_sbo "scdoc samurai wtype"
 
 # meson (needed for somebar build — not in SBo, use pip)
 echo "Ensuring meson is available..."
@@ -35,13 +35,14 @@ if $ok; then
 
     echo "Installing Suckless dwl..."
     rm -rf dwl
-    if ! git clone https://codeberg.org/dwl/dwl; then
+    if ! git clone --depth 1 https://codeberg.org/dwl/dwl; then
         echo "ERROR: failed to git clone dwl."
         ok=false
     else
         cd dwl
         cp -f "$REPO_DIR/dotfiles/suckless/dwl/config.h" config.h
-        cp -f "$REPO_DIR/dotfiles/suckless/dwl/dwl.c" dwl.c
+        cp -f "$REPO_DIR/dotfiles/suckless/dwl/dwl.c.patched" dwl.c
+        cp -f "$REPO_DIR/dotfiles/suckless/dwl/config.mk" config.mk
         if ! make clean install; then
             echo "ERROR: make clean install for dwl failed."
             ok=false

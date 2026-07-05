@@ -1,7 +1,0 @@
-shell/.wav
-View=setsid aplay "%f" &
-Open=setsid aplay "%f" &
-
-type/^video/
-View=setsid mplayer -really-quiet "%f" &
-Open=setsid mplayer -really-quiet "%f" &

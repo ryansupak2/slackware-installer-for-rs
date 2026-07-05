@@ -23,12 +23,7 @@ if id "$TARGET_USER" >/dev/null 2>&1; then
     echo "     WARNING: This is DESTRUCTIVE. All files, configs, and data for this user will be lost forever."
     echo ""
 
-    if [ -t 0 ]; then
-        read -p "Enter choice [1/2, default=1]: " choice
-        choice=${choice:-1}
-    else
-        choice=1
-    fi
+    choice=1
 
     if [ "$choice" = "2" ]; then
         echo ""

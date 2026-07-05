@@ -18,23 +18,8 @@ HOME_TARGET=$(eval echo ~$TARGET_USER)
 setup_bashrc() {
     echo "Copying User Preferences (bashrc)..."
     target="$HOME_TARGET/.bashrc"
-    if [ -f "$target" ] && [ -t 0 ]; then
-        read -p "Overwrite $target? (y/n): " choice
-        case "$choice" in
-            y|Y)
-                cp "$REPO_DIR/dotfiles/shell/bashrc" "$target"
-                chmod 600 "$target"
-                echo "Overwritten $target"
-                ;;
-            *)
-                echo "Skipped $target (safety: no overwrite)"
-                ;;
-        esac
-    else
-        cp "$REPO_DIR/dotfiles/shell/bashrc" "$target"
-        chmod 600 "$target"
-        echo "Copied to $target"
-    fi
+    cp "$REPO_DIR/dotfiles/shell/bashrc" "$target"
+    echo "Deployed $target"
 
     # .bash_profile for login shells
     bp_target="$HOME_TARGET/.bash_profile"

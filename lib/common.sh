@@ -27,7 +27,8 @@ install_pkg() {
             continue
         fi
         log_msg INFO "  slackpkg install $pkg"
-        if ! slackpkg -batch=on -default_answer=y install "$pkg" >>"$LOG_FILE" 2>&1; then
+        slackpkg -batch=on -default_answer=y install "$pkg" 2>&1 | tee -a "$LOG_FILE"
+        if [ "${PIPESTATUS[0]}" -ne 0 ]; then
             log_msg ERROR "Failed to install: $pkg"
             return 1
         fi
@@ -45,7 +46,8 @@ install_sbo() {
             continue
         fi
         log_msg INFO "  sbopkg -B -i $pkg"
-        if ! sbopkg -B -i "$pkg" >>"$LOG_FILE" 2>&1; then
+        sbopkg -B -e stop -i "$pkg" 2>&1 | tee -a "$LOG_FILE"
+        if [ "${PIPESTATUS[0]}" -ne 0 ]; then
             log_msg ERROR "Failed to install via sbopkg: $pkg"
             return 1
         fi

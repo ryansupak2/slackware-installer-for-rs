@@ -34,11 +34,11 @@ echo "Installing screen lockers (wlock + physlock)..."
 echo "Building wlock (Wayland screen locker)..."
 
 echo "  Installing wlock build dependencies..."
-install_pkg "pam libxkbcommon" || echo "  WARNING: could not install wlock build deps"
+install_pkg "pam libxkbcommon pkg-config"
 
 wlock_ok=false
 if [ -d "$REPO_DIR/sources/wlock" ]; then
-    if make -C "$REPO_DIR/sources/wlock" 2>/dev/null; then
+    if make -C "$REPO_DIR/sources/wlock"; then
         cp "$REPO_DIR/sources/wlock/wlock" /usr/local/bin/wlock 2>/dev/null
         echo "  wlock built and installed to /usr/local/bin/wlock."
         cp "$REPO_DIR/sources/wlock/wlock.pam" /etc/pam.d/wlock 2>/dev/null
@@ -49,17 +49,17 @@ if [ -d "$REPO_DIR/sources/wlock" ]; then
             wlock_ok=true  # assume ok but warn
         fi
     else
-        echo "  WARNING: could not build wlock (missing build deps?)."
+        echo "ERROR: could not build wlock (is wayland-base installed?)."
     fi
 fi
 
 # physlock (console/TTY locker)
 physlock_ok=false
 echo "Building physlock (console/TTY locker)..."
-install_pkg "kernel-headers" || echo "  WARNING: could not install kernel-headers"
+install_pkg "kernel-headers"
 
 if [ -d "$REPO_DIR/sources/physlock" ]; then
-    if make -C "$REPO_DIR/sources/physlock" HAVE_SYSTEMD=0 HAVE_ELOGIND=0 2>/dev/null; then
+    if make -C "$REPO_DIR/sources/physlock" HAVE_SYSTEMD=0 HAVE_ELOGIND=0; then
         cp "$REPO_DIR/sources/physlock/physlock" /usr/local/bin/physlock 2>/dev/null
         chmod 4755 /usr/local/bin/physlock 2>/dev/null
         echo "  physlock built and installed to /usr/local/bin/physlock."
@@ -70,10 +70,11 @@ if [ -d "$REPO_DIR/sources/physlock" ]; then
             physlock_ok=true
         fi
     else
-        echo "  WARNING: could not build physlock."
+        echo "ERROR: could not build physlock."
     fi
 fi
 
+# Verdict: acpid configs AND both lockers must succeed — no fallbacks
 if [ -x /usr/local/bin/lock-screen.sh ] && \
    [ -f /etc/acpi/events/lid-close ] && \
    [ -f /etc/acpi/events/lid-open ]; then
@@ -81,10 +82,10 @@ if [ -x /usr/local/bin/lock-screen.sh ] && \
         echo "SUCCESS: Screen locking fully configured (wlock + physlock + acpid)."
         exit 0
     elif $wlock_ok && ! $physlock_ok; then
-        echo "ERROR: wlock installed but physlock missing."
+        echo "ERROR: wlock installed but physlock failed."
         exit 1
     elif ! $wlock_ok && $physlock_ok; then
-        echo "ERROR: physlock installed but wlock missing."
+        echo "ERROR: physlock installed but wlock failed (run Core/wayland-base first)."
         exit 1
     else
         echo "ERROR: both wlock and physlock failed to install."

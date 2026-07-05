@@ -1,2 +1,0 @@
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/openvpn, /etc/rc.d/rc.openvpn, /usr/bin/setsid, /usr/bin/chmod, /usr/bin/nmcli, /bin/sh
-Defaults:%wheel !requiretty

@@ -13,7 +13,7 @@ do_view_action() {
 
     case "${filetype}" in
     common)
-        mediainfo "${MC_EXT_FILENAME}"
+        ffprobe -hide_banner "${MC_EXT_FILENAME}"
         ;;
 
     mp3)

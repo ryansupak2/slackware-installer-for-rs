@@ -17,17 +17,9 @@ SHORTCUT_FILE="$SHORTCUT_DIR/shortcuts"
 
 mkdir -p "$SHORTCUT_DIR" 2>/dev/null
 
-if [ -f "$SHORTCUT_FILE" ] && [ -t 0 ]; then
-    read -p "Overwrite $SHORTCUT_FILE? (y/n): " choice
-    case "$choice" in
-        y|Y)
-            cp "$REPO_DIR/dotfiles/firefox/shortcuts.default" "$SHORTCUT_FILE"
-            echo "Overwritten $SHORTCUT_FILE"
-            ;;
-        *)
-            echo "Skipped $SHORTCUT_FILE (safety: no overwrite)"
-            ;;
-    esac
+if [ -f "$SHORTCUT_FILE" ]; then
+    cp "$REPO_DIR/dotfiles/firefox/shortcuts.default" "$SHORTCUT_FILE"
+    echo "Overwritten $SHORTCUT_FILE"
 else
     cp "$REPO_DIR/dotfiles/firefox/shortcuts.default" "$SHORTCUT_FILE"
     echo "Created $SHORTCUT_FILE"

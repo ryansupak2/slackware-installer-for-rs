@@ -15,7 +15,7 @@ echo "*****************************************************"
 ok=true
 
 echo "Installing keychain..."
-install_sbo "keychain" || echo "WARNING: keychain install may have failed (continuing)"
+install_sbo "keychain"
 
 # Determine which key to manage (prefer the configured root SSH key)
 KEY_TYPE="${ROOT_SSH_KEY_TYPE:-ed25519}"

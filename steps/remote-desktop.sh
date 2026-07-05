@@ -25,27 +25,39 @@ if command -v wayvnc >/dev/null 2>&1; then
     echo "  wayvnc already installed: $(which wayvnc)"
 else
     echo "  Installing build dependencies for wayvnc chain..."
-    install_pkg "gnutls libjpeg-turbo pam jansson" || true
+    install_pkg "gnutls libjpeg-turbo pam jansson"
 
     # meson (needed for wayvnc chain — not in SBo, use pip)
     echo "  Ensuring meson is available..."
     if ! command -v meson >/dev/null 2>&1; then
-        pip3 install meson 2>/dev/null || echo "  WARNING: pip3 install meson failed"
+        pip3 install meson 2>&1 | tee -a "$BUILD_LOG" || { echo "ERROR: pip3 install meson failed"; ok=false; }
     fi
+
+    _run_step() {
+        local label="$1"; shift
+        echo "  Running: $label..."
+        "$@" 2>&1 | tee -a "$BUILD_LOG"
+        local rc="${PIPESTATUS[0]}"
+        if [ "$rc" -ne 0 ]; then
+            echo "ERROR: $label failed (exit $rc)"
+            return 1
+        fi
+        return 0
+    }
 
     _build_meson() {
         local name="$1" src="$2"
         cd "$src"
         rm -rf build
-        meson setup build   >"$BUILD_LOG" 2>&1 || { echo "ERROR: $name meson setup failed"; return 1; }
-        ninja -C build      >>"$BUILD_LOG" 2>&1 || { echo "ERROR: $name ninja build failed"; return 1; }
-        ninja -C build install >>"$BUILD_LOG" 2>&1 || { echo "ERROR: $name ninja install failed"; return 1; }
+        _run_step "$name meson setup" meson setup build || return 1
+        _run_step "$name ninja build"  ninja -C build || return 1
+        _run_step "$name ninja install" ninja -C build install || return 1
         echo "  $name: OK"
     }
 
     cd "$SRC_DIR"
     rm -rf aml
-    if git clone --depth 1 https://github.com/any1/aml >>"$BUILD_LOG" 2>&1; then
+    if git clone --depth 1 https://github.com/any1/aml 2>&1 | tee -a "$BUILD_LOG"; [ "${PIPESTATUS[0]}" -eq 0 ]; then
         _build_meson "aml" "$SRC_DIR/aml" || ok=false
     else
         echo "ERROR: aml clone failed"; ok=false
@@ -54,12 +66,12 @@ else
     if $ok; then
         cd "$SRC_DIR"
         rm -rf neatvnc
-        if git clone --depth 1 https://github.com/any1/neatvnc >>"$BUILD_LOG" 2>&1; then
+        if git clone --depth 1 https://github.com/any1/neatvnc 2>&1 | tee -a "$BUILD_LOG"; [ "${PIPESTATUS[0]}" -eq 0 ]; then
             cd "$SRC_DIR/neatvnc"
             rm -rf build
-            meson setup build -Dexamples=false >"$BUILD_LOG" 2>&1 || { echo "ERROR: neatvnc meson setup failed"; ok=false; }
-            if $ok; then ninja -C build >>"$BUILD_LOG" 2>&1 || { echo "ERROR: neatvnc ninja build failed"; ok=false; }; fi
-            if $ok; then ninja -C build install >>"$BUILD_LOG" 2>&1 || { echo "ERROR: neatvnc ninja install failed"; ok=false; }; fi
+            _run_step "neatvnc meson setup" meson setup build -Dexamples=false || ok=false
+            if $ok; then _run_step "neatvnc ninja build" ninja -C build || ok=false; fi
+            if $ok; then _run_step "neatvnc ninja install" ninja -C build install || ok=false; fi
             $ok && echo "  neatvnc: OK"
         else
             echo "ERROR: neatvnc clone failed"; ok=false
@@ -69,12 +81,12 @@ else
     if $ok; then
         cd "$SRC_DIR"
         rm -rf wayvnc
-        if git clone --depth 1 https://github.com/any1/wayvnc >>"$BUILD_LOG" 2>&1; then
+        if git clone --depth 1 https://github.com/any1/wayvnc 2>&1 | tee -a "$BUILD_LOG"; [ "${PIPESTATUS[0]}" -eq 0 ]; then
             cd "$SRC_DIR/wayvnc"
             rm -rf build
-            meson setup build >"$BUILD_LOG" 2>&1 || { echo "ERROR: wayvnc meson setup failed"; ok=false; }
-            if $ok; then ninja -C build >>"$BUILD_LOG" 2>&1 || { echo "ERROR: wayvnc ninja build failed"; ok=false; }; fi
-            if $ok; then ninja -C build install >>"$BUILD_LOG" 2>&1 || { echo "ERROR: wayvnc ninja install failed"; ok=false; }; fi
+            _run_step "wayvnc meson setup" meson setup build || ok=false
+            if $ok; then _run_step "wayvnc ninja build" ninja -C build || ok=false; fi
+            if $ok; then _run_step "wayvnc ninja install" ninja -C build install || ok=false; fi
             $ok && { ldconfig 2>/dev/null || true; echo "  wayvnc: OK"; }
         else
             echo "ERROR: wayvnc clone failed"; ok=false

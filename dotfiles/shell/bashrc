@@ -6,6 +6,7 @@ alias f='yad --file & exit'  #help:f=file chooser
 alias help='/usr/local/bin/help.sh'  #help:help=this screen
 alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'  #help:neofetch=system info
 alias pi='pi --readonly'  #help:pi=AI coding assistant
+alias pi-update='pi update && /root/Development/slackware-installer-for-rs/lib/patch-pi-kitty-flags.sh'  #help:pi-update=update pi + auto-fix kitty flags
 alias wifi='wifi-manager'  #help:wifi=wifi network chooser
 alias net='net-watch'
 alias net-watch='/usr/local/bin/net-watch'
@@ -47,7 +48,11 @@ export PS1='\[\e[32m\]\u@\[\e[38;5;153m\]\W\[\e[0m\]\$ '
 # to make draw (inkscape) font a readable size
 export GDK_DPI_SCALE=1.5
 
-#node (not part of core install)
-export PATH=/usr/local/node/bin:$PATH
+# Node.js + pi runtime (matches pi installer location)
+export PATH=/usr/local/node-v22.19.0-linux-x64/bin:$PATH
+
+# Auto-heal pi Kitty protocol flags after updates (idempotent, instant)
+/root/Development/slackware-installer-for-rs/lib/patch-pi-kitty-flags.sh 2>/dev/null &
+
 # screen locking: 'lock' works in dwl (wlock) and on TTY (physlock)
 alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (wlock in dwl, physlock on TTY)

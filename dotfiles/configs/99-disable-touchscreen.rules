@@ -1,0 +1,9 @@
+# Disable ELAN Touchscreen — phantom touch events cause random cursor
+# jumps, selections, and tab changes under Wayland/wlroots and X11.
+# This works at the USB device level so it applies to ALL input stacks.
+#
+# Variant 1: udev marks device ignored for libinput (covers cold boots)
+ACTION=="add|change", SUBSYSTEM=="input", ATTRS{name}=="ELAN Touchscreen*", ENV{LIBINPUT_IGNORE_DEVICE}="1"
+ACTION=="add|change", SUBSYSTEM=="input", ATTRS{name}=="ELAN Touchscreen UNKNOWN", ENV{LIBINPUT_IGNORE_DEVICE}="1"
+# Variant 2: unbind from hid-multitouch driver (covers already-probed devices)
+ACTION=="add", SUBSYSTEM=="hid", ATTRS{idVendor}=="04f3", ATTRS{idProduct}=="289f", RUN+="/bin/sh -c 'echo -n $kernel > /sys/bus/hid/drivers/hid-multitouch/unbind 2>/dev/null || true'"

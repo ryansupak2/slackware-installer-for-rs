@@ -23,21 +23,8 @@ setup_vim() {
     chown -R "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.vim"
 
     target="$HOME_TARGET/.vimrc"
-    if [ -f "$target" ] && [ -t 0 ]; then
-        read -p "Overwrite $target? (y/n): " choice
-        case "$choice" in
-            y|Y)
-                cp "$REPO_DIR/dotfiles/editors/vimrc" "$target"
-                echo "Overwritten $target"
-                ;;
-            *)
-                echo "Skipped $target (safety: no overwrite)"
-                ;;
-        esac
-    else
-        cp "$REPO_DIR/dotfiles/editors/vimrc" "$target"
-        echo "Copied to $target"
-    fi
+    cp "$REPO_DIR/dotfiles/editors/vimrc" "$target"
+    echo "Deployed $target"
 }
 
 setup_vim

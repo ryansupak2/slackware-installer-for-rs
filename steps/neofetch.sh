@@ -24,7 +24,7 @@ else
 fi
 
 # Silent side effects so the GPU line works with the default splash for root.
-install_pkg "pciutils" || true
+install_pkg "pciutils"
 mkdir -p /root/.config/neofetch 2>/dev/null || true
 cp "$REPO_DIR/dotfiles/neofetch/config.conf" /root/.config/neofetch/config.conf 2>/dev/null || true
 cp "$REPO_DIR/dotfiles/neofetch/bobdobbs.txt" /root/.config/neofetch/bobdobbs.txt 2>/dev/null || true

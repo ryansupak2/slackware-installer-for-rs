@@ -5,9 +5,9 @@ BINDIR    ?= $(PREFIX)/bin
 
 CC        ?= gcc
 CFLAGS    += -std=c99 -Wall -Wextra -O2 -g
-PKGS      := wayland-client xkbcommon pam
+PKGS      := wayland-client xkbcommon
 CFLAGS    += $(shell pkg-config --cflags $(PKGS))
-LDFLAGS   += $(shell pkg-config --libs $(PKGS)) -lrt
+LDFLAGS   += $(shell pkg-config --libs $(PKGS)) -lpam -lrt
 
 OBJ       := wlock.o ext-session-lock-v1-protocol.o
 

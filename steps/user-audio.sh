@@ -38,13 +38,18 @@ if [ ! -S "$ROOT_RT/pipewire-0" ]; then
     chmod 700 "$ROOT_RT" 2>/dev/null || true
     rm -f "$ROOT_RT"/pipewire-0 "$ROOT_RT"/pipewire-0.lock "$ROOT_RT"/pulse/native 2>/dev/null || true
 
-    pipewire 2>/dev/null &
-    while [ ! -S "$ROOT_RT/pipewire-0" ]; do sleep 0.2; done
-    wireplumber 2>/dev/null &
-    while ! wpctl status 2>/dev/null >/dev/null; do sleep 0.5; done
-    pipewire-pulse 2>/dev/null &
-    while [ ! -S "$ROOT_RT/pulse/native" ]; do sleep 0.2; done
-    PW_STARTED=true
+    pipewire &
+    PW_PID=$!
+    for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.1; [ -S "$ROOT_RT/pipewire-0" ] && break; done
+    if [ ! -S "$ROOT_RT/pipewire-0" ]; then echo "ERROR: pipewire failed to start"; kill $PW_PID 2>/dev/null; exit 1; fi
+    pipewire-media-session &
+    PM_PID=$!
+    for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.2; pactl info >/dev/null 2>&1 && break; done
+    if ! pactl info >/dev/null 2>&1; then echo "ERROR: pipewire-media-session failed to start"; kill $PM_PID 2>/dev/null; exit 1; fi
+    pipewire-pulse &
+    PP_PID=$!
+    for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.1; [ -S "$ROOT_RT/pulse/native" ] && break; done
+    if [ ! -S "$ROOT_RT/pulse/native" ]; then echo "ERROR: pipewire-pulse failed to start"; kill $PP_PID 2>/dev/null; exit 1; fi
 else
     echo "  Using root's PipeWire session"
     PW_STARTED=false

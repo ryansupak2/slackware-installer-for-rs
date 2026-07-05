@@ -1,1 +1,0 @@
-ACTION=="add", SUBSYSTEM=="leds", KERNEL=="tpacpi::kbd_backlight", RUN+="/bin/chmod 666 /sys%p/brightness"

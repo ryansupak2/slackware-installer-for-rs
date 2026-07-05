@@ -13,7 +13,14 @@ echo "AUDIO/VOLUME"
 echo "*****************************************************"
 
 # ALSA is always present on Slackware base
-install_pkg "alsa-utils" || true
+install_pkg "alsa-utils"
+
+# Force legacy HDA driver on Intel Skylake+ (SOF firmware not in base Slackware)
+ELILO_CONF="/boot/efi/EFI/Slackware/elilo.conf"
+if [ -f "$ELILO_CONF" ] && ! grep -q "snd-intel-dspcfg.dsp_driver" "$ELILO_CONF" 2>/dev/null; then
+    sed -i 's/append="\(.*\)"/append="\1 snd-intel-dspcfg.dsp_driver=1"/' "$ELILO_CONF"
+    echo "  Added snd-intel-dspcfg.dsp_driver=1 to elilo"
+fi
 
 # Add audio group
 addgroup audio 2>/dev/null || true

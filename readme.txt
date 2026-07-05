@@ -30,8 +30,14 @@ GOTCHAS — Slackware's installer is minimal. Know these before starting.
 
    ADDSWAP  — select your swap partition, let it format
    TARGET   — select your root partition, format as ext4
-   SOURCE   — choose "Install from a Slackware DVD or USB drive"
-              then "Manual" and point it at /dev/sdb1 (the installer USB)
+   SOURCE   — Despite booting from the USB, the installer's "Scan USB
+              Drives" option will NOT find it. You must manually mount it:
+
+              1. Switch to console 2 (Alt+F2), press Enter to get a shell.
+              2. Mount the USB:  mount /dev/sdb1 /mnt
+              3. Switch back to the installer (Alt+F1).
+              4. Choose SOURCE → "Install from a pre-mounted directory".
+              5. Enter: /mnt/slackware64  (the USB mount + subdirectory).
    SERIES   — select these:
 
        A     Base Linux system

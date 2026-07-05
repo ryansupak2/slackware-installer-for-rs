@@ -258,8 +258,14 @@ for d in .ssh .vim .config .mozilla .pi; do
 done
 
 # ------------------------------------------------------------------
-# Final summary (identical format to post-install-global.sh)
-# ------------------------------------------------------------------
+# Log file location (before final summary)
+if [ -f "$LOG_FILE" ]; then
+    echo ""
+    echo "Full output has been captured to: $LOG_FILE"
+    echo "(View with: less $LOG_FILE  or  tail -n 200 $LOG_FILE)"
+fi
+
+# FINAL SUMMARY — must be the very last thing printed
 echo ""
 echo "*****************************************************"
 echo "USER SETUP SUMMARY"
@@ -270,10 +276,5 @@ echo "Home: $HOME_TARGET"
 echo ""
 echo "SUCCESS: $success_count"
 echo "ERROR:   $error_count"
-echo ""
-if [ -f "$LOG_FILE" ]; then
-    echo "Full output has been captured to: $LOG_FILE"
-    echo "(You can view it with: cat $LOG_FILE | less  or  tail -n 200 $LOG_FILE)"
-fi
-echo "Done."
+
 exit 0
