@@ -1,5 +1,5 @@
 #!/bin/bash
-# steps/audio-volume.sh - AUDIO/VOLUME (Slackware: PulseAudio)
+# steps/audio-volume.sh - AUDIO/VOLUME (Slackware: PipeWire via ALSA)
 
 REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
 LOG_FILE="${LOG_FILE:-/logs/installer.log}"
@@ -36,6 +36,26 @@ for nid in 35 38 39 40 46 47; do
 done
 alsactl store 2>/dev/null || true
 
+# Disable PulseAudio autospawn (PipeWire handles audio instead)
+if [ -f /etc/pulse/client.conf ]; then
+    sed -i 's/^autospawn = yes/autospawn = no/' /etc/pulse/client.conf
+    sed -i 's/^; *autospawn = .*/autospawn = no/' /etc/pulse/client.conf
+    echo "  PulseAudio autospawn disabled"
+fi
+
+# Enable PipeWire ALSA backend (commented out by default on Slackware)
+if [ -f /usr/share/pipewire/pipewire.conf ]; then
+    mkdir -p /etc/pipewire
+    if ! grep -q '^    { factory = spa-device-factory.*api.alsa.enum.udev' /etc/pipewire/pipewire.conf 2>/dev/null; then
+        cp /usr/share/pipewire/pipewire.conf /etc/pipewire/pipewire.conf
+        sed -i '177s/^    #/    /' /etc/pipewire/pipewire.conf
+        sed -i '178s/^    #/    /' /etc/pipewire/pipewire.conf
+        echo "  PipeWire ALSA backend enabled"
+    else
+        echo "  PipeWire ALSA backend already enabled"
+    fi
+fi
+
 # Deploy volume scripts
 cp "$REPO_DIR/dotfiles/volume/volume_up.sh"    /usr/local/bin/volume_up.sh 2>/dev/null || true
 cp "$REPO_DIR/dotfiles/volume/volume_down.sh"  /usr/local/bin/volume_down.sh 2>/dev/null || true
@@ -50,5 +70,5 @@ mkdir -p /etc/profile.d
 cp "$REPO_DIR/dotfiles/system/xdg.sh" /etc/profile.d/xdg.sh 2>/dev/null || true
 chmod 644 /etc/profile.d/xdg.sh 2>/dev/null || true
 
-echo "SUCCESS: Audio/volume configured (PulseAudio)."
+echo "SUCCESS: Audio/volume configured (PipeWire)."
 exit 0

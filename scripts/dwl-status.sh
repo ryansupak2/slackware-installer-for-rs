@@ -7,8 +7,7 @@ FIFO="${XDG_RUNTIME_DIR}/somebar-0"
 LOG_DIR="$HOME/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG="$LOG_DIR/dwl-status-$(date +%Y%m%d-%H%M%S).log"
-exec 2>>"$LOG"
-echo "$(date): dwl-status started (PID $$)" >&2
+exec >>"$LOG" 2>&1
 
 # Wait for somebar to create its FIFO
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
@@ -104,16 +103,19 @@ while true; do
         line="${vnc_status}${vpn_status}${no_internet_prefix}${bat_part} | $(date +'%a, %d %b %Y | %T')"
     fi
 
+    if [ ! -p "$FIFO" ]; then
+        echo "$(date): FIFO removed — session ended"
+        break
+    fi
     if echo "status ${line}" > "$FIFO" 2>/dev/null; then
         if [ $next_log -le 0 ]; then
-            echo "$(date): wrote: ${line}" >&2
+            echo "$(date): wrote: ${line}"
             next_log=60
         fi
     else
-        echo "$(date): WRITE FAILED" >&2
-        next_log=0
+        echo "$(date): WRITE FAILED — session ended"
+        break
     fi
-    next_log=$((next_log - 1))
 
     sleep 0.1
 done

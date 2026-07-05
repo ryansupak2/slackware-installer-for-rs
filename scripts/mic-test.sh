@@ -6,7 +6,7 @@ SECS="${1:-3}"
 
 cleanup() {
     pkill -u "$(id -u)" -x pipewire-pulse 2>/dev/null
-    pkill -u "$(id -u)" -x wireplumber 2>/dev/null
+    pkill -u "$(id -u)" -x pipewire-media-session 2>/dev/null
     pkill -u "$(id -u)" -x pipewire 2>/dev/null
     rm -f /tmp/mic-test.wav
 }
@@ -30,12 +30,10 @@ if ! [ -S "$XDG_RT/pipewire-0" ]; then
     PP_PID=$!
     for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.1; [ -S "$XDG_RT/pulse/native" ] && break; done
     if [ ! -S "$XDG_RT/pulse/native" ]; then echo "ERROR: pipewire-pulse failed to start"; kill $PP_PID 2>/dev/null; exit 1; fi
-    MIC_ID=$(wpctl status 2>/dev/null | grep "Built-in Microphone" | awk '{for(i=1;i<=NF;i++) if($i~/^[0-9]+\.$/) {gsub(/\./,"",$i); print $i; exit}}')
-    [ -n "$MIC_ID" ] && wpctl set-default "$MIC_ID" 2>/dev/null
-    wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.0 2>/dev/null
-    wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 2>/dev/null
-    wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 1.0 2>/dev/null
-    wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0 2>/dev/null
+    pactl set-source-mute @DEFAULT_SOURCE@ 0 2>/dev/null
+    pactl set-source-volume @DEFAULT_SOURCE@ 100% 2>/dev/null
+    pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null
+    pactl set-sink-volume @DEFAULT_SINK@ 100% 2>/dev/null
 fi
 
 echo "Recording ${SECS}s... speak now"

@@ -33,42 +33,50 @@ if $ok; then
     mkdir -p /usr/local/src/suckless
     cd /usr/local/src/suckless
 
-    echo "Installing Suckless dwl..."
-    rm -rf dwl
-    if ! git clone --depth 1 https://codeberg.org/dwl/dwl; then
-        echo "ERROR: failed to git clone dwl."
-        ok=false
+    if [ -x /usr/local/bin/dwl ]; then
+        echo "dwl already installed — skipping"
     else
-        cd dwl
-        cp -f "$REPO_DIR/dotfiles/suckless/dwl/config.h" config.h
-        cp -f "$REPO_DIR/dotfiles/suckless/dwl/dwl.c.patched" dwl.c
-        cp -f "$REPO_DIR/dotfiles/suckless/dwl/config.mk" config.mk
-        if ! make clean install; then
-            echo "ERROR: make clean install for dwl failed."
+        echo "Installing Suckless dwl..."
+        rm -rf dwl
+        if ! git clone --depth 1 --branch v0.8 https://codeberg.org/dwl/dwl; then
+            echo "ERROR: failed to git clone dwl."
             ok=false
+        else
+            cd dwl
+            cp -f "$REPO_DIR/dotfiles/suckless/dwl/config.h" config.h
+            cp -f "$REPO_DIR/dotfiles/suckless/dwl/dwl.c.patched" dwl.c
+            cp -f "$REPO_DIR/dotfiles/suckless/dwl/config.mk" config.mk
+            if ! make clean install; then
+                echo "ERROR: make clean install for dwl failed."
+                ok=false
+            fi
+            cd ..
         fi
-        cd ..
     fi
 fi
 
 if $ok; then
-    echo "Installing somebar (dwl companion status bar)..."
-    rm -rf somebar
-    if ! git clone https://git.sr.ht/~raphi/somebar; then
-        echo "ERROR: failed to git clone somebar."
-        ok=false
+    if [ -x /usr/local/bin/somebar ]; then
+        echo "somebar already installed — skipping"
     else
-        cd somebar
-        cp "$REPO_DIR/dotfiles/somebar/config.hpp" src/config.hpp
-        cp "$REPO_DIR/dotfiles/somebar/common.hpp" src/common.hpp
-        cp "$REPO_DIR/dotfiles/somebar/bar.cpp"    src/bar.cpp
-        cp "$REPO_DIR/dotfiles/somebar/main.cpp"  src/main.cpp
-        meson setup build && ninja -C build && ninja -C build install
-        if [ $? -ne 0 ]; then
-            echo "ERROR: build/install for somebar failed."
+        echo "Installing somebar (dwl companion status bar)..."
+        rm -rf somebar
+        if ! git clone https://git.sr.ht/~raphi/somebar; then
+            echo "ERROR: failed to git clone somebar."
             ok=false
+        else
+            cd somebar
+            cp "$REPO_DIR/dotfiles/somebar/config.hpp" src/config.hpp
+            cp "$REPO_DIR/dotfiles/somebar/common.hpp" src/common.hpp
+            cp "$REPO_DIR/dotfiles/somebar/bar.cpp"    src/bar.cpp
+            cp "$REPO_DIR/dotfiles/somebar/main.cpp"  src/main.cpp
+            meson setup build && ninja -C build && ninja -C build install
+            if [ $? -ne 0 ]; then
+                echo "ERROR: build/install for somebar failed."
+                ok=false
+            fi
+            cd ..
         fi
-        cd ..
     fi
 fi
 

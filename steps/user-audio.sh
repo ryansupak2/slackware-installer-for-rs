@@ -25,7 +25,7 @@ groups "$TARGET_USER" 2>/dev/null | grep -q '\baudio\b' || {
 }
 
 # Verify packages exist
-for bin in pipewire wireplumber pipewire-pulse wpctl arecord aplay; do
+for bin in pipewire pipewire-media-session pipewire-pulse pactl arecord aplay; do
     command -v "$bin" >/dev/null 2>&1 || { echo "ERROR: $bin not found — run audio-volume.sh first"; exit 1; }
 done
 

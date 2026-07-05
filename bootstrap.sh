@@ -173,12 +173,6 @@ else
     fi
 fi
 
-# Apply Kitty protocol flag fix (7 → 5, prevents keyup double-fire)
-echo "Applying pi Kitty protocol fix..."
-if [ -x "$REPO_DIR/lib/patch-pi-kitty-flags.sh" ]; then
-    "$REPO_DIR/lib/patch-pi-kitty-flags.sh" && echo "SUCCESS: Kitty flags patched." || echo "WARNING: Kitty flags patch issues."
-fi
-
 echo "Installing pi-hashline-edit..."
 if pi install npm:pi-hashline-edit; then
         echo "SUCCESS: pi-hashline-edit installed."

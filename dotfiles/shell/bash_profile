@@ -7,3 +7,5 @@ if [ -f "$HOME/.bashrc" ]; then
 fi
 
 # Optional: any login-only setup can go below (e.g. ssh-agent, keychain already appended to .bashrc by the installer)
+
+neofetch

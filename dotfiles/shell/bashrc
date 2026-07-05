@@ -53,5 +53,4 @@ export PATH=/usr/local/node-v22.19.0-linux-x64/bin:$PATH
 # screen locking: 'lock' works in dwl (wlock) and on TTY (physlock)
 alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (wlock in dwl, physlock on TTY)
 
-# System info on shell start (terminal is fully sized by now)
-neofetch
+# System info on shell start — handled by dwl-start for first window only

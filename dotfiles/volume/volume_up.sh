@@ -1,9 +1,14 @@
 #!/bin/sh
-# Fn+F3 - Volume Up (raise + unmute) via PipeWire user session
+# Fn+F3 - Volume Up (raise + unmute, max 150%) via PipeWire pulse interface
 
-wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+ -l 1.5
-wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
+CUR=$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | head -1 | grep -oP '\d+%' | head -1 | tr -d '%')
+CUR=${CUR:-0}
+if [ "$CUR" -lt 150 ]; then
+    pactl set-sink-volume @DEFAULT_SINK@ +5% 2>/dev/null
+fi
+pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null
 
-vol=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{printf "%.0f%%", $2*100}')
-echo "Volume: ${vol:-??%}" > /tmp/status_msg
+vol=$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | head -1 | grep -oP '\d+%' | head -1)
+[ -z "$vol" ] && vol="??%"
+echo "Volume: ${vol}" > /tmp/status_msg
 echo $(($(date +%s) + 3)) > /tmp/status_end
