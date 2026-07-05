@@ -18,12 +18,38 @@ HOME_TARGET=$(eval echo ~$TARGET_USER)
 setup_bashrc() {
     echo "Copying User Preferences (bashrc)..."
     target="$HOME_TARGET/.bashrc"
-    cp "$REPO_DIR/dotfiles/shell/bashrc" "$target"
-    echo "Deployed $target"
+    src="$REPO_DIR/dotfiles/shell/bashrc"
+
+    if [ -f "$target" ]; then
+        if ! cmp -s "$src" "$target" 2>/dev/null; then
+            backup="$HOME_TARGET/.bashrc.backup-$(date +%Y%m%d-%H%M%S)"
+            cp "$target" "$backup"
+            echo "  Existing .bashrc differs from template — backed up to $(basename "$backup")"
+        else
+            echo "  .bashrc unchanged from template — skipping"
+            return
+        fi
+    fi
+    cp "$src" "$target"
+    echo "  Deployed $target"
 
     # .bash_profile for login shells
     bp_target="$HOME_TARGET/.bash_profile"
-    cp "$REPO_DIR/dotfiles/shell/bash_profile" "$bp_target" 2>/dev/null || true
+    bp_src="$REPO_DIR/dotfiles/shell/bash_profile"
+    if [ -f "$bp_target" ]; then
+        if ! cmp -s "$bp_src" "$bp_target" 2>/dev/null; then
+            bp_backup="$HOME_TARGET/.bash_profile.backup-$(date +%Y%m%d-%H%M%S)"
+            cp "$bp_target" "$bp_backup"
+            echo "  Existing .bash_profile differs from template — backed up to $(basename "$bp_backup")"
+            cp "$bp_src" "$bp_target"
+            echo "  Deployed $bp_target"
+        else
+            echo "  .bash_profile unchanged from template — skipping"
+        fi
+    else
+        cp "$bp_src" "$bp_target" 2>/dev/null || true
+        echo "  Deployed $bp_target"
+    fi
     chmod 600 "$bp_target" 2>/dev/null || true
 }
 

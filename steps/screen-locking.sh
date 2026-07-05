@@ -31,46 +31,56 @@ fi
 
 # wlock (Wayland screen locker)
 echo "Installing screen lockers (wlock + physlock)..."
-echo "Building wlock (Wayland screen locker)..."
-
-echo "  Installing wlock build dependencies..."
-install_pkg "pam libxkbcommon pkg-config"
 
 wlock_ok=false
-if [ -d "$REPO_DIR/sources/wlock" ]; then
-    if make -C "$REPO_DIR/sources/wlock"; then
-        cp "$REPO_DIR/sources/wlock/wlock" /usr/local/bin/wlock 2>/dev/null
-        echo "  wlock built and installed to /usr/local/bin/wlock."
-        cp "$REPO_DIR/sources/wlock/wlock.pam" /etc/pam.d/wlock 2>/dev/null
-        echo "  wlock PAM config installed."
-        if grep -qE '^[[:space:]]*(auth|account)[[:space:]]+(required|requisite|sufficient)[[:space:]]+pam_unix\.so' /etc/pam.d/wlock 2>/dev/null; then
-            wlock_ok=true
+if [ -x /usr/local/bin/wlock ] && [ -f /etc/pam.d/wlock ]; then
+    echo "  wlock already installed — skipping build"
+    wlock_ok=true
+else
+    echo "Building wlock (Wayland screen locker)..."
+    echo "  Installing wlock build dependencies..."
+    install_pkg "pam libxkbcommon pkg-config"
+
+    if [ -d "$REPO_DIR/sources/wlock" ]; then
+        if make -C "$REPO_DIR/sources/wlock"; then
+            cp "$REPO_DIR/sources/wlock/wlock" /usr/local/bin/wlock 2>/dev/null
+            echo "  wlock built and installed to /usr/local/bin/wlock."
+            cp "$REPO_DIR/sources/wlock/wlock.pam" /etc/pam.d/wlock 2>/dev/null
+            echo "  wlock PAM config installed."
+            if grep -qE '^[[:space:]]*(auth|account)[[:space:]]+(required|requisite|sufficient)[[:space:]]+pam_unix\.so' /etc/pam.d/wlock 2>/dev/null; then
+                wlock_ok=true
+            else
+                wlock_ok=true  # assume ok but warn
+            fi
         else
-            wlock_ok=true  # assume ok but warn
+            echo "ERROR: could not build wlock (is wayland-base installed?)."
         fi
-    else
-        echo "ERROR: could not build wlock (is wayland-base installed?)."
     fi
 fi
 
 # physlock (console/TTY locker)
 physlock_ok=false
-echo "Building physlock (console/TTY locker)..."
-install_pkg "kernel-headers"
+if [ -x /usr/local/bin/physlock ] && [ -f /etc/pam.d/physlock ]; then
+    echo "  physlock already installed — skipping build"
+    physlock_ok=true
+else
+    echo "Building physlock (console/TTY locker)..."
+    install_pkg "kernel-headers"
 
-if [ -d "$REPO_DIR/sources/physlock" ]; then
-    if make -C "$REPO_DIR/sources/physlock" HAVE_SYSTEMD=0 HAVE_ELOGIND=0; then
-        cp "$REPO_DIR/sources/physlock/physlock" /usr/local/bin/physlock 2>/dev/null
-        chmod 4755 /usr/local/bin/physlock 2>/dev/null
-        echo "  physlock built and installed to /usr/local/bin/physlock."
-        cp "$REPO_DIR/dotfiles/lockscreen/physlock.pam" /etc/pam.d/physlock 2>/dev/null
-        if grep -qE '^[[:space:]]*(auth|account)[[:space:]]+(required|requisite|sufficient)[[:space:]]+pam_unix\.so' /etc/pam.d/physlock 2>/dev/null; then
-            physlock_ok=true
+    if [ -d "$REPO_DIR/sources/physlock" ]; then
+        if make -C "$REPO_DIR/sources/physlock" HAVE_SYSTEMD=0 HAVE_ELOGIND=0; then
+            cp "$REPO_DIR/sources/physlock/physlock" /usr/local/bin/physlock 2>/dev/null
+            chmod 4755 /usr/local/bin/physlock 2>/dev/null
+            echo "  physlock built and installed to /usr/local/bin/physlock."
+            cp "$REPO_DIR/dotfiles/lockscreen/physlock.pam" /etc/pam.d/physlock 2>/dev/null
+            if grep -qE '^[[:space:]]*(auth|account)[[:space:]]+(required|requisite|sufficient)[[:space:]]+pam_unix\.so' /etc/pam.d/physlock 2>/dev/null; then
+                physlock_ok=true
+            else
+                physlock_ok=true
+            fi
         else
-            physlock_ok=true
+            echo "ERROR: could not build physlock."
         fi
-    else
-        echo "ERROR: could not build physlock."
     fi
 fi
 

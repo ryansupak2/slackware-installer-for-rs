@@ -51,8 +51,17 @@ echo "Enabling and starting NetworkManager..."
 chmod +x /etc/rc.d/rc.networkmanager 2>/dev/null || true
 /etc/rc.d/rc.networkmanager start 2>/dev/null || true
 
-# 4. Copy rc.local
-cp "$REPO_DIR/dotfiles/system/rc.local" /etc/rc.d/rc.local 2>/dev/null || true
+# 4. Ensure rc.local exists and starts NetworkManager (append, never overwrite)
+if [ ! -f /etc/rc.d/rc.local ]; then
+    cp "$REPO_DIR/dotfiles/system/rc.local" /etc/rc.d/rc.local 2>/dev/null || true
+else
+    if ! grep -q "rc.networkmanager start" /etc/rc.d/rc.local 2>/dev/null; then
+        echo "/etc/rc.d/rc.networkmanager start" >> /etc/rc.d/rc.local
+        echo "  Added NetworkManager start to rc.local"
+    else
+        echo "  NetworkManager already in rc.local"
+    fi
+fi
 chmod +x /etc/rc.d/rc.local 2>/dev/null || true
 
 # 5. Connect to WiFi if keys provided
