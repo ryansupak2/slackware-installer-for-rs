@@ -3,16 +3,36 @@ SLACKWARE LINUX POST-INSTALL
 Fresh Slackware 15.0 install -> working Wayland desktop (ThinkPad X13).
 
 
-PREREQUISITES
--------------
+INSTALLING SLACKWARE
+-------------------
+GOTCHAS — Slackware's installer is minimal. Know these before starting.
 
-1. Install Slackware 15.0 from ISO. Partition the drive as follows:
+1. Boot from the USB stick. At the boot prompt, just press Enter.
 
-   - 512 MB        EFI System Partition (type EF00 in gdisk/cgdisk)
-   - 2x RAM size   Linux Swap (e.g. 32 GB for 16 GB RAM)
-   - Remainder     Linux Filesystem (type 8300)
+2. Partition the disk. Run cgdisk on your NVMe drive:
 
-2. During package selection, install these series:
+       cgdisk /dev/nvme0n1
+
+   Create three partitions in this order:
+
+       Size          Type    Code   Description
+       512 MB                 EF00   EFI System Partition
+       2x RAM size            8200   Linux Swap
+       Remainder              8300   Linux Filesystem
+
+   Write the table and quit.
+
+3. Run the installer:
+
+       setup
+
+   Work through each menu item. Key choices at each screen:
+
+   ADDSWAP  — select your swap partition, let it format
+   TARGET   — select your root partition, format as ext4
+   SOURCE   — choose "Install from a Slackware DVD or USB drive"
+              then "Manual" and point it at /dev/sdb1 (the installer USB)
+   SERIES   — select these:
 
        A     Base Linux system
        AP    Applications (non-X)
@@ -22,18 +42,34 @@ PREREQUISITES
        X     X Window System + XWayland
        XAP   X Applications (Firefox, Inkscape, etc.)
 
-3. After install, boot into Slackware. Plug in a USB stick containing
-   this repo (slackware-installer-for-rs/). Edit setup.keys.root on the
-   USB with at minimum:
+   PROMPT   — choose "full" (install everything without prompting)
+   NETWORK  — skip (NetworkManager handles it later)
+   FONT     — pick ter-v32b (or skip, bootstrap.sh sets it)
+   LILO     — skip (UEFI system, use elilo below)
+   ELILO    — install to the EFI partition
 
-       WIFI_SSID=YourNetwork
-       WIFI_PASS=YourPassword
-       DEEPSEEK_API_KEY=sk-...
+4. Set root password, exit setup, and reboot. Remove the USB.
 
-4. Mount the USB, enter the repo, and make scripts executable:
 
-       mount /dev/sdb1 /mnt/usb
+AFTER INSTALL
+-------------
+
+1. After install, boot into Slackware. Log in as root with the
+   password you set during setup.
+
+2. Plug in the second USB stick containing this repo. Mount it:
+
+       mkdir -p /mnt/usb
+       mount /dev/sdb1 /mnt/usb   (check dmesg | tail for the device name)
        cd /mnt/usb/slackware-installer-for-rs
+
+   setup.keys.root is pre-populated with WiFi and Deepseek keys.
+   If you need to change them, edit setup.keys.root now:
+
+       vi setup.keys.root   (or nano, or your preferred editor)
+
+3. Make scripts executable and run bootstrap:
+
        chmod +x bootstrap.sh post-install-global.sh post-install-user.sh
 
 

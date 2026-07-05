@@ -92,9 +92,26 @@ error_count=0
 if [ -f "$REPO_DIR/lib/common.sh" ]; then
     . "$REPO_DIR/lib/common.sh"
 fi
+
 echo "*****************************************************"
-echo "BASE PACKAGES & CONSOLE FONT"
+echo "SBOPKG + BASE PACKAGES + CONSOLE FONT"
 echo "*****************************************************"
+
+# --- Install sbopkg (needed for nodejs22) ---
+echo "Downloading and installing sbopkg..."
+if ! command -v sbopkg >/dev/null 2>&1; then
+    SBOPKG_URL="https://github.com/sbopkg/sbopkg/releases/download/0.38.3/sbopkg-0.38.3-noarch-1_wsr.tgz"
+    if wget -q "$SBOPKG_URL" -O /tmp/sbopkg.tgz; then
+        installpkg /tmp/sbopkg.tgz && rm -f /tmp/sbopkg.tgz
+        sbopkg -r  # sync SBo repository (~100MB, needs internet)
+    else
+        echo "ERROR: could not download sbopkg. nodejs22 install will fail."
+    fi
+else
+    echo "sbopkg already installed."
+fi
+
+# --- Install base packages ---
 echo "Installing base packages..."
 install_pkg "curl sudo" || true
 install_sbo "nodejs22" && {
