@@ -1,0 +1,9 @@
+# .bash_profile - sourced for login shells (bash -l, login sessions, etc.)
+
+# Source .bashrc for aliases, PS1, PATH, etc.
+# This ensures aliases (gs, vi, help, wifi, etc.) work even in login shells.
+if [ -f "$HOME/.bashrc" ]; then
+    . "$HOME/.bashrc"
+fi
+
+# Optional: any login-only setup can go below (e.g. ssh-agent, keychain already appended to .bashrc by the installer)

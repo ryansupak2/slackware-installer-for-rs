@@ -1,0 +1,37 @@
+WIFI_SSID=YOUR_WIFI_SSID
+WIFI_PASS=YOUR_WIFI_PASS
+DEEPSEEK_API_KEY=YOUR_DEEPSEEK_API_KEY
+# NordVPN service credentials (from https://my.nordaccount.com/ → NordVPN → Manual Setup)
+NORD_USER=YOUR_NORD_SERVICE_USERNAME
+NORD_PASS=YOUR_NORD_SERVICE_PASSWORD
+# NordVPN access token (from https://my.nordaccount.com/ → NordVPN → Access Token)
+# Generate this if you have 2FA enabled; used for API calls alongside service credentials
+NORDVPN_TOKEN=YOUR_NORDVPN_ACCESS_TOKEN
+
+# === 1. Root SSH Key (separate from Keychain agent wiring) ===
+# Used by the "Root SSH Key" menu item in Security & Access
+ROOT_SSH_KEY_TYPE=ed25519
+ROOT_SSH_COMMENT=ryansupak@gmail.com
+# Leave blank for no passphrase (strongly recommended for unattended root use)
+ROOT_SSH_PASSPHRASE=
+
+# === 2. GitHub (for the installer repo / updates) ===
+# GITHUB_INSTALLER_PAT must include scopes: repo + admin:public_key + gist
+# (gist scope enables pi /share; admin:public_key enables SSH key upload)
+# (Used by the "GitHub SSH (PAT)" menu item in Security & Access)
+GITHUB_INSTALLER_PAT=YOUR_GITHUB_INSTALLER_PAT
+GITHUB_INSTALLER_USERNAME=ryansupak2
+GITHUB_INSTALLER_EMAIL=ryansupak@gmail.com
+
+# === 4. Soulseek Daemon (slskd) ===
+# Soulseek login credentials for the headless slskd daemon
+SLSKD_USERNAME=your_soulseek_username
+SLSKD_PASSWORD=your_soulseek_password
+# slskd version to download (check https://github.com/slskd/slskd/releases)
+SLSKD_VERSION=0.25.1
+# Web UI port (default 5030), Soulseek protocol port (default 50300)
+SLSKD_WEB_PORT=5030
+SLSKD_SLSK_PORT=50300
+# Directories for shared files and downloads
+SLSKD_SHARE_DIR=/var/lib/slskd/music
+SLSKD_DOWNLOAD_DIR=/var/lib/slskd/downloads

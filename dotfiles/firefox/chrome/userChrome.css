@@ -1,0 +1,53 @@
+/* Force dark top chrome (titlebar, tabs, navbar) in Firefox on minimal setups like Slackware + dwl.
+   This complements GTK_THEME=Adwaita:dark and gtk settings.ini.
+   Requires toolkit.legacyUserProfileCustomizations.stylesheets = true in about:config (set by installer).
+*/
+
+:root {
+    --toolbar-bgcolor: #202023 !important;
+    --toolbar-color: #f0f0f0 !important;
+    --tab-selected-bgcolor: #2a2a2e !important;
+    --lwt-accent-color: #202023 !important;
+    --lwt-text-color: #f0f0f0 !important;
+    --arrowpanel-background: #202023 !important;
+    --arrowpanel-color: #f0f0f0 !important;
+}
+
+/* Main top bars */
+#titlebar,
+#TabsToolbar,
+#nav-bar,
+#PersonalToolbar,
+#navigator-toolbox {
+    background-color: #202023 !important;
+    color: #f0f0f0 !important;
+    border-bottom: 1px solid #3a3a3e !important;
+}
+
+/* Selected tab */
+.tab-background[selected="true"] {
+    background-color: #2a2a2e !important;
+}
+
+/* Inactive tabs */
+.tab-background:not([selected="true"]) {
+    background-color: #1a1a1d !important;
+}
+
+/* URL bar and search */
+#urlbar,
+.searchbar-textbox {
+    background-color: #2a2a2e !important;
+    color: #f0f0f0 !important;
+}
+
+/* Buttons and icons in toolbar */
+.toolbarbutton-1,
+#PanelUI-button {
+    fill: #f0f0f0 !important;
+}
+
+/* Ensure the window title (if using native titlebar) is readable */
+.titlebar-buttonbox {
+    color: #f0f0f0 !important;
+}

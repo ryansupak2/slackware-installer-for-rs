@@ -1,0 +1,53 @@
+alias vi='vim'  #help:vi=vim
+alias draw='inkscape & exit'  #help:draw=inkscape
+w() { /usr/local/bin/w "$@" & disown; exit; }  #help:w=firefox (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
+alias 'w?'='/usr/local/bin/w?'  #help:w?=list url shortcuts
+alias f='yad --file & exit'  #help:f=file chooser
+alias help='/usr/local/bin/help.sh'  #help:help=this screen
+alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'  #help:neofetch=system info
+alias pi='pi --readonly'  #help:pi=AI coding assistant
+alias wifi='wifi-manager'  #help:wifi=wifi network chooser
+alias net='net-watch'
+alias net-watch='/usr/local/bin/net-watch'
+#
+## startx note (important):
+## We do NOT define any alias for startx here.
+## startx (the safe wrapper installed to /usr/local/bin/startx) is only ever
+## meant to be run from a bare text console / login prompt, *before* any
+## graphical session or .bashrc has been sourced. Aliasing it would be
+## inappropriate and potentially confusing.
+alias sound='alsamixer -c 0'  #help:sound=volume mixer
+alias vnc='/usr/local/bin/vnc'  #help:vnc=VNC server manager
+alias vpn='/usr/local/bin/vpn'  #help:vpn=openvpn toggle
+alias slsk='/usr/local/bin/slsk'  #help:slsk=soulseek
+alias gc='git commit'  #help:gc=git commit
+alias gs='git status'  #help:gs=git status
+alias gp='git push'  #help:gp=git push
+alias ga='git add'  #help:ga=git add
+## startx note (important):
+## We do NOT define any alias for startx here.
+## startx (the safe wrapper installed to /usr/local/bin/startx) is only ever
+## meant to be run from a bare text console / login prompt, *before* any
+## graphical session or .bashrc has been sourced. Aliasing it would be
+## inappropriate and potentially confusing.
+alias sound='alsamixer -c 0'
+alias vnc='/usr/local/bin/vnc'  #help:vnc=VNC server manager
+alias slsk='/usr/local/bin/slsk'
+alias gc='git commit'
+alias gs='git status'
+alias gp='git push'
+alias ga='git add'
+# Keyboard backlight: no longer set automatically on shell start.
+# (Set once at X session start by ~/.xinitrc to 50%.)
+
+# console prompt (restored): LoggedInUser@TopDirectory in shades of green/blue
+# (matches pre-refactor behavior; overrides system /etc/profile PS1)
+export PS1='\[\e[32m\]\u@\[\e[38;5;153m\]\W\[\e[0m\]\$ '
+
+# to make draw (inkscape) font a readable size
+export GDK_DPI_SCALE=1.5
+
+#node (not part of core install)
+export PATH=/usr/local/node/bin:$PATH
+# screen locking: 'lock' works in dwl (wlock) and on TTY (physlock)
+alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (wlock in dwl, physlock on TTY)

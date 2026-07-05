@@ -1,0 +1,13 @@
+syntax on
+set number
+set t_Co=256
+colorscheme pablo
+
+set clipboard=unnamedplus
+
+set backup
+set backupdir=~/.vim/backup
+set swapfile
+set directory=~/.vim/swap
+set undofile
+set undodir=~/.vim/undo

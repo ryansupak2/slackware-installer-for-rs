@@ -1,0 +1,28 @@
+#!/bin/bash
+# steps/console-font.sh - CONSOLE FONT
+
+REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
+LOG_FILE="${LOG_FILE:-/logs/installer.log}"
+
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
+
+echo "*****************************************************"
+echo "CONSOLE FONT"
+echo "*****************************************************"
+echo "Enabling console font via /etc/rc.d/rc.font..."
+
+# Slackware's rc.M already calls /etc/rc.d/rc.font if it's executable.
+# Just write the setfont command and make it executable.
+cat > /etc/rc.d/rc.font << 'EOF'
+#!/bin/bash
+setfont ter-v32b
+EOF
+chmod +x /etc/rc.d/rc.font
+
+# Apply immediately
+setfont ter-v32b 2>/dev/null || true
+
+echo "SUCCESS: Console font configured (ter-v32b, permanent via rc.font)."
+exit 0

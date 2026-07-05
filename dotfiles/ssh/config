@@ -1,0 +1,4 @@
+Host *
+    StrictHostKeyChecking ask
+    UserKnownHostsFile ~/.ssh/known_hosts
+    IdentitiesOnly yes

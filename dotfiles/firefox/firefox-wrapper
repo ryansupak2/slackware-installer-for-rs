@@ -1,0 +1,7 @@
+#!/bin/sh
+exec env \
+    MOZ_DISABLE_GMP_SANDBOX=1 \
+    MOZ_GMP_PATH=/usr/lib/mozilla/gmp-widevinecdm:/usr/lib/firefox/gmp-widevinecdm \
+    GTK_THEME=Adwaita:dark \
+    MOZ_GTK_TITLEBAR_DECORATION=client \
+    /usr/lib/firefox/firefox "$@"

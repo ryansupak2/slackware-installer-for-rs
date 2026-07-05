@@ -1,0 +1,7 @@
+enable_auth=true
+username=vncviewer
+password=Piyf0jk1
+certificate_file=/etc/wayvnc/cert.pem
+private_key_file=/etc/wayvnc/key.pem
+allow_broken_crypto=true
+relax_encryption=true

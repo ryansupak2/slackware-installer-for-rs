@@ -1,0 +1,14 @@
+ovpn.zip
+
+# wlock build artifacts
+sources/wlock/*.o
+sources/wlock/wlock
+
+# physlock build artifacts
+sources/physlock/*.o
+sources/physlock/physlock
+
+# Key files (contain credentials — NEVER commit)
+setup.keys.root
+setup.keys.rs
+setup.keys.ryansupak
