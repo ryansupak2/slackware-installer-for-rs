@@ -1648,6 +1648,19 @@ keypress(struct wl_listener *listener, void *data)
 	int handled = 0;
 	uint32_t mods = wlr_keyboard_get_modifiers(&group->wlr_group->keyboard);
 
+	/* Reconcile somebar modKeyHeld with actual keyboard state.
+	 * The Mod-key release event can be lost after suspend/resume while
+	 * input devices reconnect. Checking the real modifier state on every
+	 * key event catches this without a timer. */
+	if (!(mods & WLR_MODIFIER_LOGO)) {
+		const char *rt = getenv("XDG_RUNTIME_DIR");
+		char sf[256];
+		if (rt) {
+			snprintf(sf, sizeof(sf), "%s/somebar-0", rt);
+			int sfd = open(sf, O_WRONLY | O_NONBLOCK);
+			if (sfd >= 0) { write(sfd, "showmod off\n", 12); close(sfd); }
+		}
+	}
 	wlr_idle_notifier_v1_notify_activity(idle_notifier, seat);
 
 	/* On _press_ if there is no active screen locker,
