@@ -11,6 +11,8 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
 #include <wlr/backend/libinput.h>
@@ -1668,6 +1670,30 @@ keypress(struct wl_listener *listener, void *data)
 
 	if (handled)
 		return;
+
+	/* Hide Mode: bare Mod-key (Super_L/R) shows/hides somebar */
+	if (!locked) {
+		for (i = 0; i < nsyms; i++) {
+			if (syms[i] == XKB_KEY_Super_L || syms[i] == XKB_KEY_Super_R) {
+				const char *runtime = getenv("XDG_RUNTIME_DIR");
+				char fifo[256];
+				if (runtime) {
+					snprintf(fifo, sizeof(fifo), "%s/somebar-0", runtime);
+					if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+						int fd = open(fifo, O_WRONLY | O_NONBLOCK);
+						if (fd >= 0) { write(fd, "showmod all\n", 13); close(fd); }
+					} else {
+						struct stat st;
+						if (stat("/tmp/hide_mode", &st) == 0) {
+							int fd2 = open(fifo, O_WRONLY | O_NONBLOCK);
+							if (fd2 >= 0) { write(fd2, "showmod off\n", 13); close(fd2); }
+						}
+					}
+				}
+				break;
+			}
+		}
+	}
 
 	wlr_seat_set_keyboard(seat, &group->wlr_group->keyboard);
 	/* Forward both press and release to clients. Keybinding processing above

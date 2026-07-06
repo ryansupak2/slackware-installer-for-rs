@@ -33,7 +33,8 @@ if $ok; then
     mkdir -p /usr/local/src/suckless
     cd /usr/local/src/suckless
 
-    if [ -x /usr/local/bin/dwl ]; then
+    if [ -x /usr/local/bin/dwl ] && \
+       cmp -s "$REPO_DIR/dotfiles/suckless/dwl/config.h" /usr/local/src/suckless/dwl-stamp/config.h 2>/dev/null; then
         echo "dwl already installed — skipping"
     else
         echo "Installing Suckless dwl..."
@@ -49,6 +50,10 @@ if $ok; then
             if ! make clean install; then
                 echo "ERROR: make clean install for dwl failed."
                 ok=false
+            else
+                # Stamp the dotfiles so we can detect changes on reinstall
+                mkdir -p /usr/local/src/suckless/dwl-stamp
+                cp -f "$REPO_DIR/dotfiles/suckless/dwl/config.h" /usr/local/src/suckless/dwl-stamp/config.h
             fi
             cd ..
         fi
@@ -56,7 +61,11 @@ if $ok; then
 fi
 
 if $ok; then
-    if [ -x /usr/local/bin/somebar ]; then
+    if [ -x /usr/local/bin/somebar ] && \
+       cmp -s "$REPO_DIR/dotfiles/somebar/main.cpp" /usr/local/src/suckless/somebar-stamp/main.cpp 2>/dev/null && \
+       cmp -s "$REPO_DIR/dotfiles/somebar/bar.cpp" /usr/local/src/suckless/somebar-stamp/bar.cpp 2>/dev/null && \
+       cmp -s "$REPO_DIR/dotfiles/somebar/config.hpp" /usr/local/src/suckless/somebar-stamp/config.hpp 2>/dev/null && \
+       cmp -s "$REPO_DIR/dotfiles/somebar/common.hpp" /usr/local/src/suckless/somebar-stamp/common.hpp 2>/dev/null; then
         echo "somebar already installed — skipping"
     else
         echo "Installing somebar (dwl companion status bar)..."
@@ -70,10 +79,17 @@ if $ok; then
             cp "$REPO_DIR/dotfiles/somebar/common.hpp" src/common.hpp
             cp "$REPO_DIR/dotfiles/somebar/bar.cpp"    src/bar.cpp
             cp "$REPO_DIR/dotfiles/somebar/main.cpp"  src/main.cpp
-            meson setup build && ninja -C build && ninja -C build install
+            meson setup build --wipe && ninja -C build && ninja -C build install
             if [ $? -ne 0 ]; then
                 echo "ERROR: build/install for somebar failed."
                 ok=false
+            else
+                # Stamp the dotfiles so we can detect changes on reinstall
+                mkdir -p /usr/local/src/suckless/somebar-stamp
+                cp -f "$REPO_DIR/dotfiles/somebar/main.cpp" /usr/local/src/suckless/somebar-stamp/main.cpp
+                cp -f "$REPO_DIR/dotfiles/somebar/bar.cpp" /usr/local/src/suckless/somebar-stamp/bar.cpp
+                cp -f "$REPO_DIR/dotfiles/somebar/config.hpp" /usr/local/src/suckless/somebar-stamp/config.hpp
+                cp -f "$REPO_DIR/dotfiles/somebar/common.hpp" /usr/local/src/suckless/somebar-stamp/common.hpp
             fi
             cd ..
         fi
@@ -86,8 +102,17 @@ if $ok; then
     chmod +x /usr/local/bin/dwl-start
     cp "$REPO_DIR/scripts/dwl-status.sh" /usr/local/bin/dwl-status
     chmod +x /usr/local/bin/dwl-status
+    cp "$REPO_DIR/scripts/temp-msg.sh" /usr/local/bin/temp-msg.sh
+    chmod +x /usr/local/bin/temp-msg.sh
+    cp "$REPO_DIR/scripts/toggle-hide-mode.sh" /usr/local/bin/toggle-hide-mode.sh
+    chmod +x /usr/local/bin/toggle-hide-mode.sh
+    cp "$REPO_DIR/scripts/toggle-bar.sh" /usr/local/bin/toggle-bar.sh
+    chmod +x /usr/local/bin/toggle-bar.sh
     echo "  dwl-start deployed to /usr/local/bin/dwl-start"
     echo "  dwl-status deployed to /usr/local/bin/dwl-status"
+    echo "  temp-msg deployed to /usr/local/bin/temp-msg.sh"
+    echo "  toggle-hide-mode deployed to /usr/local/bin/toggle-hide-mode.sh"
+    echo "  toggle-bar deployed to /usr/local/bin/toggle-bar.sh"
     echo "Installing shell shortcuts + neofetch launcher..."
     cp "$REPO_DIR/scripts/g" /usr/local/bin/g
     chmod +x /usr/local/bin/g

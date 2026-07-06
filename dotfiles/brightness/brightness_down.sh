@@ -1,4 +1,8 @@
 #!/bin/sh
+
+# Source temp-msg helper
+if [ -f /usr/local/bin/temp-msg.sh ]; then . /usr/local/bin/temp-msg.sh
+else set_temp_msg() { echo "$1" > /tmp/status_msg; echo $(($(date +%s) + ${2:-4})) > /tmp/status_end; }; fi
 device=$(ls /sys/class/backlight/ | head -1)
 if [ -n "$device" ]; then
     max=$(cat /sys/class/backlight/$device/max_brightness)
@@ -7,6 +11,5 @@ if [ -n "$device" ]; then
     if [ $new -lt 0 ]; then new=0; fi
     echo $new > /sys/class/backlight/$device/brightness
     percent=$((new * 100 / max))
-    echo "Brightness: $percent%" > /tmp/status_msg
-    echo $(($(date +%s) + 3)) > /tmp/status_end
+    set_temp_msg "Brightness: $percent%"
 fi

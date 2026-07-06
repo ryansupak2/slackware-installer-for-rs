@@ -8,6 +8,7 @@
 #include <optional>
 #include <utility>
 #include <vector>
+#include <ctime>
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -34,6 +35,10 @@ struct Monitor {
 	bool desiredVisibility {true};
 	bool hasData;
 	uint32_t tags;
+	// Hide Mode: track previous values to avoid spurious auto-show on unchanged data
+	uint32_t prevTags {0};
+	bool prevSelected {false};
+	std::string prevLayout;
 };
 
 struct SeatPointer {
@@ -84,6 +89,9 @@ static int displayFd {-1};
 static int statusFifoFd {-1};
 static int statusFifoWriter {-1};
 static bool quitting {false};
+static bool hideMode = true;
+static time_t autoShowUntil = 0;
+static bool modKeyHeld = false;
 
 // update keybindings to match your dwl
 void view(Monitor& m, const Arg& arg)
@@ -241,6 +249,12 @@ void onReady()
 	for (auto output : uninitializedOutputs) {
 		setupMonitor(output.first, output.second);
 	}
+	// Hide Mode is ON by default — ensure monitors start hidden
+	if (hideMode) {
+		for (auto &monitor : monitors) {
+			monitor.desiredVisibility = false;
+		}
+	}
 	wl_display_roundtrip(display); // wait for xdg_output names before we read stdin
 }
 
@@ -318,18 +332,35 @@ static void handleStdin(const std::string& line)
 		stream >> std::ws;
 		std::getline(stream, title);
 		mon->bar.setTitle(title);
+		// Log: title changes are expected during Firefox tab switches / app launches
+		// and should NOT trigger auto-show (only tags/layout/selmon do)
+		fprintf(stderr, "[somebar] title: mon=%s val='%s' (no auto-show)\n", monName.c_str(), title.c_str());
 	} else if (command == "selmon") {
 		uint32_t selected;
 		stream >> selected;
 		mon->bar.setSelected(selected);
+		bool selChanged = (mon->prevSelected != (selected != 0));
+		bool oldSelected = mon->prevSelected;
+		mon->prevSelected = (selected != 0);
 		if (selected) {
 			selmon = &*mon;
 		} else if (selmon == &*mon) {
 			selmon = nullptr;
 		}
+		// Hide Mode: auto-show only when selmon actually changes
+		if (hideMode && selChanged) {
+			autoShowUntil = time(nullptr) + 3;
+			mon->desiredVisibility = true;
+			fprintf(stderr, "[somebar] selmon CHANGED: mon=%s prev=%d new=%d -> auto-show\n", monName.c_str(), oldSelected, mon->prevSelected);
+		} else if (hideMode) {
+			fprintf(stderr, "[somebar] selmon unchanged: mon=%s val=%d (suppressed)\n", monName.c_str(), mon->prevSelected);
+		}
 	} else if (command == "tags") {
 		uint32_t occupied, tags, clientTags, urgent;
 		stream >> occupied >> tags >> clientTags >> urgent;
+		bool tagsChanged = (mon->prevTags != tags);
+		uint32_t oldTags = mon->prevTags;
+		mon->prevTags = tags;
 		for (auto i=0u; i<tagNames.size(); i++) {
 			auto tagMask = 1 << i;
 			int state = TagState::None;
@@ -340,11 +371,30 @@ static void handleStdin(const std::string& line)
 			mon->bar.setTag(i, state, occupied & tagMask ? 1 : 0, clientTags & tagMask ? 0 : -1);
 		}
 		mon->tags = tags;
+		// Hide Mode: auto-show only when tags actually change
+		if (hideMode && tagsChanged) {
+			autoShowUntil = time(nullptr) + 3;
+			mon->desiredVisibility = true;
+			fprintf(stderr, "[somebar] tags CHANGED: mon=%s prev=%u new=%u -> auto-show\n", monName.c_str(), oldTags, tags);
+		} else if (hideMode) {
+			fprintf(stderr, "[somebar] tags unchanged: mon=%s val=%u (suppressed)\n", monName.c_str(), tags);
+		}
 	} else if (command == "layout") {
 		auto layout = std::string {};
 		stream >> std::ws;
 		std::getline(stream, layout);
+		bool layoutChanged = (mon->prevLayout != layout);
+		std::string oldLayout = std::move(mon->prevLayout);
+		mon->prevLayout = layout;
 		mon->bar.setLayout(layout);
+		// Hide Mode: auto-show only when layout actually changes
+		if (hideMode && layoutChanged) {
+			autoShowUntil = time(nullptr) + 3;
+			mon->desiredVisibility = true;
+			fprintf(stderr, "[somebar] layout CHANGED: mon=%s prev='%s' new='%s' -> auto-show\n", monName.c_str(), oldLayout.c_str(), layout.c_str());
+		} else if (hideMode) {
+			fprintf(stderr, "[somebar] layout unchanged: mon=%s val='%s' (suppressed)\n", monName.c_str(), layout.c_str());
+		}
 	}
 	mon->hasData = true;
 	updatemon(*mon);
@@ -352,6 +402,7 @@ static void handleStdin(const std::string& line)
 
 const std::string prefixStatus = "status ";
 const std::string prefixShow = "show ";
+const std::string prefixShowmod = "showmod ";
 const std::string prefixHide = "hide ";
 const std::string prefixToggle = "toggle ";
 const std::string argAll = "all";
@@ -372,12 +423,56 @@ void onStatus()
 				monitor.bar.setStatus(lastStatus);
 				monitor.bar.invalidate();
 			}
+		} else if (str.rfind(prefixShowmod, 0) == 0) {
+			auto arg = str.substr(prefixShowmod.size());
+			if (arg.rfind("off", 0) == 0) {
+				// Mod RELEASE: start 3-second countdown
+				fprintf(stderr, "[somebar] FIFO: showmod off, modKeyHeld=false, 3s timer (hideMode=%d)\n", hideMode);
+				modKeyHeld = false;
+				autoShowUntil = time(nullptr) + 3;
+			} else {
+				// Mod PRESS: show bar, block auto-hide until release
+				fprintf(stderr, "[somebar] FIFO: showmod '%s', modKeyHeld=true (hideMode=%d)\n", arg.c_str(), hideMode);
+				modKeyHeld = true;
+				autoShowUntil = 0;
+				updateVisibility(arg, [](bool) { return true; });
+			}
 		} else if (str.rfind(prefixShow, 0) == 0) {
-			updateVisibility(str.substr(prefixShow.size()), [](bool) { return true; });
+			auto arg = str.substr(prefixShow.size());
+			fprintf(stderr, "[somebar] FIFO: show '%s' (hideMode=%d)\n", arg.c_str(), hideMode);
+			updateVisibility(arg, [](bool) { return true; });
+			// Signal/temp-msg show: set 3s auto-hide (modKeyHeld blocks actual hide)
+			if (hideMode) {
+				autoShowUntil = time(nullptr) + 3;
+			}
 		} else if (str.rfind(prefixHide, 0) == 0) {
-			updateVisibility(str.substr(prefixHide.size()), [](bool) { return false; });
+			auto arg = str.substr(prefixHide.size());
+			fprintf(stderr, "[somebar] FIFO: hide '%s' (hideMode=%d)\n", arg.c_str(), hideMode);
+			// Clear any pending auto-hide timer on explicit hide
+			autoShowUntil = 0;
+			updateVisibility(arg, [](bool) { return false; });
 		} else if (str.rfind(prefixToggle, 0) == 0) {
-			updateVisibility(str.substr(prefixToggle.size()), [](bool vis) { return !vis; });
+			auto arg = str.substr(prefixToggle.size());
+			fprintf(stderr, "[somebar] FIFO: toggle '%s' (hideMode=%d)\n", arg.c_str(), hideMode);
+			updateVisibility(arg, [](bool vis) { return !vis; });
+		} else if (str.rfind("hidemode on", 0) == 0) {
+			fprintf(stderr, "[somebar] FIFO: hidemode on\n");
+			hideMode = true;
+			autoShowUntil = 0;
+			modKeyHeld = false;
+			for (auto &monitor : monitors) {
+				monitor.desiredVisibility = false;
+				updatemon(monitor);
+			}
+		} else if (str.rfind("hidemode off", 0) == 0) {
+			fprintf(stderr, "[somebar] FIFO: hidemode off\n");
+			hideMode = false;
+			autoShowUntil = 0;
+			modKeyHeld = false;
+			for (auto &monitor : monitors) {
+				monitor.desiredVisibility = true;
+				updatemon(monitor);
+			}
 		}
 	});
 }
@@ -546,8 +641,29 @@ int main(int argc, char* argv[])
 	}
 
 	while (!quitting) {
+		// Check auto-hide timer for Hide Mode
+		int pollTimeout = -1;
+		if (autoShowUntil > 0) {
+			time_t now = time(nullptr);
+			if (now >= autoShowUntil) {
+				autoShowUntil = 0;
+				// Only hide if Mod key is not currently held
+				if (hideMode && !modKeyHeld) {
+					fprintf(stderr, "[somebar] auto-hide timer expired: re-hiding all monitors\n");
+					for (auto &monitor : monitors) {
+						monitor.desiredVisibility = false;
+						updatemon(monitor);
+					}
+				} else if (modKeyHeld) {
+					fprintf(stderr, "[somebar] auto-hide timer expired but modKeyHeld=true, skipping hide\n");
+				}
+			} else {
+				pollTimeout = static_cast<int>((autoShowUntil - now) * 1000);
+			}
+		}
+
 		waylandFlush();
-		if (poll(pollfds.data(), pollfds.size(), -1) < 0) {
+		if (poll(pollfds.data(), pollfds.size(), pollTimeout) < 0) {
 			if (errno != EINTR) {
 				diesys("poll");
 			}

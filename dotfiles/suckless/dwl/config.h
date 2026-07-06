@@ -130,6 +130,8 @@ static const Key keys[] = {
 	{ 0,                            XKB_KEY_XF86MonBrightnessUp,   spawn, {.v = (const char*[]){"/usr/local/bin/brightness_up.sh", NULL} } },
 	{ WLR_MODIFIER_SHIFT,           XKB_KEY_XF86MonBrightnessDown, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_down.sh", NULL} } },
 	{ WLR_MODIFIER_SHIFT,           XKB_KEY_XF86MonBrightnessUp,   spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_up.sh", NULL} } },
+	{ MODKEY,                       XKB_KEY_h,                     spawn,  SHCMD("/usr/local/bin/toggle-hide-mode.sh") },
+	{ MODKEY,                       XKB_KEY_b,                     spawn,  SHCMD("/usr/local/bin/toggle-bar.sh") },
 };
 
 static const Button buttons[] = {
