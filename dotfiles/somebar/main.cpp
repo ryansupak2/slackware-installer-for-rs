@@ -233,6 +233,17 @@ void updatemon(Monitor& mon)
 	} else if (mon.bar.visible()) {
 		mon.bar.hide();
 	}
+	// Sync /tmp/bar_shown for toggle-bar.sh message logic
+	bool anyVisible = false;
+	for (auto &m : monitors) {
+		if (m.bar.visible()) { anyVisible = true; break; }
+	}
+	if (anyVisible) {
+		int fd = open("/tmp/bar_shown", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+		if (fd >= 0) close(fd);
+	} else {
+		unlink("/tmp/bar_shown");
+	}
 }
 
 // called after we have received the initial batch of globals

@@ -19,12 +19,12 @@ fi
 if [ -f "$HIDE_MODE_FILE" ]; then
     # Turn hide mode OFF — show bar, message stays for 3s
     rm -f "$HIDE_MODE_FILE"
-    set_temp_msg "(Hide Mode Off)"
+    set_temp_msg "(Hide Mode Off [Mod+H])"
     echo "hidemode off" > "$FIFO" 2>/dev/null
 else
-    # Turn hide mode ON — show bar with message, then hide after 3s
+    # Turn hide mode ON — show bar with message, auto-hide via somebar timer
     touch "$HIDE_MODE_FILE"
-    set_temp_msg "(Hide Mode On [Mod+H])"
+    echo "hidemode on" > "$FIFO" 2>/dev/null
     echo "show all" > "$FIFO" 2>/dev/null
-    (sleep 3; [ -f "$HIDE_MODE_FILE" ] && echo "hidemode on" > "$FIFO" 2>/dev/null) &
+    set_temp_msg "(Hide Mode On [Mod+H])"
 fi

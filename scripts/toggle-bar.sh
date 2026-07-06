@@ -16,11 +16,21 @@ else
 fi
 
 if [ -f "$HIDE_MODE_FILE" ]; then
-    # Hide Mode was ON — turn it off, show bar, display message
+    # Hide Mode was ON — turn it off, show bar with bar-visible message
     rm -f "$HIDE_MODE_FILE"
     echo "hidemode off" > "$FIFO" 2>/dev/null
-    set_temp_msg "(Hide Mode Off)"
+    set_temp_msg "(Bar Visible [Mod+B])"
 else
-    # Hide Mode already OFF — just toggle bar visibility
-    echo "toggle all" > "$FIFO" 2>/dev/null
+    # Hide Mode already OFF — toggle bar visibility
+    BAR_STATE="/tmp/bar_shown"
+    if [ -f "$BAR_STATE" ]; then
+        # Bar is visible — hide it, no message
+        rm -f "$BAR_STATE"
+        echo "hide all" > "$FIFO" 2>/dev/null
+    else
+        # Bar is hidden — show it with message
+        touch "$BAR_STATE"
+        echo "show all" > "$FIFO" 2>/dev/null
+        set_temp_msg "(Bar Visible [Mod+B])"
+    fi
 fi
