@@ -8,9 +8,18 @@ fi
 
 # Optional: any login-only setup can go below (e.g. ssh-agent, keychain already appended to .bashrc by the installer)
 
+LOG="$HOME/logs/shell-init.log"
+mkdir -p "$HOME/logs" 2>/dev/null
+
 if [ -n "$DWL_FIRST_TERMINAL" ]; then
-    echo -e "\n\n\n"
+    echo "[$(date '+%H:%M:%S')] first-terminal newline" >> "$LOG"
+    echo
     unset DWL_FIRST_TERMINAL
+elif [ -f /tmp/hide_mode ]; then
+    echo "[$(date '+%H:%M:%S')] hide-mode newline" >> "$LOG"
+    echo
+else
+    echo "[$(date '+%H:%M:%S')] normal start (no newline)" >> "$LOG"
 fi
 
 neofetch
