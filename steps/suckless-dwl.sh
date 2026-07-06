@@ -34,7 +34,8 @@ if $ok; then
     cd /usr/local/src/suckless
 
     if [ -x /usr/local/bin/dwl ] && \
-       cmp -s "$REPO_DIR/dotfiles/suckless/dwl/config.h" /usr/local/src/suckless/dwl-stamp/config.h 2>/dev/null; then
+       cmp -s "$REPO_DIR/dotfiles/suckless/dwl/config.h" /usr/local/src/suckless/dwl-stamp/config.h 2>/dev/null && \
+       cmp -s "$REPO_DIR/dotfiles/suckless/dwl/dwl.c.patched" /usr/local/src/suckless/dwl-stamp/dwl.c.patched 2>/dev/null; then
         echo "dwl already installed — skipping"
     else
         echo "Installing Suckless dwl..."
@@ -54,6 +55,7 @@ if $ok; then
                 # Stamp the dotfiles so we can detect changes on reinstall
                 mkdir -p /usr/local/src/suckless/dwl-stamp
                 cp -f "$REPO_DIR/dotfiles/suckless/dwl/config.h" /usr/local/src/suckless/dwl-stamp/config.h
+                cp -f "$REPO_DIR/dotfiles/suckless/dwl/dwl.c.patched" /usr/local/src/suckless/dwl-stamp/dwl.c.patched
             fi
             cd ..
         fi

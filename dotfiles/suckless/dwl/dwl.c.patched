@@ -2857,6 +2857,16 @@ unlocksession(struct wl_listener *listener, void *data)
 {
 	SessionLock *lock = wl_container_of(listener, lock, unlock);
 	destroylock(lock, 1);
+
+	/* Force-clear somebar modKeyHeld — the Mod key release may have
+	 * been missed during lock/lid-close, leaving the bar permanently shown. */
+	const char *runtime = getenv("XDG_RUNTIME_DIR");
+	char fifo[256];
+	if (runtime) {
+		snprintf(fifo, sizeof(fifo), "%s/somebar-0", runtime);
+		int fd = open(fifo, O_WRONLY | O_NONBLOCK);
+		if (fd >= 0) { write(fd, "showmod off\n", 12); close(fd); }
+	}
 }
 
 void

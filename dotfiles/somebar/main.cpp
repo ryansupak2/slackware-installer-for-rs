@@ -449,8 +449,9 @@ void onStatus()
 			if (arg.rfind("off", 0) == 0) {
 				// Mod RELEASE
 				fprintf(stderr, "[somebar] FIFO: showmod off, modKeyHeld=false (hideMode=%d)\n", hideMode);
+				auto wasHeld = modKeyHeld;
 				modKeyHeld = false;
-				if (hideMode) {
+				if (hideMode && wasHeld) {
 					autoShowUntil = time(nullptr) + 3;
 				}
 			} else {
