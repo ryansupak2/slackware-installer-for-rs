@@ -53,11 +53,17 @@ setup_ssh() {
     fi
 
     if command -v keychain >/dev/null 2>&1; then
-        echo "eval \\`keychain --eval --quiet ~/.ssh/id_${KEY_TYPE}\\`" >> "$HOME_TARGET/.bashrc"
-        echo "SSH keychain setup added to $HOME_TARGET/.bashrc"
+        if ! grep -q 'keychain --eval' "$HOME_TARGET/.bashrc" 2>/dev/null; then
+            echo "eval \\`keychain --eval --quiet ~/.ssh/id_${KEY_TYPE}\\`" >> "$HOME_TARGET/.bashrc"
+            echo "SSH keychain setup added to $HOME_TARGET/.bashrc"
+        else
+            echo "SSH keychain already in $HOME_TARGET/.bashrc — skipping"
+        fi
     else
-        echo "eval \"\\$(ssh-agent -s)\" && ssh-add ~/.ssh/id_${KEY_TYPE}" >> "$HOME_TARGET/.bashrc"
-        echo "SSH agent setup added to $HOME_TARGET/.bashrc (keychain not available)"
+        if ! grep -q 'ssh-agent -s' "$HOME_TARGET/.bashrc" 2>/dev/null; then
+            echo "eval \"\\$(ssh-agent -s)\" && ssh-add ~/.ssh/id_${KEY_TYPE}" >> "$HOME_TARGET/.bashrc"
+            echo "SSH agent setup added to $HOME_TARGET/.bashrc (keychain not available)"
+        fi
     fi
 
     chown -R "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.ssh"

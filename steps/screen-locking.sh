@@ -29,6 +29,19 @@ if $ok; then
     chmod +x /usr/local/bin/lid-timer.sh 2>/dev/null || true
 fi
 
+# --- elogind system-sleep hook (lock screen before/after suspend) ---
+ELG_DIR="/usr/lib/elogind/system-sleep"
+if [ ! -d "$ELG_DIR" ]; then
+    echo "ERROR: elogind system-sleep directory not found at $ELG_DIR."
+    echo "       Screen will not lock on suspend/resume."
+    ok=false
+else
+    mkdir -p "$ELG_DIR" 2>/dev/null || true
+    cp "$REPO_DIR/dotfiles/lockscreen/elogind-sleep-hook.sh" "$ELG_DIR/lock-screen.sh" 2>/dev/null || ok=false
+    chmod +x "$ELG_DIR/lock-screen.sh" 2>/dev/null || true
+    echo "  elogind sleep hook deployed to $ELG_DIR/lock-screen.sh"
+fi
+
 # wlock (Wayland screen locker)
 echo "Installing screen lockers (wlock + physlock)..."
 
@@ -50,7 +63,8 @@ else
             if grep -qE '^[[:space:]]*(auth|account)[[:space:]]+(required|requisite|sufficient)[[:space:]]+pam_unix\.so' /etc/pam.d/wlock 2>/dev/null; then
                 wlock_ok=true
             else
-                wlock_ok=true  # assume ok but warn
+                echo "ERROR: wlock PAM config missing required pam_unix.so entries."
+                wlock_ok=false
             fi
         else
             echo "ERROR: could not build wlock (is wayland-base installed?)."

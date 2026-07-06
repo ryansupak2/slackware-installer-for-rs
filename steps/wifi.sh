@@ -12,6 +12,8 @@ echo "*****************************************************"
 echo "NETWORKING"
 echo "*****************************************************"
 
+ok=true
+
 # 1. Detect WiFi card
 WLAN_IF=$(iw dev 2>/dev/null | awk '$1 == "Interface" { print $2; exit }' || true)
 if [ -z "$WLAN_IF" ]; then
@@ -49,7 +51,7 @@ fi
 # 3. Start NetworkManager
 echo "Enabling and starting NetworkManager..."
 chmod +x /etc/rc.d/rc.networkmanager 2>/dev/null || true
-/etc/rc.d/rc.networkmanager start 2>/dev/null || true
+/etc/rc.d/rc.networkmanager start 2>/dev/null || ok=false
 
 # 4. Ensure rc.local exists and starts NetworkManager (append, never overwrite)
 if [ ! -f /etc/rc.d/rc.local ]; then
@@ -76,4 +78,10 @@ else
     echo "WiFi not auto-configured; use nmtui or nmcli manually."
 fi
 
-exit 0
+if $ok; then
+    echo "SUCCESS: WiFi configured."
+    exit 0
+else
+    echo "ERROR: WiFi setup failed (NetworkManager did not start)."
+    exit 1
+fi

@@ -40,6 +40,7 @@ if [ ! -S "$ROOT_RT/pipewire-0" ]; then
 
     pipewire &
     PW_PID=$!
+    PW_STARTED=true
     for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.1; [ -S "$ROOT_RT/pipewire-0" ] && break; done
     if [ ! -S "$ROOT_RT/pipewire-0" ]; then echo "ERROR: pipewire failed to start"; kill $PW_PID 2>/dev/null; exit 1; fi
     pipewire-media-session &
@@ -61,12 +62,28 @@ chmod a+rw "$ROOT_RT"/pipewire-0 2>/dev/null || true
 chmod -R a+rwX "$ROOT_RT"/pulse 2>/dev/null || true
 
 # ── Test mic capture as the target user ────────────────────────────────
+echo "  Ensuring capture profile is active..."
+# Force duplex profile if not already set (jack detection may show mic as unavailable)
+CAPTURE_SOURCE=$(pactl list sources short 2>/dev/null | grep -v monitor | head -1 | awk '{print $2}')
+if [ -z "$CAPTURE_SOURCE" ]; then
+    CARD_ID=$(pactl list cards short 2>/dev/null | grep alsa | head -1 | awk '{print $1}')
+    if [ -n "$CARD_ID" ]; then
+        pactl set-card-profile "$CARD_ID" output:analog-stereo+input:analog-stereo 2>/dev/null || true
+        pactl set-card-profile "$CARD_ID" output:analog-stereo+input:iec958-stereo 2>/dev/null || true
+        sleep 1
+        CAPTURE_SOURCE=$(pactl list sources short 2>/dev/null | grep -v monitor | head -1 | awk '{print $2}')
+    fi
+fi
 echo "  Testing microphone capture for $TARGET_USER..."
 capture_ok=1
-su "$TARGET_USER" -c "
-    export XDG_RUNTIME_DIR='$ROOT_RT'
-    timeout 6 arecord -D pipewire -c 2 -f S16_LE -r 48000 -d 2 /tmp/cap-user-\$USER.wav 2>/dev/null
-"
+if [ -n "$CAPTURE_SOURCE" ]; then
+    su "$TARGET_USER" -c "
+        export XDG_RUNTIME_DIR='$ROOT_RT'
+        timeout 6 parecord --device='$CAPTURE_SOURCE' /tmp/cap-user-\$USER.wav 2>/dev/null
+    "
+else
+    echo "  No capture source found — cannot test microphone."
+fi
 
 CAP_FILE="/tmp/cap-user-$TARGET_USER.wav"
 if [ -f "$CAP_FILE" ] && [ "$(stat -c%s "$CAP_FILE" 2>/dev/null)" -gt 100 ]; then

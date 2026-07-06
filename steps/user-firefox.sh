@@ -54,23 +54,13 @@ setup_firefox() {
         fi
     done
 
-    # Pre-copy Widevine CDM (from global install)
-    local VERSION="4.10.2934.0"
-    for src in /usr/lib64/mozilla/gmp-widevinecdm/$VERSION /usr/lib64/firefox/gmp-widevinecdm/$VERSION; do
-        if [ -d "$src" ]; then
-            mkdir -p "$profdir/gmp-widevinecdm/$VERSION"
-            cp -a "$src/"* "$profdir/gmp-widevinecdm/$VERSION/" 2>/dev/null || true
-        fi
-    done
-
     chown -R "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.config/gtk-3.0" "$HOME_TARGET/.mozilla" 2>/dev/null || true
 
     if $ok; then
         echo "SUCCESS: Firefox DRM skeleton prepared for $TARGET_USER."
         echo "  - GTK dark theme + userChrome.css + legacy pref"
-        echo "  - Widevine CDM pre-copied into profile (4.10.2934.0)"
-        echo "  - EME/Widevine prefs enabled, auto-update disabled"
-        echo "  First run of 'firefox' should just work for DRM content."
+        echo "  - EME/Widevine prefs enabled, auto-update enabled"
+        echo "  - Firefox will auto-download Widevine on first DRM site visit"
         exit 0
     else
         echo "ERROR: Firefox skeleton setup had problems (GTK or profile files)."

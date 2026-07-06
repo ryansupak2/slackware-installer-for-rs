@@ -3,7 +3,7 @@
 
 # Source temp-msg helper
 if [ -f /usr/local/bin/temp-msg.sh ]; then . /usr/local/bin/temp-msg.sh
-else set_temp_msg() { echo "$1" > /tmp/status_msg; echo $(($(date +%s) + ${2:-4})) > /tmp/status_end; }; fi
+else set_temp_msg() { echo "$1" > "$XDG_RUNTIME_DIR/status_msg"; echo $(($(date +%s) + ${2:-4})) > "$XDG_RUNTIME_DIR/status_end"; }; fi
 
 pactl set-sink-mute @DEFAULT_SINK@ toggle 2>/dev/null
 

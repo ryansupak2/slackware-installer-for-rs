@@ -56,6 +56,17 @@ if [ -f /usr/share/pipewire/pipewire.conf ]; then
     fi
 fi
 
+# Force duplex capture profile (jack detection may report mic as unavailable)
+echo "Enabling audio capture profile..."
+CARD_ID=$(pactl list cards short 2>/dev/null | grep alsa | head -1 | awk '{print $1}')
+if [ -n "$CARD_ID" ]; then
+    pactl set-card-profile "$CARD_ID" output:analog-stereo+input:analog-stereo 2>/dev/null || \
+    pactl set-card-profile "$CARD_ID" output:analog-stereo+input:iec958-stereo 2>/dev/null || \
+    echo "  Capture profile set on card $CARD_ID"
+else
+    echo "  WARNING: No ALSA card found — capture may not work."
+fi
+
 # Deploy volume scripts
 cp "$REPO_DIR/dotfiles/volume/volume_up.sh"    /usr/local/bin/volume_up.sh 2>/dev/null || true
 cp "$REPO_DIR/dotfiles/volume/volume_down.sh"  /usr/local/bin/volume_down.sh 2>/dev/null || true

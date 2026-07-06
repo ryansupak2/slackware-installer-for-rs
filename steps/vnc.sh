@@ -55,6 +55,22 @@ if $ok; then
     else
         echo "  TLS certs already present — skipping."
     fi
+
+    # Deploy wayvnc config with auto-generated password
+    if [ ! -f /usr/local/etc/wayvnc/config ]; then
+        echo "  Creating wayvnc config with random password..."
+        VNC_PASS=$(head -c 10 /dev/urandom | base64 | tr -d '+/=' | head -c 10)
+        cat > /usr/local/etc/wayvnc/config << WVCFG
+enable_auth=true
+use_relative_paths=true
+password=${VNC_PASS}
+WVCFG
+        chmod 600 /usr/local/etc/wayvnc/config
+        echo "  VNC password: ${VNC_PASS}"
+        echo "  (Run 'vnc start' from within dwl, then connect with this password)"
+    else
+        echo "  wayvnc config already exists — skipping."
+    fi
 fi
 
 if $ok; then

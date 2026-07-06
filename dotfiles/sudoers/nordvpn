@@ -1,2 +1,2 @@
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/setsid, /usr/bin/chmod, /usr/local/bin/vpn, /usr/sbin/openvpn, /usr/bin/pkill, /sbin/sysctl
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/setsid, /usr/bin/chmod, /usr/local/bin/vpn, /usr/sbin/openvpn, /usr/bin/pkill, /sbin/sysctl, /sbin/iptables, /sbin/ip6tables
 Defaults:%wheel !requiretty

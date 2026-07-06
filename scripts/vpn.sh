@@ -59,17 +59,28 @@ has_configs() {
     [ -d "$CONFIG_DIR" ] && ls "$CONFIG_DIR"/*.ovpn >/dev/null 2>&1
 }
 
-# ── IPv6 leak prevention ───────────────────────────────────────────────
-block_ipv6() {
-    for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
-        as_root /sbin/sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=1" >/dev/null 2>&1
-    done
+# ── Killswitch (block non-VPN traffic when tunnel is up) ───────────────
+enable_killswitch() {
+    # Allow loopback
+    as_root /sbin/iptables -I OUTPUT 1 -o lo -j ACCEPT 2>/dev/null || true
+    # Allow tunnel interface
+    as_root /sbin/iptables -I OUTPUT 2 -o tun0 -j ACCEPT 2>/dev/null || true
+    # Allow already-established connections (critical: existing flows stay alive)
+    as_root /sbin/iptables -I OUTPUT 3 -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+    # Block everything else
+    as_root /sbin/iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited 2>/dev/null || true
+    # IPv6: drop all
+    as_root /sbin/ip6tables -A OUTPUT -j DROP 2>/dev/null || true
+    log_msg INFO "Killswitch ON — only VPN traffic allowed"
 }
 
-restore_ipv6() {
-    for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
-        as_root /sbin/sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=0" >/dev/null 2>&1
-    done
+disable_killswitch() {
+    as_root /sbin/iptables -D OUTPUT -o lo -j ACCEPT 2>/dev/null || true
+    as_root /sbin/iptables -D OUTPUT -o tun0 -j ACCEPT 2>/dev/null || true
+    as_root /sbin/iptables -D OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+    as_root /sbin/iptables -D OUTPUT -j REJECT --reject-with icmp-admin-prohibited 2>/dev/null || true
+    as_root /sbin/ip6tables -D OUTPUT -j DROP 2>/dev/null || true
+    log_msg INFO "Killswitch OFF"
 }
 
 get_country_dns() {
@@ -104,16 +115,18 @@ connect_country() {
         echo -n "Connecting to ${server}... "
 
         # Build temp config
-        cp "$config" /tmp/ovpn_temp.ovpn
+        local tmpcfg
+        tmpcfg=$(mktemp /tmp/ovpn-XXXXXX) || { log_msg ERROR "cannot create temp file"; continue; }
+        cp "$config" "$tmpcfg"
         if [ -n "$dns" ]; then
-            echo "dhcp-option DNS $dns" >> /tmp/ovpn_temp.ovpn
+            echo "dhcp-option DNS $dns" >> "$tmpcfg"
         fi
-        sed -i '/^auth-user-pass/d' /tmp/ovpn_temp.ovpn
-        echo "auth-user-pass $AUTH_FILE" >> /tmp/ovpn_temp.ovpn
-        echo "redirect-gateway ipv6" >> /tmp/ovpn_temp.ovpn
+        sed -i '/^auth-user-pass/d' "$tmpcfg"
+        echo "auth-user-pass $AUTH_FILE" >> "$tmpcfg"
+        echo "redirect-gateway ipv6" >> "$tmpcfg"
 
         # Launch daemonized
-        if ! as_root openvpn --config /tmp/ovpn_temp.ovpn --daemon; then
+        if ! as_root openvpn --config "$tmpcfg" --daemon; then
             log_msg ERROR "openvpn failed to start for $server"
             continue
         fi
@@ -125,7 +138,7 @@ connect_country() {
             waited=$((waited + 1))
             if is_connected; then
                 echo -e "${GREEN}done${NC} (${waited}s)"
-                block_ipv6
+                enable_killswitch
                 return 0
             fi
         done
@@ -140,7 +153,7 @@ connect_country() {
 
 # ── Disconnect ─────────────────────────────────────────────────────────
 disconnect_vpn() {
-    restore_ipv6
+    disable_killswitch
     as_root pkill openvpn 2>/dev/null || true
     sleep 0.5
     as_root pkill -f 'openvpn.*ovpn' 2>/dev/null || true
