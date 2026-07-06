@@ -100,15 +100,12 @@ while true; do
         last_vpn_check=$now
     fi
 
-    # Ping check (every 5s, direct, no external process)
+    # Ping check (every 5s, backgrounded — never blocks the loop)
     if [ $((now - next_ping)) -ge 0 ]; then
-        if ping -c1 -W2 1.1.1.1 >/dev/null 2>&1; then
-            net_status="UP"
-        else
-            net_status="DOWN"
-        fi
+        ( ping -c1 -W2 1.1.1.1 >/dev/null 2>&1 && echo UP || echo DOWN ) > "/tmp/dwl-ping-$(id -u)" 2>/dev/null &
         next_ping=$((now + 5))
     fi
+    net_status=$(cat "/tmp/dwl-ping-$(id -u)" 2>/dev/null || echo "DOWN")
     no_internet_prefix=""
     if [ "$net_status" != "UP" ]; then
         no_internet_prefix="[No Internet] "

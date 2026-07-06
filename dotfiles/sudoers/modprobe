@@ -1,2 +1,2 @@
 %wheel ALL=(ALL) NOPASSWD: /sbin/modprobe, /sbin/rmmod
-Defaults:%wheel !requiretty
+Defaults:%wheel !requiretty, lecture=never

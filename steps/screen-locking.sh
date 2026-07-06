@@ -30,7 +30,7 @@ if $ok; then
 fi
 
 # --- elogind system-sleep hook (lock screen before/after suspend) ---
-ELG_DIR="/usr/lib/elogind/system-sleep"
+ELG_DIR="/lib64/elogind/system-sleep"
 if [ ! -d "$ELG_DIR" ]; then
     echo "ERROR: elogind system-sleep directory not found at $ELG_DIR."
     echo "       Screen will not lock on suspend/resume."

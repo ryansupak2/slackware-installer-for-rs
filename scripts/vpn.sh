@@ -33,7 +33,7 @@ log_msg() {
     local level="$1"; shift
     local msg="$*"
     local ts=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "[\$ts] [\$level] \$msg"
+    echo -e "[${ts}] [${level}] ${msg}"
 }
 
 # ── Privilege helpers ──────────────────────────────────────────────────
@@ -59,28 +59,17 @@ has_configs() {
     [ -d "$CONFIG_DIR" ] && ls "$CONFIG_DIR"/*.ovpn >/dev/null 2>&1
 }
 
-# ── Killswitch (block non-VPN traffic when tunnel is up) ───────────────
-enable_killswitch() {
-    # Allow loopback
-    as_root /sbin/iptables -I OUTPUT 1 -o lo -j ACCEPT 2>/dev/null || true
-    # Allow tunnel interface
-    as_root /sbin/iptables -I OUTPUT 2 -o tun0 -j ACCEPT 2>/dev/null || true
-    # Allow already-established connections (critical: existing flows stay alive)
-    as_root /sbin/iptables -I OUTPUT 3 -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
-    # Block everything else
-    as_root /sbin/iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited 2>/dev/null || true
-    # IPv6: drop all
-    as_root /sbin/ip6tables -A OUTPUT -j DROP 2>/dev/null || true
-    log_msg INFO "Killswitch ON — only VPN traffic allowed"
+# ── IPv6 leak prevention ───────────────────────────────────────────────
+block_ipv6() {
+    for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
+        as_root sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=1" >/dev/null 2>&1
+    done
 }
 
-disable_killswitch() {
-    as_root /sbin/iptables -D OUTPUT -o lo -j ACCEPT 2>/dev/null || true
-    as_root /sbin/iptables -D OUTPUT -o tun0 -j ACCEPT 2>/dev/null || true
-    as_root /sbin/iptables -D OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
-    as_root /sbin/iptables -D OUTPUT -j REJECT --reject-with icmp-admin-prohibited 2>/dev/null || true
-    as_root /sbin/ip6tables -D OUTPUT -j DROP 2>/dev/null || true
-    log_msg INFO "Killswitch OFF"
+restore_ipv6() {
+    for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
+        as_root sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=0" >/dev/null 2>&1
+    done
 }
 
 get_country_dns() {
@@ -138,7 +127,7 @@ connect_country() {
             waited=$((waited + 1))
             if is_connected; then
                 echo -e "${GREEN}done${NC} (${waited}s)"
-                enable_killswitch
+                block_ipv6
                 return 0
             fi
         done
@@ -153,7 +142,7 @@ connect_country() {
 
 # ── Disconnect ─────────────────────────────────────────────────────────
 disconnect_vpn() {
-    disable_killswitch
+    restore_ipv6
     as_root pkill openvpn 2>/dev/null || true
     sleep 0.5
     as_root pkill -f 'openvpn.*ovpn' 2>/dev/null || true
