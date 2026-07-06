@@ -2865,7 +2865,15 @@ unlocksession(struct wl_listener *listener, void *data)
 	if (runtime) {
 		snprintf(fifo, sizeof(fifo), "%s/somebar-0", runtime);
 		int fd = open(fifo, O_WRONLY | O_NONBLOCK);
-		if (fd >= 0) { write(fd, "showmod off\n", 12); close(fd); }
+		if (fd >= 0) {
+			fprintf(stderr, "[dwl] unlock: sending showmod off to somebar FIFO (fd=%d, runtime=%s)\n", fd, runtime);
+			write(fd, "showmod off\n", 12);
+			close(fd);
+		} else {
+			fprintf(stderr, "[dwl] unlock: FAILED to open somebar FIFO %s (errno=%d)\n", fifo, errno);
+		}
+	} else {
+		fprintf(stderr, "[dwl] unlock: XDG_RUNTIME_DIR not set, cannot send showmod off\n");
 	}
 }
 

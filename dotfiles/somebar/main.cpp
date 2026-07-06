@@ -448,11 +448,13 @@ void onStatus()
 			auto arg = str.substr(prefixShowmod.size());
 			if (arg.rfind("off", 0) == 0) {
 				// Mod RELEASE
-				fprintf(stderr, "[somebar] FIFO: showmod off, modKeyHeld=false (hideMode=%d)\n", hideMode);
 				auto wasHeld = modKeyHeld;
 				modKeyHeld = false;
 				if (hideMode && wasHeld) {
+					fprintf(stderr, "[somebar] FIFO: showmod off (wasHeld=true), modKeyHeld=false, autoShowUntil=now+3 (hideMode=%d)\n", hideMode);
 					autoShowUntil = time(nullptr) + 3;
+				} else {
+					fprintf(stderr, "[somebar] FIFO: showmod off (wasHeld=%d), modKeyHeld=false, timer NOT set (hideMode=%d)\n", wasHeld, hideMode);
 				}
 			} else {
 				// Mod PRESS: only show bar in Hide Mode
