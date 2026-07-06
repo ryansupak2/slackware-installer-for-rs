@@ -241,16 +241,18 @@ void updatemon(Monitor& mon)
 	if (mon.bar.visible()) {
 		mon.bar.setExclusive((!hideMode && mon.desiredVisibility) ? Bar::barHeight() : 0);
 	}
-	// Sync /tmp/bar_shown for toggle-bar.sh message logic
+	// Sync $XDG_RUNTIME_DIR/bar_shown for toggle-bar.sh message logic
 	bool anyShown = false;
 	for (auto &m : monitors) {
 		if (m.bar.isShown()) { anyShown = true; break; }
 	}
+	const char *rt = getenv("XDG_RUNTIME_DIR");
+	std::string barPath = std::string(rt ? rt : "/tmp") + "/bar_shown";
 	if (anyShown) {
-		int fd = open("/tmp/bar_shown", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+		int fd = open(barPath.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
 		if (fd >= 0) close(fd);
 	} else {
-		unlink("/tmp/bar_shown");
+		unlink(barPath.c_str());
 	}
 }
 

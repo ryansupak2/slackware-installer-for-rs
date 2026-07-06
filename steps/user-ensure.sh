@@ -82,7 +82,7 @@ if ! useradd -m "$TARGET_USER"; then
 fi
 
 # Add all the standard groups a desktop user needs
-for grp in wheel input video audio tty plugdev; do
+for grp in wheel input video seat audio tty netdev; do
     addgroup "$grp" 2>/dev/null || true
     usermod -aG "$grp" "$TARGET_USER" 2>/dev/null || true
 done

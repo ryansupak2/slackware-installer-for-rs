@@ -96,6 +96,8 @@ echo "  auth.json -> $PI_DIR/auth.json  (DEEPSEEK_API_KEY from setup.keys.rs)"
 # ------------------------------------------------------------------
 if cp "$REPO_DIR/dotfiles/pi/readonly-mode.ts" "$EXT_DIR/readonly-mode.ts" 2>/dev/null; then
     echo "  readonly-mode.ts -> $EXT_DIR/readonly-mode.ts"
+    # Chown before pi install so the target user can write lock files
+    chown -R "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.pi" 2>/dev/null || true
     if su - "$TARGET_USER" -c "/usr/local/bin/pi install $EXT_DIR/readonly-mode.ts"; then
         echo "  readonly-mode extension registered for $TARGET_USER."
     else
@@ -103,10 +105,7 @@ if cp "$REPO_DIR/dotfiles/pi/readonly-mode.ts" "$EXT_DIR/readonly-mode.ts" 2>/de
     fi
 fi
 
-# ------------------------------------------------------------------
-# 6. Chown everything to the target user
-# ------------------------------------------------------------------
-chown -R "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.pi" 2>/dev/null || true
+# Chown already done before pi install above
 
 echo ""
 echo "SUCCESS: pi-coding-agent configured for $TARGET_USER."

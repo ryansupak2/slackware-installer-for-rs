@@ -16,9 +16,12 @@ if [ -n "$DWL_FIRST_TERMINAL" ]; then
     echo
     neofetch
     unset DWL_FIRST_TERMINAL
-elif [ -f /tmp/hide_mode ]; then
+elif [ -f "$XDG_RUNTIME_DIR/hide_mode" ]; then
     echo "[$(date '+%H:%M:%S')] hide-mode newline" >> "$LOG"
     echo
 else
     echo "[$(date '+%H:%M:%S')] normal start (no newline)" >> "$LOG"
+    case "$(tty 2>/dev/null)" in
+        /dev/tty*) neofetch ;;
+    esac
 fi

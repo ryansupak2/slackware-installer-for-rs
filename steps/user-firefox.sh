@@ -50,7 +50,7 @@ setup_firefox() {
             fi
         done
         if ! grep -q 'media.gmp-manager.updateEnabled' "$f" 2>/dev/null; then
-            echo 'user_pref("media.gmp-manager.updateEnabled", false);' >> "$f"
+            echo 'user_pref("media.gmp-manager.updateEnabled", true);' >> "$f"
         fi
     done
 

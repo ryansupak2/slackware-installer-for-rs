@@ -2,26 +2,15 @@
 #
 # dwl-start — Wayland/dwl session launcher
 # Run from a text console.  Logs to ~/logs/dwl-YYYYMMDD-HHMMSS.log
-#   -v, --verbose  Show output on terminal (default: log only)
+# All output mirrored to terminal so the log captures everything.
 
 LOG_DIR="$HOME/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOGFILE="$LOG_DIR/dwl-$(date +%Y%m%d-%H%M%S).log"
 
-# ── Parse flags ──────────────────────────────────────────────────
-VERBOSE=0
-case "${1:-}" in
-    -v|--verbose) VERBOSE=1 ;;
-esac
-
 # ── Output routing ───────────────────────────────────────────────
-# Default (quiet): everything → log only (clean terminal)
-# Verbose:         both → log + terminal
-if [ "$VERBOSE" = 1 ]; then
-    exec > >(tee -a "$LOGFILE") 2>&1
-else
-    exec >>"$LOGFILE" 2>&1
-fi
+# Quiet: everything → log only (clean terminal)
+exec >>"$LOGFILE" 2>&1
 
 echo "========================================"
 echo "DWL session starting — $(date)"
@@ -98,7 +87,7 @@ echo "── seatd ──"
 killall seatd 2>/dev/null || true
 sudo pkill -x seatd 2>/dev/null || true
 sleep 0.3
-sudo rm -f /run/seatd.sock 2>/dev/null || true
+rm -f /run/seatd.sock 2>/dev/null || true
 
 # ── DWL ───────────────────────────────────────────────────────
 echo "── dwl + somebar + foot ──"

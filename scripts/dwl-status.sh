@@ -3,16 +3,11 @@
 # dwl-status — continuous status bar text for dwl+somebar
 # Writes "status <text>" lines to somebar's FIFO.
 #
-# Source shared temp-msg helper (guarded for bootstrap)
+# Source shared temp-msg helper
 if [ -f /usr/local/bin/temp-msg.sh ]; then
     . /usr/local/bin/temp-msg.sh
-else
-    set_temp_msg() {
-        echo "$1" > /tmp/status_msg
-        echo $(($(date +%s) + ${2:-4})) > /tmp/status_end
-    }
 fi
-HIDE_MODE_FILE="/tmp/hide_mode"
+HIDE_MODE_FILE="$XDG_RUNTIME_DIR/hide_mode"
 FIFO="${XDG_RUNTIME_DIR}/somebar-0"
 LOG_DIR="$HOME/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
@@ -133,12 +128,12 @@ while true; do
     msg_active=0
     msg_active=0
     msg=""
-    if [ -f /tmp/status_msg ] && [ "$now" -lt $(cat /tmp/status_end 2>/dev/null || echo 0) ]; then
-        msg=$(cat /tmp/status_msg)
+    if [ -f "$XDG_RUNTIME_DIR/status_msg" ] && [ "$now" -lt $(cat "$XDG_RUNTIME_DIR/status_end" 2>/dev/null || echo 0) ]; then
+        msg=$(cat "$XDG_RUNTIME_DIR/status_msg")
         line="${vnc_status}${vpn_status}${msg} | $(date +'%T')"
         msg_active=1
     else
-        rm -f /tmp/status_msg /tmp/status_end 2>/dev/null || true
+        rm -f "$XDG_RUNTIME_DIR/status_msg" "$XDG_RUNTIME_DIR/status_end" 2>/dev/null || true
         line="$full_line"
     fi
     # When a temporary message appears while in hide mode, show the bar so the
