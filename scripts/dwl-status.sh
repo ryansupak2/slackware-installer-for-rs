@@ -102,7 +102,7 @@ while true; do
 
     # Ping check (every 5s, backgrounded — never blocks the loop)
     if [ $((now - next_ping)) -ge 0 ]; then
-        ( ping -c1 -W2 1.1.1.1 >/dev/null 2>&1 && echo UP || echo DOWN ) > "/tmp/dwl-ping-$(id -u)" 2>/dev/null &
+        ( ping -c1 -W2 1.1.1.1 >/dev/null 2>&1 && echo UP || echo DOWN ) > "/tmp/dwl-ping-$(id -u).tmp" 2>/dev/null && mv "/tmp/dwl-ping-$(id -u).tmp" "/tmp/dwl-ping-$(id -u)" &
         next_ping=$((now + 5))
     fi
     net_status=$(cat "/tmp/dwl-ping-$(id -u)" 2>/dev/null || echo "DOWN")
