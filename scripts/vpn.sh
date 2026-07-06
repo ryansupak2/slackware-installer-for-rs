@@ -28,19 +28,12 @@ GREEN='\033[32m'
 RED='\033[31m'
 NC='\033[0m'
 
-# ── Startup banner ──────────────────────────────────────────────────────
-echo "=================================================="
-echo "VPN started: $(date)"
-echo "Log: $LOG_FILE"
-echo "=================================================="
-echo ""
-
 # ── Logging ────────────────────────────────────────────────────────────
 log_msg() {
     local level="$1"; shift
     local msg="$*"
     local ts=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$ts] [$level] $msg"
+    echo -e "[\$ts] [\$level] \$msg"
 }
 
 # ── Privilege helpers ──────────────────────────────────────────────────
@@ -68,16 +61,14 @@ has_configs() {
 
 # ── IPv6 leak prevention ───────────────────────────────────────────────
 block_ipv6() {
-    log_msg INFO "blocking IPv6 on physical interfaces"
     for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
-        as_root /sbin/sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=1" 2>/dev/null
+        as_root /sbin/sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=1" >/dev/null 2>&1
     done
 }
 
 restore_ipv6() {
-    log_msg INFO "restoring IPv6 on physical interfaces"
     for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
-        as_root /sbin/sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=0" 2>/dev/null
+        as_root /sbin/sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=0" >/dev/null 2>&1
     done
 }
 
@@ -110,15 +101,15 @@ connect_country() {
         local server
         server=$(basename "$config" .ovpn)
 
-        log_msg INFO "trying $server (attempt $tried/$MAX_TRIES)"
+        echo -n "Connecting to ${server}... "
 
         # Build temp config
         cp "$config" /tmp/ovpn_temp.ovpn
         if [ -n "$dns" ]; then
             echo "dhcp-option DNS $dns" >> /tmp/ovpn_temp.ovpn
         fi
-        grep -q '^auth-user-pass' /tmp/ovpn_temp.ovpn || \
-            echo "auth-user-pass $AUTH_FILE" >> /tmp/ovpn_temp.ovpn
+        sed -i '/^auth-user-pass/d' /tmp/ovpn_temp.ovpn
+        echo "auth-user-pass $AUTH_FILE" >> /tmp/ovpn_temp.ovpn
         echo "redirect-gateway ipv6" >> /tmp/ovpn_temp.ovpn
 
         # Launch daemonized
@@ -133,13 +124,13 @@ connect_country() {
             sleep 1
             waited=$((waited + 1))
             if is_connected; then
-                log_msg OK "${GREEN}connected${NC} to $server after ${waited}s"
+                echo -e "${GREEN}done${NC} (${waited}s)"
                 block_ipv6
                 return 0
             fi
         done
 
-        log_msg WARN "$server: no tun0 after ${waited}s — killing daemon"
+        echo -e "${RED}timeout${NC}"
         as_root pkill openvpn 2>/dev/null || true
     done
 
@@ -149,9 +140,7 @@ connect_country() {
 
 # ── Disconnect ─────────────────────────────────────────────────────────
 disconnect_vpn() {
-    log_msg INFO "disconnecting"
     restore_ipv6
-
     as_root pkill openvpn 2>/dev/null || true
     sleep 0.5
     as_root pkill -f 'openvpn.*ovpn' 2>/dev/null || true
@@ -160,7 +149,7 @@ disconnect_vpn() {
     sleep 1
 
     if ! is_connected; then
-        log_msg OK "${RED}disconnected${NC}"
+        echo -e "${RED}DISCONNECTED${NC}"
         return 0
     else
         log_msg ERROR "tun0 still up after kill — run: sudo pkill -9 openvpn"
@@ -240,7 +229,6 @@ run_cli() {
                 sleep 1
             fi
             if connect_country "$1"; then
-                echo -e "${GREEN}Connected${NC}. VPN daemon running in background."
                 echo "Run 'vpn disconnect' to stop."
             else
                 exit 1
@@ -262,5 +250,4 @@ else
     run_cli "$1"
 fi
 
-echo ""
-echo "VPN session ended. Full log: $LOG_FILE"
+

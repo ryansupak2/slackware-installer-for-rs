@@ -12,9 +12,9 @@
 # - Scan (full results, no artificial limits)
 # - Pick any network from the full scan list
 # - Prompt for password only when needed (or always offer to (re)enter)
-# - Persist network + password in /etc/wpa_supplicant/wpa_supplicant.conf
-# - Auto-join preference: most-recently-joined network gets highest priority
-#   (so wpa_supplicant will prefer it on boot / when multiple saved networks are visible)
+# - Persist network via NetworkManager (auto-connect survives reboot)
+# - Auto-join preference: most-recently-joined network set to autoconnect
+# - Fallback: on any connection failure, rejoin the current default WiFi
 #
 # Prerequisites (normally already present from post-install-global):
 #   NetworkManager should be running (started by post-install-global wifi step)
@@ -27,8 +27,16 @@ if [ "$(id -u)" -ne 0 ] && ! id -nG 2>/dev/null | tr ' ' '\n' | grep -qx netdev;
     echo "(You can also run the installer's post-install-user.sh --user <username> to fix this.)"
     exit 1
 fi
-# Ensure sbin directories are in PATH (wpa_cli, iw, ip, dhcpcd live there on Slackware)
+# Ensure sbin directories are in PATH (iw, ip, dhcpcd live there on Slackware)
 export PATH="/usr/sbin:/sbin:$PATH"
+
+# Check that nmcli is available (required)
+if ! command -v nmcli >/dev/null 2>&1; then
+    echo "ERROR: nmcli (NetworkManager CLI) not found in PATH."
+    echo "NetworkManager must be installed and running."
+    echo "Run the installer wifi step (./steps/wifi.sh) to set up WiFi."
+    exit 1
+fi
 
 # Parse command-line flags
 VERBOSE=false
@@ -48,6 +56,7 @@ esac
 BOLD='\033[1m'
 GREEN='\033[32m'
 RED='\033[31m'
+YELLOW='\033[33m'
 NC='\033[0m'
 
 # Dual logging (everything goes to screen AND the log file)
@@ -67,12 +76,54 @@ echo "=================================================="
 # ------------------------------------------------------------------
 
 get_wifi_ifaces() {
-    # Return space-separated list of wireless interfaces
-    iw dev 2>/dev/null | awk '$1 == "Interface" { print $2 }' | tr '\n' ' '
+    # Return space-separated list of wireless interfaces.
+    # Try nmcli first (works even when NM manages the interface),
+    # fall back to iw/sysfs.
+    local ifaces
+    ifaces=$(nmcli -t -f DEVICE,TYPE device status 2>/dev/null | grep ':wifi$' | cut -d: -f1 | tr '\n' ' ')
+    if [ -z "$ifaces" ]; then
+        ifaces=$(iw dev 2>/dev/null | awk '$1 == "Interface" { print $2 }' | tr '\n' ' ')
+    fi
+    if [ -z "$ifaces" ]; then
+        ifaces=$(ls /sys/class/net/ 2>/dev/null | grep -E '^(wlan|wlp|wlo)' | tr '\n' ' ')
+    fi
+    echo "$ifaces"
+}
+
+get_active_ssid() {
+    # Returns the currently-connected SSID (empty string if none).
+    # Works with NetworkManager via nmcli.
+    local iface="$1"
+    nmcli -t -f GENERAL.CONNECTION device show "$iface" 2>/dev/null | cut -d: -f2
+}
+
+get_lan_state() {
+    # Returns summary of LAN (ethernet) status.
+    # Output: "CONNECTED:iface:conn_name" or "DISCONNECTED" or empty if no LAN devices.
+    local lan_ifaces
+    lan_ifaces=$(nmcli -t -f DEVICE,TYPE device status 2>/dev/null | grep ':ethernet$' | cut -d: -f1 | tr '\n' ' ')
+    if [ -z "$lan_ifaces" ]; then
+        echo ""
+        return
+    fi
+    for liface in $lan_ifaces; do
+        local lstate lconn
+        lstate=$(nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep "^${liface}:" | cut -d: -f2)
+        lconn=$(nmcli -t -f GENERAL.CONNECTION device show "$liface" 2>/dev/null | cut -d: -f2)
+        if [ "$lstate" = "connected" ] && [ -n "$lconn" ]; then
+            echo "CONNECTED:${liface}:${lconn}"
+            return
+        fi
+    done
+    echo "DISCONNECTED"
+}
+
+internet_ok() {
+    ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1
 }
 
 quick_wifi_summary() {
-    # Compact one-line summary of current WiFi connection state.
+    # Compact summary of WiFi + LAN connection state.
     # Displayed at the top on initial open (and on return to menu after actions).
     # The full "Show WiFi status" menu option (1) remains available for deeper insight.
     local ifaces
@@ -84,19 +135,43 @@ quick_wifi_summary() {
     local connected_ssid=""
     for iface in $ifaces; do
         local ssid
-        ssid=$(wpa_cli -i "$iface" status 2>/dev/null | awk -F= '/^ssid=/ {print $2}' | tr -d '"')
-        local state
-        state=$(wpa_cli -i "$iface" status 2>/dev/null | awk -F= '/^wpa_state=/ {print $2}')
-        if [ "$state" = "COMPLETED" ] && [ -n "$ssid" ]; then
+        ssid=$(get_active_ssid "$iface")
+        if [ -n "$ssid" ]; then
             connected_ssid="$ssid"
             break
         fi
     done
+
+    # Which interface is the active internet route?
+    local active_route
+    active_route=$(ip route show default 2>/dev/null | awk '{print $NF, $5}' | sort -n | head -1 | awk '{print $2}')
+
+    # WiFi line
     if [ -n "$connected_ssid" ]; then
-        echo -e "Wifi Network ${BOLD}${connected_ssid}${NC} is ${GREEN}Connected${NC}"
+        local wifi_tag=""
+        if [ "$active_route" = "$iface" ]; then wifi_tag=" ${BOLD}${YELLOW}[Internet]${NC}"; fi
+        echo -e "WiFi:    ${GREEN}connected${NC}  to ${BOLD}${connected_ssid}${NC}${wifi_tag}"
     else
-        echo "No Wifi Network is currently ${RED}Disconnected${NC}"
+        echo -e "WiFi:    ${RED}not connected${NC}"
     fi
+
+    # LAN line (only if LAN hardware exists)
+    local lan_state lan_line
+    lan_state=$(get_lan_state)
+    case "$lan_state" in
+        CONNECTED:* )
+            local lan_iface lan_conn
+            lan_iface=$(echo "$lan_state" | cut -d: -f2)
+            lan_conn=$(echo "$lan_state" | cut -d: -f3)
+            local lan_tag=""
+            if [ "$active_route" = "$lan_iface" ]; then lan_tag=" ${BOLD}${YELLOW}[Internet]${NC}"; fi
+            echo -e "LAN:     ${GREEN}connected${NC}  on ${lan_iface} (${lan_conn})${lan_tag}"
+            ;;
+        DISCONNECTED)
+            echo -e "LAN:     ${RED}not connected${NC}"
+            ;;
+        # empty = no LAN hardware, skip entirely
+    esac
 }
 
 show_status() {
@@ -108,7 +183,7 @@ show_status() {
     ifaces=$(get_wifi_ifaces)
 
     if [ -z "$ifaces" ]; then
-        echo "No WiFi devices found (no wireless interfaces detected via iw)."
+        echo "No WiFi devices found (no wireless interfaces detected)."
         echo "Check hardware / kernel modules (e.g. iwlwifi, ath9k, etc.)."
         return
     fi
@@ -117,34 +192,23 @@ show_status() {
     echo ""
 
     local any_connected=false
-    local internet_ok=false
 
     for iface in $ifaces; do
         echo "----- Device: $iface -----"
 
-        # Basic device info
+        # Basic device info from iw
         iw dev "$iface" info 2>/dev/null | head -5 || echo "  (iw info not available)"
 
-        # Link / association state
-        local link_state
-        link_state=$(iw dev "$iface" link 2>/dev/null | head -3)
-        if echo "$link_state" | grep -q "Connected"; then
-            echo -e "  Link: ${GREEN}Connected${NC}"
+        # NM device state
+        local nm_state nm_conn
+        nm_state=$(nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep "^${iface}:" | cut -d: -f2)
+        nm_conn=$(nmcli -t -f GENERAL.CONNECTION device show "$iface" 2>/dev/null | cut -d: -f2)
+
+        if [ "$nm_state" = "connected" ] && [ -n "$nm_conn" ]; then
+            echo -e "  NM state: ${GREEN}connected${NC} to ${BOLD}${nm_conn}${NC}"
             any_connected=true
         else
-            echo -e "  Link: ${RED}Not connected${NC} (or down)"
-        fi
-
-        # wpa_supplicant state + current SSID
-        local wpa_state ssid
-        wpa_state=$(wpa_cli -i "$iface" status 2>/dev/null | awk -F= '/^wpa_state=/ {print $2}')
-        ssid=$(wpa_cli -i "$iface" status 2>/dev/null | awk -F= '/^ssid=/ {print $2}' | tr -d '"')
-
-        echo "  wpa_supplicant state: ${wpa_state:-unknown}"
-        if [ -n "$ssid" ]; then
-            echo -e "  Current SSID: ${BOLD}${ssid}${NC}"
-        else
-            echo "  Current SSID: (none)"
+            echo -e "  NM state: ${RED}${nm_state:-unknown}${NC}"
         fi
 
         # IP address (if any)
@@ -159,26 +223,67 @@ show_status() {
         echo ""
     done
 
-    # Internet connectivity check (only meaningful if we have a default route + address)
+    # --- LAN / Ethernet section ---
+    local lan_ifaces
+    lan_ifaces=$(nmcli -t -f DEVICE,TYPE device status 2>/dev/null | grep ':ethernet$' | cut -d: -f1 | tr '\n' ' ')
+    if [ -n "$lan_ifaces" ]; then
+        local lan_found=false
+        for liface in $lan_ifaces; do
+            local lstate lconn lip
+            lstate=$(nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep "^${liface}:" | cut -d: -f2)
+            lconn=$(nmcli -t -f GENERAL.CONNECTION device show "$liface" 2>/dev/null | cut -d: -f2)
+            lip=$(ip -4 addr show dev "$liface" 2>/dev/null | awk '/inet / {print $2}' | head -1)
+            echo "----- Device: $liface (ethernet) -----"
+            if [ "$lstate" = "connected" ] && [ -n "$lconn" ]; then
+                echo -e "  NM state: ${GREEN}connected${NC} to ${BOLD}${lconn}${NC}"
+                lan_found=true
+            elif [ "$lstate" = "unavailable" ]; then
+                echo "  NM state: unavailable (no cable or down)"
+            else
+                echo -e "  NM state: ${RED}${lstate:-unknown}${NC}"
+            fi
+            if [ -n "$lip" ]; then
+                echo "  IPv4: $lip"
+            else
+                echo "  IPv4: (no address)"
+            fi
+            echo ""
+        done
+    fi
+
+    # Default routes (show which interface carries internet)
+    local routes
+    routes=$(ip route show default 2>/dev/null)
+    if [ -n "$routes" ]; then
+        echo "Default routes (lower metric = preferred):"
+        # Sort by metric and mark the active one
+        local first=true
+        while IFS= read -r route; do
+            local rdev rmetric
+            rdev=$(echo "$route" | awk '{print $5}')
+            rmetric=$(echo "$route" | awk '{print $NF}')
+            local tag=""
+            if $first; then
+                tag=" ${YELLOW}← active${NC}"
+                first=false
+            fi
+            printf "  %-8s metric %s%s\n" "$rdev" "$rmetric" "$tag"
+        done <<< "$routes"
+        echo ""
+    fi
+
+    # Internet connectivity check
+    local has_internet=false
+    if internet_ok; then
+        has_internet=true
+    fi
+
     echo "Internet reachability check (ping 8.8.8.8)..."
-    if ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
-        echo "  Internet: YES (reachable)"
-        internet_ok=true
+    if $has_internet; then
+        echo -e "  Internet: ${GREEN}YES${NC} (reachable)"
     else
         echo "  Internet: NO (ping failed - may be no default route, captive portal, or upstream issue)"
     fi
-
-    echo ""
-    if $any_connected; then
-        echo "At least one WiFi device is associated."
-    else
-        echo "No WiFi device is currently associated."
-    fi
-
-    if $internet_ok; then
-        echo "You appear to have working internet."
-    fi
-    echo "*****************************************************"
 }
 
 disconnect_wifi() {
@@ -197,16 +302,13 @@ disconnect_wifi() {
     local disconnected_any=false
 
     for iface in $ifaces; do
-        local ssid
-        ssid=$(wpa_cli -i "$iface" status 2>/dev/null | awk -F= '/^ssid=/ {print $2}' | tr -d '"')
-        local state
-        state=$(wpa_cli -i "$iface" status 2>/dev/null | awk -F= '/^wpa_state=/ {print $2}')
-
-        if [ "$state" = "COMPLETED" ] || [ -n "$ssid" ]; then
+        local ssid nm_state
+        nm_state=$(nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep "^${iface}:" | cut -d: -f2)
+        ssid=$(get_active_ssid "$iface")
+        if [ "$nm_state" = "connected" ] && [ -n "$ssid" ]; then
             echo -e "Disconnecting $iface (currently on ${BOLD}${ssid}${NC})..."
-            wpa_cli -i "$iface" disconnect 2>/dev/null || true
-            dhcpcd -k "$iface" 2>/dev/null || true
-            echo "  Sent disconnect to $iface."
+            nmcli device disconnect "$iface" 2>/dev/null || true
+            echo "  Disconnected $iface."
             disconnected_any=true
         fi
     done
@@ -220,9 +322,52 @@ disconnect_wifi() {
     echo "*****************************************************"
 }
 
+# ------------------------------------------------------------------
+# Fallback: rejoin the default (currently-active) WiFi network.
+# Called whenever a join_network attempt fails.
+# ------------------------------------------------------------------
+rejoin_default_wifi() {
+    local iface="$1"
+    local conn_name="$2"
+
+    if [ -z "$conn_name" ]; then
+        echo "  No default WiFi connection name provided — nothing to rejoin."
+        return 1
+    fi
+
+    echo ""
+    echo "-----------------------------------------------------"
+    echo -e "Falling back: reconnecting to default WiFi ${BOLD}${conn_name}${NC}..."
+
+    nmcli connection up "$conn_name" 2>/dev/null || {
+        echo -e "WARNING: Could not rejoin ${BOLD}${conn_name}${NC}."
+        return 1
+    }
+
+    # Wait for association
+    local reconnected=false
+    for i in $(seq 1 20); do
+        local state
+        state=$(nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep "^${iface}:" | cut -d: -f2)
+        if [ "$state" = "connected" ]; then
+            reconnected=true
+            break
+        fi
+        sleep 1
+    done
+
+    if $reconnected; then
+        echo -e "SUCCESS: ${GREEN}Reconnected${NC} to ${BOLD}${conn_name}${NC}."
+    else
+        echo -e "WARNING: Reconnect to ${BOLD}${conn_name}${NC} timed out."
+    fi
+    echo "-----------------------------------------------------"
+    return 0
+}
+
 
 # Robustly join a network from a scan list (or by SSID).
-# Handles password prompt, persistence, and most-recently-joined priority.
+# Handles password prompt, persistence, and fallback to default WiFi.
 join_network() {
     echo "*****************************************************"
     echo "SCAN AND CONNECT TO A WIFI NETWORK"
@@ -239,78 +384,64 @@ join_network() {
     local iface
     iface=$(echo "$ifaces" | awk '{print $1}')
 
+    # Snapshot the currently-active connection BEFORE we do anything,
+    # so we can fall back to it on failure.
+    local default_conn
+    default_conn=$(get_active_ssid "$iface")
+
     echo "Using interface: $iface"
     echo ""
     echo "Performing fresh scan (shows ALL results)..."
-    wpa_cli -i "$iface" scan >/dev/null 2>&1 || true
-    sleep 3
+    nmcli device wifi rescan 2>/dev/null || true
+    sleep 4
 
     local scan_output
-    scan_output=$(wpa_cli -i "$iface" scan_results 2>/dev/null)
+    scan_output=$(nmcli -t -f SSID,SIGNAL,BSSID,SECURITY device wifi list 2>/dev/null)
 
-    if [ -z "$scan_output" ] || [ "$(echo "$scan_output" | wc -l)" -le 1 ]; then
+    if [ -z "$scan_output" ]; then
         echo "ERROR: No scan results (or scan failed). Check that the interface is up."
+        if [ -n "$default_conn" ]; then
+            rejoin_default_wifi "$iface" "$default_conn"
+        fi
         return 1
     fi
 
-    # Build list of scan lines in a temp file (POSIX, no bash arrays)
+    # Build deduplicated list: group by SSID, keep strongest signal.
+    # nmcli -t format: SSID:SIGNAL:BSSID\:xx\:xx...:SECURITY
+    # Signal is a percentage (0-100), higher = better.
     local scan_file
     scan_file=$(mktemp /tmp/wifi-scan-XXXXXX) || { echo "ERROR: cannot create temp file"; return 1; }
-    echo "$scan_output" | tail -n +2 | sort -t$'\t' -k3 -rn > "$scan_file"
+
+    if $VERBOSE; then
+        # Raw mode: show every BSSID individually
+        echo "$scan_output" | sort -t: -k2 -rn > "$scan_file"
+    else
+        # Grouped mode: keep only the strongest signal for each SSID,
+        # skip hidden networks (empty SSID).
+        awk -F: '{
+            sig = $2 + 0
+            ssid = $1
+            if (ssid == "") next
+            if (!(ssid in seen) || sig > best_sig[ssid]) {
+                best_sig[ssid] = sig
+                best_line[ssid] = $0
+                seen[ssid] = 1
+            }
+        }
+        END {
+            for (s in seen) print best_line[s]
+        }' <<< "$scan_output" | sort -t: -k2 -rn > "$scan_file"
+    fi
 
     local line_count
     line_count=$(wc -l < "$scan_file")
     if [ "$line_count" -eq 0 ]; then
         rm -f "$scan_file"
         echo "ERROR: No networks found in scan results."
-        return 1
-    fi
-    # Decide: grouped-by-SSID (default) or raw BSSID list (--verbose)
-    local active_file active_count
-    if $VERBOSE; then
-        # Reformat raw lines: SSID first for display
-        local scan_file_fmt
-        scan_file_fmt=$(mktemp /tmp/wifi-scan-fmt-XXXXXX) || { rm -f "$scan_file"; echo "ERROR: cannot create temp file"; return 1; }
-        awk '{
-            bssid=$1; signal=$3; flags=$4
-            ssid=$5; for(i=6;i<=NF;i++) ssid=ssid" "$i
-            printf "%s\t%s dBm\t%s\t%s\n", ssid, signal, bssid, flags
-        }' "$scan_file" > "$scan_file_fmt"
-        rm -f "$scan_file"
-        active_file="$scan_file_fmt"
-        active_count="$line_count"
-    else
-        # Group by SSID: keep only the strongest-signal entry for each SSID.
-        # This collapses multiple BSSIDs advertising the same SSID (mesh APs,
-        # dual-band) into a single entry, while still showing truly distinct
-        # networks under different names.
-        local scan_file_dedup
-        scan_file_dedup=$(mktemp /tmp/wifi-scan-dedup-XXXXXX) || { rm -f "$scan_file"; echo "ERROR: cannot create temp file"; return 1; }
-        awk '{
-            sig = $3 + 0
-            bssid = $1; signal = $3; flags = $4
-            ssid = $5
-            for (i = 6; i <= NF; i++) ssid = ssid " " $i
-            if (!(ssid in seen) || sig > best_sig[ssid]) {
-                best_sig[ssid] = sig
-                best_line[ssid] = sprintf("%s\t%s dBm\t%s\t%s", ssid, signal, bssid, flags)
-                seen[ssid] = 1
-            }
-        }
-        END {
-            for (s in seen) print best_line[s]
-        }' "$scan_file" | sort -t$'\t' -k2 -rn > "$scan_file_dedup"
-        rm -f "$scan_file"
-
-        local dedup_count
-        dedup_count=$(wc -l < "$scan_file_dedup")
-        if [ "$dedup_count" -eq 0 ]; then
-            rm -f "$scan_file_dedup"
-            echo "ERROR: No networks found after deduplication."
-            return 1
+        if [ -n "$default_conn" ]; then
+            rejoin_default_wifi "$iface" "$default_conn"
         fi
-        active_file="$scan_file_dedup"
-        active_count="$dedup_count"
+        return 1
     fi
 
     echo ""
@@ -321,85 +452,70 @@ join_network() {
     fi
     echo "-----------------------------------------------------"
     local i=1
+    local FS=$'\x01'
     while IFS= read -r line; do
-        d_ssid=$(echo "$line" | cut -f1)
-        d_signal=$(echo "$line" | cut -f2)
-        d_bssid=$(echo "$line" | cut -f3)
-        d_flags=$(echo "$line" | cut -f4)
-        printf "%2d. ${BOLD}%-28s${NC} %8s  %-17s  %s\n" "$i" "$d_ssid" "$d_signal" "$d_bssid" "$d_flags"
+        local d_ssid d_signal d_bssid d_security safe_line
+        # Replace \: with placeholder to avoid cut splitting on escaped colons
+        safe_line=$(echo "$line" | sed 's/\\:/'"$FS"'/g')
+        d_ssid=$(echo "$safe_line" | cut -d: -f1 | sed "s/$FS/:/g")
+        d_signal=$(echo "$safe_line" | cut -d: -f2)
+        d_bssid=$(echo "$safe_line" | cut -d: -f3 | sed "s/$FS/:/g")
+        d_security=$(echo "$safe_line" | cut -d: -f4- | sed "s/$FS/:/g")
+        printf "%2d. ${BOLD}%-28s${NC} %3s%%  %-17s  %s\n" "$i" "$d_ssid" "$d_signal" "$d_bssid" "$d_security"
         i=$((i+1))
-    done < "$active_file"
+    done < "$scan_file"
     echo "-----------------------------------------------------"
 
     local choice
     read -p "Enter number of network to join (or X to cancel): " choice
     if [ "$choice" = "x" ] || [ "$choice" = "X" ] || [ "$choice" = "exit" ] || [ "$choice" = "Exit" ] || [ "$choice" = "EXIT" ]; then
-        rm -f "$active_file"
+        rm -f "$scan_file"
         return 0
     fi
     case "$choice" in
-        ''|*[!0-9]*) echo "Invalid choice."; rm -f "$active_file"; return 0 ;;
+        ''|*[!0-9]*) echo "Invalid choice."; rm -f "$scan_file"; return 0 ;;
     esac
-    if [ "$choice" -lt 1 ] || [ "$choice" -gt "$active_count" ]; then
+    if [ "$choice" -lt 1 ] || [ "$choice" -gt "$line_count" ]; then
         echo "Invalid choice."
-        rm -f "$active_file"
+        rm -f "$scan_file"
         return 0
     fi
 
     local selected_line
-    selected_line=$(sed -n "${choice}p" "$active_file")
-    rm -f "$active_file"
+    selected_line=$(sed -n "${choice}p" "$scan_file")
+    rm -f "$scan_file"
 
-    # Parse the reformatted line.
-    # Format: SSID<TAB>SIGNAL dBm<TAB>FLAGS<TAB>BSSID
-    local bssid signal flags ssid
-    ssid=$(echo "$selected_line" | cut -f1)
-    signal=$(echo "$selected_line" | cut -f2 | sed 's/ dBm//')
-    bssid=$(echo "$selected_line" | cut -f3)
-    flags=$(echo "$selected_line" | cut -f4)
-    # wpa_cli scan_results escapes non-ASCII as \\xHH; decode to raw bytes
-    ssid=$(printf '%b' "$ssid")
-    # Hex-encode SSID for robust wpa_cli set_network (passes raw bytes correctly)
-    ssid_hex=$(printf '%s' "$ssid" | xxd -p | tr -d '\n')
+    # Parse: SSID:SIGNAL:BSSID:SECURITY (handle \: escapes in BSSID)
+    local ssid signal bssid security safe_sel FS2
+    FS2=$'\x01'
+    safe_sel=$(echo "$selected_line" | sed 's/\\:/'"$FS2"'/g')
+    ssid=$(echo "$safe_sel" | cut -d: -f1 | sed "s/$FS2/:/g")
+    signal=$(echo "$safe_sel" | cut -d: -f2)
+    bssid=$(echo "$safe_sel" | cut -d: -f3 | sed "s/$FS2/:/g")
+    security=$(echo "$safe_sel" | cut -d: -f4- | sed "s/$FS2/:/g")
 
     if [ -z "$ssid" ]; then
         echo "ERROR: Could not parse SSID from selected line."
+        if [ -n "$default_conn" ]; then
+            rejoin_default_wifi "$iface" "$default_conn"
+        fi
         return 1
     fi
 
     echo ""
-    echo -e "Selected: ${BOLD}${ssid}${NC}  (signal: $signal dBm, flags: $flags)"
+    echo -e "Selected: ${BOLD}${ssid}${NC}  (signal: $signal%, security: ${security:-open})"
     echo "BSSID: $bssid"
 
-    # Find if this SSID is already saved (use get_network to get raw SSID
-    # bytes, avoiding \\x escape mismatch from list_networks output).
-    local existing_id=""
-    local wpacli_tmp
-    wpacli_tmp=$(mktemp /tmp/wifi-wpacli-XXXXXX) || { echo "ERROR: cannot create temp file"; return 1; }
-    wpa_cli -i "$iface" list_networks 2>/dev/null | tail -n +2 > "$wpacli_tmp" 2>/dev/null || true
-    while read -r line; do
-        nid=$(echo "$line" | cut -f1)
-        # wpa_cli get_network returns raw SSID bytes, avoiding escape mismatch
-        nssid=$(wpa_cli -i "$iface" get_network "$nid" ssid 2>/dev/null | head -1)
-        # get_network returns SSID as quoted ASCII (possibly with \\x escapes)
-        # or bare hex for non-ASCII. Normalize to hex for byte-accurate comparison.
-        nssid=$(echo "$nssid" | tr -d '"')
-        if echo "$nssid" | grep -q '[^0-9a-fA-F]'; then
-            # Not pure hex — decode \\x escapes then hex-encode
-            nssid=$(printf '%b' "$nssid" | xxd -p | tr -d '\n')
-        fi
-        if [ "$nssid" = "$ssid_hex" ]; then
-            existing_id="$nid"
-            break
-        fi
-    done < "$wpacli_tmp"
-    rm -f "$wpacli_tmp"
+    # Check if network is already saved in NM
+    # Escape regex special chars in SSID for safe grep matching
+    local ssid_escaped existing_uuid
+    ssid_escaped=$(echo "$ssid" | sed 's/[.[\*^$()+?{|]/\\&/g')
+    existing_uuid=$(nmcli -t -f NAME,UUID,TYPE connection show 2>/dev/null | grep "^${ssid_escaped}:" | grep ':802-11-wireless$' | head -1 | cut -d: -f2)
 
-    # Only prompt for password if the network is NOT already saved
     local pass=""
-    if [ -z "$existing_id" ]; then
+    if [ -z "$existing_uuid" ]; then
         local needs_pass=false
-        if echo "$flags" | grep -qiE 'WPA|WEP|SAE|PSK'; then
+        if echo "$security" | grep -qiE 'WPA|WEP|WPA2|WPA3|SAE|PSK|802.1X'; then
             needs_pass=true
         fi
         if $needs_pass; then
@@ -410,105 +526,60 @@ join_network() {
             read -p "Press Enter to continue with open network, or type a password if you know one is needed: " pass
             echo ""
         fi
-    fi
-
-    # ------------------------------------------------------------------
-    # Add / update the network via wpa_cli
-    # ------------------------------------------------------------------
-    echo -e "Configuring network ${BOLD}${ssid}${NC}..."
-
-    local net_id
-    if [ -n "$existing_id" ]; then
-        echo "  Network already saved (id $existing_id). Using existing credentials."
-        net_id="$existing_id"
     else
-        echo "  Adding new network..."
-        net_id=$(wpa_cli -i "$iface" add_network 2>/dev/null | tail -1)
-        if [ -z "$net_id" ] || [ "$net_id" = "FAIL" ]; then
-            echo "ERROR: Failed to add network via wpa_cli."
-            return 1
-        fi
-        # Set SSID as hex (no quotes) — robust for non-ASCII characters
-        wpa_cli -i "$iface" set_network "$net_id" ssid "$ssid_hex" >/dev/null
-        if [ -n "$pass" ]; then
-            wpa_cli -i "$iface" set_network "$net_id" psk "\"$pass\"" >/dev/null
-        else
-            wpa_cli -i "$iface" set_network "$net_id" key_mgmt NONE >/dev/null
-        fi
-        wpa_cli -i "$iface" set_network "$net_id" scan_ssid 1 >/dev/null 2>&1 || true   # helps with some hidden/edge cases
+        echo "  Network already saved (UUID $existing_uuid). Using existing credentials."
     fi
 
     # ------------------------------------------------------------------
-    # Set highest priority for "most-recently-joined" auto-connect preference
+    # Connect via nmcli
     # ------------------------------------------------------------------
-    local max_prio=0
-    for nid in $(wpa_cli -i "$iface" list_networks 2>/dev/null | tail -n +2 | cut -f1); do
-        local p
-        p=$(wpa_cli -i "$iface" get_network "$nid" priority 2>/dev/null || echo 0)
-        if [ "$p" -gt "$max_prio" ]; then
-            max_prio=$p
+    echo -e "Connecting to ${BOLD}${ssid}${NC}..."
+    local connect_result
+    if [ -n "$pass" ]; then
+        connect_result=$(nmcli device wifi connect "$ssid" password "$pass" 2>&1)
+    else
+        connect_result=$(nmcli device wifi connect "$ssid" 2>&1)
+    fi
+    local connect_rc=$?
+
+    if [ $connect_rc -ne 0 ]; then
+        echo "ERROR: nmcli connect failed:"
+        echo "  $connect_result"
+        if [ -n "$default_conn" ]; then
+            rejoin_default_wifi "$iface" "$default_conn"
         fi
-    done
-    local new_prio=$((max_prio + 10))
-    wpa_cli -i "$iface" set_network "$net_id" priority "$new_prio" >/dev/null
-
-    # Enable and select it now
-    wpa_cli -i "$iface" enable_network "$net_id" >/dev/null
-    wpa_cli -i "$iface" select_network "$net_id" >/dev/null
-
-    echo "  Selected network id $net_id with priority $new_prio (most recent = highest priority)."
-
-    # ------------------------------------------------------------------
-    # Wait for association + IP (modeled after the original installer logic)
-    # ------------------------------------------------------------------
-    echo "Waiting for association (up to 30s)..."
-    local connected=false
-    for i in $(seq 1 30); do
-        local state
-        state=$(wpa_cli -i "$iface" status 2>/dev/null | awk -F= '/^wpa_state=/ {print $2}')
-        if [ "$state" = "COMPLETED" ]; then
-            connected=true
-            break
-        fi
-        sleep 1
-    done
-
-    if ! $connected; then
-        echo -e "ERROR: Failed to associate with ${BOLD}${ssid}${NC} (timed out)."
-        echo "Check password, signal strength, or try scanning again."
         return 1
     fi
 
-    echo "  Association successful (COMPLETED)."
+    echo "  $connect_result"
 
-    # Wait for DHCP / IP
-    echo "Waiting for IP address (up to 30s)..."
-    local has_ip=false
-    for i in $(seq 1 30); do
-        if ip -4 addr show dev "$iface" 2>/dev/null | grep -q 'inet '; then
-            has_ip=true
-            break
-        fi
-        sleep 1
-    done
+    # Set autoconnect on the new connection
+    nmcli connection modify "$ssid" connection.autoconnect yes 2>/dev/null || true
 
-    if $has_ip; then
-        echo "  IP address obtained."
-    else
-        echo "  WARNING: No IP address yet (dhcpcd may still be working, or static config needed)."
+    # Verify connection
+    local nm_state
+    nm_state=$(nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep "^${iface}:" | cut -d: -f2)
+    if [ "$nm_state" != "connected" ]; then
+        # Wait a bit for NM to finish
+        sleep 3
+        nm_state=$(nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep "^${iface}:" | cut -d: -f2)
     fi
 
-    # Persist the config (so it survives reboot)
-    wpa_cli -i "$iface" save_config >/dev/null 2>&1 || true
-
-    # Final quick internet check
-    echo ""
-    if ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
-        echo -e "SUCCESS: ${GREEN}Connected${NC} to ${BOLD}${ssid}${NC} and internet is reachable."
-        echo "         Network saved. It will be preferred for future auto-connect (highest priority)."
+    if [ "$nm_state" = "connected" ]; then
+        # Internet check
+        if internet_ok; then
+            echo -e "SUCCESS: ${GREEN}Connected${NC} to ${BOLD}${ssid}${NC} and internet is reachable."
+            echo "         Network saved. It will auto-connect on future boots."
+        else
+            echo -e "SUCCESS: ${GREEN}Connected${NC} to ${BOLD}${ssid}${NC} (saved for auto-connect), but internet check failed."
+            echo "         (You may be behind a captive portal or have no upstream route yet.)"
+        fi
     else
-        echo -e "SUCCESS: ${GREEN}Connected${NC} to ${BOLD}${ssid}${NC} (saved for auto-connect), but internet check failed."
-        echo "         (You may be behind a captive portal or have no upstream route yet.)"
+        echo -e "ERROR: Connection to ${BOLD}${ssid}${NC} did not complete (state: ${nm_state:-unknown})."
+        if [ -n "$default_conn" ]; then
+            rejoin_default_wifi "$iface" "$default_conn"
+        fi
+        return 1
     fi
 
     echo "*****************************************************"
@@ -518,154 +589,100 @@ join_network() {
 
 list_saved_networks() {
     echo "*****************************************************"
-    echo "LIST SAVED NETWORKS (from wpa_supplicant)"
+    echo "LIST SAVED NETWORKS (from NetworkManager)"
     echo "*****************************************************"
 
-    local ifaces
-    ifaces=$(get_wifi_ifaces)
-    local iface
-    iface=$(echo "$ifaces" | awk '{print $1}')
+    local saved
+    saved=$(nmcli -t -f NAME,UUID,TYPE connection show 2>/dev/null | grep ':802-11-wireless$')
 
-    if [ -z "$iface" ]; then
-        echo "No WiFi interface available to query."
-        return
-    fi
-
-    local list_tmp
-    list_tmp=$(mktemp /tmp/wifi-list-XXXXXX) || { echo "ERROR: cannot create temp file"; return; }
-    wpa_cli -i "$iface" list_networks 2>/dev/null > "$list_tmp"
-    head -1 "$list_tmp"   # show header line
-
-    # Write body to a temp file so we can read in a non-subshell while loop
-    local body_tmp
-    body_tmp=$(mktemp /tmp/wifi-body-XXXXXX) || { rm -f "$list_tmp"; echo "ERROR: cannot create temp file"; return; }
-    tail -n +2 "$list_tmp" > "$body_tmp"
-    rm -f "$list_tmp"
-
-    # Store nids for lookup by user choice number (one per line, same order)
-    local nids_file
-    nids_file=$(mktemp /tmp/wifi-nids-XXXXXX) || { rm -f "$body_tmp"; echo "ERROR: cannot create temp file"; return; }
-
-    echo "Saved networks:"
-    echo "-----------------------------------------------------"
-    local count=0
-    while read -r line; do
-        count=$((count + 1))
-        nid=$(echo "$line" | cut -f1)
-        echo "$nid" >> "$nids_file"
-        nssid_raw=$(wpa_cli -i "$iface" get_network "$nid" ssid 2>/dev/null | head -1)
-        nssid=$(echo "$nssid_raw" | tr -d '"')
-        if echo "$nssid" | grep -q '[^0-9a-fA-F]'; then
-            nssid=$(printf '%b' "$nssid")
-        else
-            nssid=$(echo "$nssid" | xxd -r -p)
-        fi
-        rest=$(echo "$line" | cut -f3-)
-        printf "%2d. ${BOLD}%-28s${NC} [id %s] %s\n" "$count" "$nssid" "$nid" "$rest"
-    done < "$body_tmp"
-    echo "-----------------------------------------------------"
-
-    if [ "$count" -eq 0 ]; then
-        echo "No saved networks."
-        rm -f "$body_tmp" "$nids_file"
+    if [ -z "$saved" ]; then
+        echo "No saved WiFi networks."
         echo "*****************************************************"
         return
     fi
 
-    echo "Higher priority number = preferred for auto-connect on boot."
+    echo "Saved networks:"
+    echo "-----------------------------------------------------"
+
+    local nids_file
+    nids_file=$(mktemp /tmp/wifi-nids-XXXXXX) || { echo "ERROR: cannot create temp file"; return; }
+    local count=0
+    while IFS= read -r line; do
+        count=$((count + 1))
+        local n_name n_uuid
+        n_name=$(echo "$line" | cut -d: -f1)
+        n_uuid=$(echo "$line" | cut -d: -f2)
+        echo "$n_uuid" >> "$nids_file"
+        local autoconnect
+        autoconnect=$(nmcli -t -f connection.autoconnect connection show "$n_uuid" 2>/dev/null | cut -d: -f2)
+        local timestamp
+        timestamp=$(nmcli -t -f connection.timestamp connection show "$n_uuid" 2>/dev/null | cut -d: -f2)
+        printf "%2d. ${BOLD}%-28s${NC} [%s] autoconnect=%s\n" "$count" "$n_name" "$n_uuid" "${autoconnect:-?}"
+    done <<< "$saved"
+    echo "-----------------------------------------------------"
+
+    echo "Type 'up' to connect, 'X' to return."
     echo ""
 
     local choice
     read -p "Enter number to connect (or X to return to menu): " choice
     if [ "$choice" = "x" ] || [ "$choice" = "X" ] || [ "$choice" = "exit" ] || [ "$choice" = "Exit" ] || [ "$choice" = "EXIT" ]; then
-        rm -f "$body_tmp" "$nids_file"
+        rm -f "$nids_file"
         return 0
     fi
     case "$choice" in
-        ''|*[!0-9]*) echo "Invalid choice."; rm -f "$body_tmp" "$nids_file"; return 0 ;;
+        ''|*[!0-9]*) echo "Invalid choice."; rm -f "$nids_file"; return 0 ;;
     esac
     if [ "$choice" -lt 1 ] || [ "$choice" -gt "$count" ]; then
         echo "Invalid choice."
-        rm -f "$body_tmp" "$nids_file"
+        rm -f "$nids_file"
         return 0
     fi
 
-    local selected_nid selected_ssid
-    selected_nid=$(sed -n "${choice}p" "$nids_file")
-    selected_ssid_raw=$(wpa_cli -i "$iface" get_network "$selected_nid" ssid 2>/dev/null | head -1)
-    selected_ssid=$(echo "$selected_ssid_raw" | tr -d '"')
-    if echo "$selected_ssid" | grep -q '[^0-9a-fA-F]'; then
-        selected_ssid=$(printf '%b' "$selected_ssid")
-    else
-        selected_ssid=$(echo "$selected_ssid" | xxd -r -p)
-    fi
-    rm -f "$body_tmp" "$nids_file"
+    local selected_uuid
+    selected_uuid=$(sed -n "${choice}p" "$nids_file")
+    rm -f "$nids_file"
+
+    local ifaces iface default_conn
+    ifaces=$(get_wifi_ifaces)
+    iface=$(echo "$ifaces" | awk '{print $1}')
+    default_conn=$(get_active_ssid "$iface")
 
     echo ""
-    echo -e "Connecting to saved network ${BOLD}${selected_ssid}${NC} (id $selected_nid)..."
+    echo -e "Connecting to saved network (UUID $selected_uuid)..."
 
-    # Set highest priority for most-recently-connected preference
-    local max_prio=0
-    for nid in $(wpa_cli -i "$iface" list_networks 2>/dev/null | tail -n +2 | cut -f1); do
-        local p
-        p=$(wpa_cli -i "$iface" get_network "$nid" priority 2>/dev/null || echo 0)
-        if [ "$p" -gt "$max_prio" ]; then
-            max_prio=$p
+    nmcli connection up "$selected_uuid" 2>&1 || {
+        echo "ERROR: Failed to bring up connection."
+        if [ -n "$default_conn" ]; then
+            rejoin_default_wifi "$iface" "$default_conn"
         fi
-    done
-    local new_prio=$((max_prio + 10))
-    wpa_cli -i "$iface" set_network "$selected_nid" priority "$new_prio" >/dev/null
-
-    wpa_cli -i "$iface" enable_network "$selected_nid" >/dev/null
-    wpa_cli -i "$iface" select_network "$selected_nid" >/dev/null
-    echo "  Selected network id $selected_nid with priority $new_prio."
-
-    # Wait for association
-    echo "Waiting for association (up to 30s)..."
-    local connected=false
-    for i in $(seq 1 30); do
-        local state
-        state=$(wpa_cli -i "$iface" status 2>/dev/null | awk -F= '/^wpa_state=/ {print $2}')
-        if [ "$state" = "COMPLETED" ]; then
-            connected=true
-            break
-        fi
-        sleep 1
-    done
-
-    if ! $connected; then
-        echo "ERROR: Failed to associate (timed out)."
-        echo "  The saved credentials may be wrong, or the network is out of range."
         return 1
-    fi
+    }
 
-    echo "  Association successful (COMPLETED)."
+    # Set it to autoconnect
+    nmcli connection modify "$selected_uuid" connection.autoconnect yes 2>/dev/null || true
 
-    # Wait for DHCP / IP
-    echo "Waiting for IP address (up to 30s)..."
-    local has_ip=false
-    for i in $(seq 1 30); do
-        if ip -4 addr show dev "$iface" 2>/dev/null | grep -q 'inet '; then
-            has_ip=true
-            break
+    # Wait a moment and check
+    sleep 3
+    local nm_state
+    nm_state=$(nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep "^${iface}:" | cut -d: -f2)
+
+    if [ "$nm_state" = "connected" ]; then
+        if internet_ok; then
+            echo -e "SUCCESS: ${GREEN}Connected${NC} and internet is reachable."
+        else
+            echo -e "SUCCESS: ${GREEN}Connected${NC}, but internet check failed."
+            echo "         (You may be behind a captive portal or have no upstream route yet.)"
         fi
-        sleep 1
-    done
-
-    if $has_ip; then
-        echo "  IP address obtained."
     else
-        echo "  WARNING: No IP address yet (dhcpcd may still be working)."
-    fi
-
-    wpa_cli -i "$iface" save_config >/dev/null 2>&1 || true
-
-    echo ""
-    if ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
-        echo -e "SUCCESS: ${GREEN}Connected${NC} and internet is reachable."
-    else
-        echo -e "SUCCESS: ${GREEN}Connected${NC}, but internet check failed."
-        echo "         (You may be behind a captive portal or have no upstream route yet.)"
+        echo "WARNING: Device state is $nm_state (not 'connected' yet)."
+        echo "  NetworkManager may still be connecting. Check 'Show status'."
+        if [ -n "$default_conn" ]; then
+            # Only fall back if we were previously connected AND now we're fully disconnected
+            if [ "$nm_state" = "disconnected" ]; then
+                rejoin_default_wifi "$iface" "$default_conn"
+            fi
+        fi
     fi
 
     echo "*****************************************************"
