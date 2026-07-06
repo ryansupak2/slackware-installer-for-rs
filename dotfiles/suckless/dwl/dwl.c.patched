@@ -1684,7 +1684,9 @@ keypress(struct wl_listener *listener, void *data)
 						if (fd >= 0) { write(fd, "showmod all\n", 13); close(fd); }
 					} else {
 						struct stat st;
-						if (stat("/tmp/hide_mode", &st) == 0) {
+					char hidefile[256];
+					snprintf(hidefile, sizeof(hidefile), "%s/hide_mode", runtime);
+						if (stat(hidefile, &st) == 0) {
 							int fd2 = open(fifo, O_WRONLY | O_NONBLOCK);
 							if (fd2 >= 0) { write(fd2, "showmod off\n", 13); close(fd2); }
 						}
