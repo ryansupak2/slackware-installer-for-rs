@@ -122,7 +122,7 @@ exec 2>&1
     /usr/local/bin/dwl-status &
     rm -f "$XDG_RUNTIME_DIR"/somebar-0 2>/dev/null || true
     /usr/local/bin/somebar &
-    WAYLAND_DISPLAY=wayland-0 foot -- bash -l &
+    DWL_FIRST_TERMINAL=1 WAYLAND_DISPLAY=wayland-0 foot -- bash -l &
     wait
   )
 '

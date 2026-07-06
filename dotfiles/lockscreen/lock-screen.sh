@@ -10,18 +10,61 @@
 #   - physlock's VT acquisition conflicts with the compositor's DRM master,
 #     so we never run physlock while a graphical session is active.
 
-# Mutex: prevent concurrent runs (ACPI lid + elogind sleep hook can fire
-# simultaneously).  mkdir is atomic — only one instance wins.
-LOCKDIR=/tmp/lock-screen.mutex
-mkdir "$LOCKDIR" 2>/dev/null || exit 0
-trap 'rmdir "$LOCKDIR" 2>/dev/null' EXIT
+# Ensure standard paths (acpid runs with minimal env)
+export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+# Ensure log directory exists BEFORE redirecting output
+LOG_DIR=/root/logs
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+
+# ── PID-file mutex (survives suspend/resume) ─────────────────────
+# Unlike mkdir, a PID file lets us detect stale locks from a
+# pre-suspend instance that is still holding the mutex after resume.
+LOCKFILE=/tmp/lock-screen.lock
+
+if [ -f "$LOCKFILE" ]; then
+    oldpid=$(cat "$LOCKFILE" 2>/dev/null)
+    if [ -n "$oldpid" ] && kill -0 "$oldpid" 2>/dev/null; then
+        # A live instance still holds the lock — exit quietly
+        exit 0
+    fi
+    # Stale lock (dead PID or unreadable) — clean it up
+    rm -f "$LOCKFILE" 2>/dev/null
+fi
+echo $$ > "$LOCKFILE"
+trap 'rm -f "$LOCKFILE" 2>/dev/null' EXIT
 
 # Diagnostic logging (one log per invocation)
-LOG="/root/logs/lock-screen-$(date +%Y%m%d-%H%M%S).log"
+LOG="$LOG_DIR/lock-screen-$(date +%Y%m%d-%H%M%S).log"
 exec >> "$LOG" 2>&1
-echo "$(date) lock-screen: WAYLAND='${WAYLAND_DISPLAY:-none}' USER=$USER dwl=$(pgrep -c dwl 2>/dev/null || echo 0) physlock_running=$(pgrep -c physlock 2>/dev/null || echo 0)"
 
-# ─── In-session call (Mod+Esc from dwl) ─────────────────────────
+CURRENT_TTY=$(tty 2>/dev/null || echo "none")
+echo "$(date) lock-screen: WAYLAND='${WAYLAND_DISPLAY:-none}' USER=$USER TTY=$CURRENT_TTY dwl=$(pgrep -c dwl 2>/dev/null || echo 0) physlock_running=$(pgrep -c physlock 2>/dev/null || echo 0)"
+
+# ── Helper: start physlock if available and not already running ──
+try_physlock() {
+    if command -v physlock >/dev/null 2>&1; then
+        if pgrep -x physlock >/dev/null 2>&1; then
+            echo "$(date) physlock already running, skipping"
+            return 0
+        fi
+        echo "$(date) starting physlock -d"
+        physlock -d &
+        local physlock_pid=$!
+        sleep 0.3
+        if kill -0 "$physlock_pid" 2>/dev/null; then
+            echo "$(date) physlock started (pid $physlock_pid)"
+            return 0
+        else
+            echo "$(date) ERROR: physlock exited immediately (pid $physlock_pid)"
+            return 1
+        fi
+    else
+        echo "$(date) physlock not found!"
+        return 1
+    fi
+}
+
+# ── In-session call (Mod+Esc from dwl) ─────────────────────────
 # Lock the current Wayland session with wlock and block until it exits.
 if [ -n "$WAYLAND_DISPLAY" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
     command -v wlock >/dev/null 2>&1 || exit 1
@@ -30,7 +73,7 @@ if [ -n "$WAYLAND_DISPLAY" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
     exit 0
 fi
 
-# ─── System call (acpid / elogind / manual) ─────────────────────
+# ── System call (acpid / elogind / manual) ─────────────────────
 # If a graphical session (dwl) is running, lock it with wlock.
 # Running physlock here would steal the VT from the compositor and
 # cause a hard hang (DRM master conflict).
@@ -39,12 +82,13 @@ fi
 
 if pgrep dwl >/dev/null 2>&1; then
     echo "$(date) branch: dwl detected, trying wlock"
-    command -v wlock >/dev/null 2>&1 || {
+
+    if ! command -v wlock >/dev/null 2>&1; then
         # wlock not available — fall back to physlock
         echo "$(date) wlock not found, falling back to physlock"
-        command -v physlock >/dev/null 2>&1 && pgrep -x physlock >/dev/null 2>&1 || physlock -d &
+        try_physlock
         exit 0
-    }
+    fi
 
     # Lock every active dwl session as its owner
     wlock_started=0
@@ -67,7 +111,7 @@ if pgrep dwl >/dev/null 2>&1; then
         # dwl was found but no usable session existed (dying/zombie dwl,
         # or socket already cleaned up). Fall back to physlock.
         echo "$(date) no wlock started (dwl zombie?), falling back to physlock"
-        command -v physlock >/dev/null 2>&1 && pgrep -x physlock >/dev/null 2>&1 || physlock -d &
+        try_physlock
         exit 0
     fi
 
@@ -78,15 +122,8 @@ if pgrep dwl >/dev/null 2>&1; then
 else
     echo "$(date) branch: no dwl, using physlock"
     # No graphical session — lock TTY consoles with physlock
-    if command -v physlock >/dev/null 2>&1; then
-        if pgrep -x physlock >/dev/null 2>&1; then
-            echo "$(date) physlock already running, skipping"
-        else
-            echo "$(date) starting physlock -d"
-            physlock -d &
-        fi
-    else
-        echo "$(date) physlock not found!"
+    if ! try_physlock; then
+        echo "$(date) ERROR: failed to start physlock"
     fi
 fi
 

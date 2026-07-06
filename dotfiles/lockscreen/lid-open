@@ -1,2 +1,2 @@
-event=button/lid LID open
+event=button/lid.*open
 action=/usr/local/bin/lock-screen.sh &

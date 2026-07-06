@@ -8,4 +8,9 @@ fi
 
 # Optional: any login-only setup can go below (e.g. ssh-agent, keychain already appended to .bashrc by the installer)
 
+if [ -n "$DWL_FIRST_TERMINAL" ]; then
+    echo -e "\n\n\n"
+    unset DWL_FIRST_TERMINAL
+fi
+
 neofetch
