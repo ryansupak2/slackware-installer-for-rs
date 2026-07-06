@@ -69,6 +69,7 @@ if $ok; then
        cmp -s "$REPO_DIR/dotfiles/somebar/bar.hpp" /usr/local/src/suckless/somebar-stamp/bar.hpp 2>/dev/null && \
        cmp -s "$REPO_DIR/dotfiles/somebar/config.hpp" /usr/local/src/suckless/somebar-stamp/config.hpp 2>/dev/null && \
        cmp -s "$REPO_DIR/dotfiles/somebar/common.hpp" /usr/local/src/suckless/somebar-stamp/common.hpp 2>/dev/null; then
+        :  # noop — somebar is up to date
     else
         echo "Installing somebar (dwl companion status bar)..."
         rm -rf somebar
