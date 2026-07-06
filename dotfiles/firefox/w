@@ -11,6 +11,8 @@ if [ $# -gt 0 ]; then
                 resolved=$(awk -v key="$raw" '$1 == key {print $2; exit}' "$f")
                 [ -n "$resolved" ] && uri="$resolved"
             fi
+            # fallback: treat unrecognized input as a raw URL
+            [ "$uri" = "about:blank" ] && uri="$raw"
             ;;
     esac
 fi
