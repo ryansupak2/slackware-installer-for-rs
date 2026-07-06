@@ -33,13 +33,13 @@ echo "hidemode on" > "$FIFO" 2>/dev/null
 # Briefly show the bar with the hide mode message, then hide after 3s
 set_temp_msg "(Hide Mode On [Mod+H])"
 echo "show all" > "$FIFO" 2>/dev/null
-(sleep 3; [ -f "$HIDE_MODE_FILE" ] && echo "hidemode on" > "$FIFO" 2>/dev/null) &
 next_log=0
 next_ping=0
 net_status="DOWN"
 prev_kbd_brightness=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || echo 0)
 prev_signal=""
 prev_msg_active=0
+prev_msg=""
 prev_online=""
 
 while true; do
@@ -131,6 +131,8 @@ while true; do
 
     # Temporary message overrides normal status
     msg_active=0
+    msg_active=0
+    msg=""
     if [ -f /tmp/status_msg ] && [ "$now" -lt $(cat /tmp/status_end 2>/dev/null || echo 0) ]; then
         msg=$(cat /tmp/status_msg)
         line="${vnc_status}${vpn_status}${msg} | $(date +'%T')"
@@ -141,10 +143,12 @@ while true; do
     fi
     # When a temporary message appears while in hide mode, show the bar so the
     # user sees the message (matching the standard Volume/Brightness behavior)
-    if [ "$hide_mode_on" = 1 ] && [ "$msg_active" = 1 ] && [ "$prev_msg_active" = 0 ]; then
-        echo "$(date): TEMP-MSG show: msg='$msg' (new temp message appeared)" >&2
-        echo "show all" > "$FIFO" 2>/dev/null
-        # auto-hide handled by somebar's autoShowUntil timer
+    # When a temporary message appears or changes while in hide mode, show the bar
+    if [ "$hide_mode_on" = 1 ] && [ "$msg_active" = 1 ]; then
+        if [ "$prev_msg_active" = 0 ] || [ "$msg" != "$prev_msg" ]; then
+            echo "$(date): TEMP-MSG show: msg='$msg'" >&2
+            echo "show all" > "$FIFO" 2>/dev/null
+        fi
     fi
     # When a temporary message expires, just log (somebar's timer handles re-hide)
     if [ "$hide_mode_on" = 1 ] && [ "$msg_active" = 0 ] && [ "$prev_msg_active" = 1 ]; then
@@ -159,6 +163,7 @@ while true; do
     fi
     prev_signal="$signal_line"
     prev_msg_active=$msg_active
+    prev_msg="$msg"
 
     # Detect physical charger plug/unplug (not battery charging toggling)
     online=0

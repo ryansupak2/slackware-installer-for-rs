@@ -224,21 +224,29 @@ void updatemon(Monitor& mon)
 	if (!mon.hasData) {
 		return;
 	}
-	if (mon.desiredVisibility) {
+	bool shouldShow = mon.desiredVisibility || (hideMode && autoShowUntil > 0);
+	fprintf(stderr, "[somebar] updatemon: shouldShow=%d desiredVis=%d hideMode=%d autoUntil=%ld\n",
+		shouldShow, mon.desiredVisibility, hideMode, (long)autoShowUntil);
+	if (shouldShow) {
 		if (mon.bar.visible()) {
-			mon.bar.invalidate();
+			mon.bar.setShown(true);
 		} else {
 			mon.bar.show(mon.wlOutput.get());
 		}
 	} else if (mon.bar.visible()) {
 		mon.bar.hide();
 	}
-	// Sync /tmp/bar_shown for toggle-bar.sh message logic
-	bool anyVisible = false;
-	for (auto &m : monitors) {
-		if (m.bar.visible()) { anyVisible = true; break; }
+	// Set exclusive zone: only reserve space when bar is fully shown
+	// (hideMode OFF and desiredVisibility true). Otherwise 0 = full screen.
+	if (mon.bar.visible()) {
+		mon.bar.setExclusive((!hideMode && mon.desiredVisibility) ? Bar::barHeight() : 0);
 	}
-	if (anyVisible) {
+	// Sync /tmp/bar_shown for toggle-bar.sh message logic
+	bool anyShown = false;
+	for (auto &m : monitors) {
+		if (m.bar.isShown()) { anyShown = true; break; }
+	}
+	if (anyShown) {
 		int fd = open("/tmp/bar_shown", O_CREAT | O_WRONLY | O_TRUNC, 0644);
 		if (fd >= 0) close(fd);
 	} else {
@@ -361,7 +369,7 @@ static void handleStdin(const std::string& line)
 		// Hide Mode: auto-show only when selmon actually changes
 		if (hideMode && selChanged) {
 			autoShowUntil = time(nullptr) + 3;
-			mon->desiredVisibility = true;
+			// desiredVisibility unchanged for temp show in hide mode
 			fprintf(stderr, "[somebar] selmon CHANGED: mon=%s prev=%d new=%d -> auto-show\n", monName.c_str(), oldSelected, mon->prevSelected);
 		} else if (hideMode) {
 			fprintf(stderr, "[somebar] selmon unchanged: mon=%s val=%d (suppressed)\n", monName.c_str(), mon->prevSelected);
@@ -385,7 +393,7 @@ static void handleStdin(const std::string& line)
 		// Hide Mode: auto-show only when tags actually change
 		if (hideMode && tagsChanged) {
 			autoShowUntil = time(nullptr) + 3;
-			mon->desiredVisibility = true;
+			// desiredVisibility unchanged for temp show in hide mode
 			fprintf(stderr, "[somebar] tags CHANGED: mon=%s prev=%u new=%u -> auto-show\n", monName.c_str(), oldTags, tags);
 		} else if (hideMode) {
 			fprintf(stderr, "[somebar] tags unchanged: mon=%s val=%u (suppressed)\n", monName.c_str(), tags);
@@ -401,7 +409,7 @@ static void handleStdin(const std::string& line)
 		// Hide Mode: auto-show only when layout actually changes
 		if (hideMode && layoutChanged) {
 			autoShowUntil = time(nullptr) + 3;
-			mon->desiredVisibility = true;
+			// desiredVisibility unchanged for temp show in hide mode
 			fprintf(stderr, "[somebar] layout CHANGED: mon=%s prev='%s' new='%s' -> auto-show\n", monName.c_str(), oldLayout.c_str(), layout.c_str());
 		} else if (hideMode) {
 			fprintf(stderr, "[somebar] layout unchanged: mon=%s val='%s' (suppressed)\n", monName.c_str(), layout.c_str());
@@ -446,15 +454,21 @@ void onStatus()
 				fprintf(stderr, "[somebar] FIFO: showmod '%s', modKeyHeld=true (hideMode=%d)\n", arg.c_str(), hideMode);
 				modKeyHeld = true;
 				autoShowUntil = 0;
-				updateVisibility(arg, [](bool) { return true; });
+				if (hideMode) {
+					for (auto &m : monitors) m.bar.setShown(true);
+				} else {
+					updateVisibility(arg, [](bool) { return true; });
+				}
 			}
 		} else if (str.rfind(prefixShow, 0) == 0) {
 			auto arg = str.substr(prefixShow.size());
 			fprintf(stderr, "[somebar] FIFO: show '%s' (hideMode=%d)\n", arg.c_str(), hideMode);
-			updateVisibility(arg, [](bool) { return true; });
-			// Signal/temp-msg show: set 3s auto-hide (modKeyHeld blocks actual hide)
 			if (hideMode) {
+				// Temp show: just set timer + visually unhide, don't change desiredVisibility
 				autoShowUntil = time(nullptr) + 3;
+				for (auto &m : monitors) m.bar.setShown(true);
+			} else {
+				updateVisibility(arg, [](bool) { return true; });
 			}
 		} else if (str.rfind(prefixHide, 0) == 0) {
 			auto arg = str.substr(prefixHide.size());
@@ -662,10 +676,11 @@ int main(int argc, char* argv[])
 				if (hideMode && !modKeyHeld) {
 					fprintf(stderr, "[somebar] auto-hide timer expired: re-hiding all monitors\n");
 					for (auto &monitor : monitors) {
-						monitor.desiredVisibility = false;
-						updatemon(monitor);
+						fprintf(stderr, "[somebar] auto-hide: calling bar.hide() directly\n");
+						monitor.bar.hide();
 					}
 				} else if (modKeyHeld) {
+					fprintf(stderr, "[somebar] auto-hide timer expired but modKeyHeld=true, skipping hide\n");
 					fprintf(stderr, "[somebar] auto-hide timer expired but modKeyHeld=true, skipping hide\n");
 				}
 			} else {

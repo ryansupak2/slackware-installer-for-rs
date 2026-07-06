@@ -108,11 +108,14 @@ bool Bar::visible() const
 void Bar::show(wl_output* output)
 {
 	if (visible()) {
+		fprintf(stderr, "[bar] show() already visible, unhiding\n");
+		_hidden = false;
+		invalidate();
 		return;
 	}
 	_surface.reset(wl_compositor_create_surface(compositor));
 	_layerSurface.reset(zwlr_layer_shell_v1_get_layer_surface(wlrLayerShell,
-		_surface.get(), output, ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM, "net.tapesoftware.Somebar"));
+		_surface.get(), output, ZWLR_LAYER_SHELL_V1_LAYER_TOP, "net.tapesoftware.Somebar"));
 	zwlr_layer_surface_v1_add_listener(_layerSurface.get(), &_layerSurfaceListener, this);
 	auto anchor = topbar ? ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP : ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM;
 	zwlr_layer_surface_v1_set_anchor(_layerSurface.get(),
@@ -120,8 +123,28 @@ void Bar::show(wl_output* output)
 
 	auto barSize = barfont.height + paddingY * 2;
 	zwlr_layer_surface_v1_set_size(_layerSurface.get(), 0, barSize);
-	zwlr_layer_surface_v1_set_exclusive_zone(_layerSurface.get(), barSize);
+	zwlr_layer_surface_v1_set_exclusive_zone(_layerSurface.get(), 0);
 	wl_surface_commit(_surface.get());
+}
+
+void Bar::setExclusive(uint32_t zone)
+{
+	if (!_layerSurface) return;
+	zwlr_layer_surface_v1_set_exclusive_zone(_layerSurface.get(), zone);
+	// Don't commit here — let the next invalidate/render do it
+}
+
+int Bar::barHeight()
+{
+	return barfont.height + paddingY * 2;
+}
+
+void Bar::setShown(bool shown)
+{
+	if (!visible()) return;
+	_hidden = !shown;
+	fprintf(stderr, "[bar] setShown(%d) -> _hidden=%d\n", shown, _hidden);
+	invalidate();
 }
 
 void Bar::hide()
@@ -129,9 +152,9 @@ void Bar::hide()
 	if (!visible()) {
 		return;
 	}
-	_layerSurface.reset();
-	_surface.reset();
-	_bufs.reset();
+	// Don't destroy surface — keep exclusive zone so windows don't resize.
+	_hidden = true;
+	invalidate();
 }
 
 void Bar::setTag(int tag, int state, int numClients, int focusedClient)
@@ -165,9 +188,9 @@ void Bar::invalidate()
 		return;
 	}
 	_invalid = true;
+	render();
 	auto frame = wl_surface_frame(_surface.get());
 	wl_callback_add_listener(frame, &_frameListener, this);
-	wl_surface_commit(_surface.get());
 }
 
 void Bar::click(Monitor* mon, int x, int, int btn)
@@ -204,7 +227,7 @@ void Bar::layerSurfaceConfigure(uint32_t serial, uint32_t width, uint32_t height
 	if (_bufs && width == _bufs->width && height == _bufs->height) {
 		return;
 	}
-	_bufs.emplace(width, height, WL_SHM_FORMAT_XRGB8888);
+	_bufs.emplace(width, height, WL_SHM_FORMAT_ARGB8888);
 	render();
 }
 
@@ -225,16 +248,26 @@ void Bar::render()
 	pango_cairo_update_context(_painter, _pangoContext.get());
 	_x = 0;
 
-	renderTags();
-	setColorScheme(_selected ? colorActive : colorInactive);
-	renderComponent(_layoutCmp);
-	renderComponent(_titleCmp);
-	renderStatus();
+	if (_hidden) {
+		fprintf(stderr, "[bar] render: TRANSPARENT\n");
+		cairo_save(_painter);
+		cairo_set_operator(_painter, CAIRO_OPERATOR_CLEAR);
+		cairo_paint(_painter);
+		cairo_restore(_painter);
+	} else {
+		fprintf(stderr, "[bar] render: CONTENT\n");
+		renderTags();
+		setColorScheme(_selected ? colorActive : colorInactive);
+		renderComponent(_layoutCmp);
+		renderComponent(_titleCmp);
+		renderStatus();
+	}
 
 	_painter = nullptr;
 	wl_surface_attach(_surface.get(), _bufs->buffer(), 0, 0);
 	wl_surface_damage(_surface.get(), 0, 0, _bufs->width, _bufs->height);
 	wl_surface_commit(_surface.get());
+	fprintf(stderr, "[bar] committed (_hidden=%d)\n", _hidden);
 	_bufs->flip();
 	_invalid = false;
 }

@@ -64,9 +64,9 @@ if $ok; then
     if [ -x /usr/local/bin/somebar ] && \
        cmp -s "$REPO_DIR/dotfiles/somebar/main.cpp" /usr/local/src/suckless/somebar-stamp/main.cpp 2>/dev/null && \
        cmp -s "$REPO_DIR/dotfiles/somebar/bar.cpp" /usr/local/src/suckless/somebar-stamp/bar.cpp 2>/dev/null && \
+       cmp -s "$REPO_DIR/dotfiles/somebar/bar.hpp" /usr/local/src/suckless/somebar-stamp/bar.hpp 2>/dev/null && \
        cmp -s "$REPO_DIR/dotfiles/somebar/config.hpp" /usr/local/src/suckless/somebar-stamp/config.hpp 2>/dev/null && \
        cmp -s "$REPO_DIR/dotfiles/somebar/common.hpp" /usr/local/src/suckless/somebar-stamp/common.hpp 2>/dev/null; then
-        echo "somebar already installed — skipping"
     else
         echo "Installing somebar (dwl companion status bar)..."
         rm -rf somebar
@@ -78,6 +78,7 @@ if $ok; then
             cp "$REPO_DIR/dotfiles/somebar/config.hpp" src/config.hpp
             cp "$REPO_DIR/dotfiles/somebar/common.hpp" src/common.hpp
             cp "$REPO_DIR/dotfiles/somebar/bar.cpp"    src/bar.cpp
+            cp "$REPO_DIR/dotfiles/somebar/bar.hpp"    src/bar.hpp
             cp "$REPO_DIR/dotfiles/somebar/main.cpp"  src/main.cpp
             meson setup build --wipe && ninja -C build && ninja -C build install
             if [ $? -ne 0 ]; then
@@ -88,6 +89,7 @@ if $ok; then
                 mkdir -p /usr/local/src/suckless/somebar-stamp
                 cp -f "$REPO_DIR/dotfiles/somebar/main.cpp" /usr/local/src/suckless/somebar-stamp/main.cpp
                 cp -f "$REPO_DIR/dotfiles/somebar/bar.cpp" /usr/local/src/suckless/somebar-stamp/bar.cpp
+                cp -f "$REPO_DIR/dotfiles/somebar/bar.hpp" /usr/local/src/suckless/somebar-stamp/bar.hpp
                 cp -f "$REPO_DIR/dotfiles/somebar/config.hpp" /usr/local/src/suckless/somebar-stamp/config.hpp
                 cp -f "$REPO_DIR/dotfiles/somebar/common.hpp" /usr/local/src/suckless/somebar-stamp/common.hpp
             fi
