@@ -416,6 +416,15 @@ static void handleStdin(const std::string& line)
 		} else if (hideMode) {
 			fprintf(stderr, "[somebar] layout unchanged: mon=%s val='%s' (suppressed)\n", monName.c_str(), layout.c_str());
 		}
+	} else if (command == "mods") {
+		uint32_t mods;
+		stream >> mods;
+		// WLR_MODIFIER_LOGO = 1 << 6 = 64
+		if (hideMode && modKeyHeld && !(mods & 64)) {
+			fprintf(stderr, "[somebar] mods reconcile: modKeyHeld=true but Mod not held (mods=%u), starting auto-hide\n", mods);
+			modKeyHeld = false;
+			autoShowUntil = time(nullptr) + 3;
+		}
 	}
 	mon->hasData = true;
 	updatemon(*mon);

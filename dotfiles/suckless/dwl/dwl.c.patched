@@ -2167,10 +2167,12 @@ printstatus(void)
 		printf("%s tags %"PRIu32" %"PRIu32" %"PRIu32" %"PRIu32"\n",
 			m->wlr_output->name, occ, m->tagset[m->seltags], sel, urg);
 		printf("%s layout %s\n", m->wlr_output->name, m->ltsymbol);
+		struct wlr_keyboard *kb = wlr_seat_get_keyboard(seat);
+		uint32_t mods = kb ? wlr_keyboard_get_modifiers(kb) : 0;
+		printf("%s mods %"PRIu32"\n", m->wlr_output->name, mods);
 	}
 	fflush(stdout);
 }
-
 void
 powermgrsetmode(struct wl_listener *listener, void *data)
 {
