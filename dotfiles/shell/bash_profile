@@ -14,6 +14,7 @@ mkdir -p "$HOME/logs" 2>/dev/null
 if [ -n "$DWL_FIRST_TERMINAL" ]; then
     echo "[$(date '+%H:%M:%S')] first-terminal newline" >> "$LOG"
     echo
+    neofetch
     unset DWL_FIRST_TERMINAL
 elif [ -f /tmp/hide_mode ]; then
     echo "[$(date '+%H:%M:%S')] hide-mode newline" >> "$LOG"
@@ -21,5 +22,3 @@ elif [ -f /tmp/hide_mode ]; then
 else
     echo "[$(date '+%H:%M:%S')] normal start (no newline)" >> "$LOG"
 fi
-
-neofetch

@@ -445,19 +445,19 @@ void onStatus()
 		} else if (str.rfind(prefixShowmod, 0) == 0) {
 			auto arg = str.substr(prefixShowmod.size());
 			if (arg.rfind("off", 0) == 0) {
-				// Mod RELEASE: start 3-second countdown
-				fprintf(stderr, "[somebar] FIFO: showmod off, modKeyHeld=false, 3s timer (hideMode=%d)\n", hideMode);
+				// Mod RELEASE
+				fprintf(stderr, "[somebar] FIFO: showmod off, modKeyHeld=false (hideMode=%d)\n", hideMode);
 				modKeyHeld = false;
-				autoShowUntil = time(nullptr) + 3;
+				if (hideMode) {
+					autoShowUntil = time(nullptr) + 3;
+				}
 			} else {
-				// Mod PRESS: show bar, block auto-hide until release
+				// Mod PRESS: only show bar in Hide Mode
 				fprintf(stderr, "[somebar] FIFO: showmod '%s', modKeyHeld=true (hideMode=%d)\n", arg.c_str(), hideMode);
 				modKeyHeld = true;
 				autoShowUntil = 0;
 				if (hideMode) {
 					for (auto &m : monitors) m.bar.setShown(true);
-				} else {
-					updateVisibility(arg, [](bool) { return true; });
 				}
 			}
 		} else if (str.rfind(prefixShow, 0) == 0) {
