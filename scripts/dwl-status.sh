@@ -106,9 +106,10 @@ while true; do
     vox_file="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/vox_state"
     if [ -f "$vox_file" ]; then
         case "$(cat "$vox_file" 2>/dev/null)" in
-            loading)   vox_badge="[VOX Loading...] " ;;
-            recording) vox_badge="[VOX] " ;;
-            *)         vox_badge="[VOX] " ;;
+            loading)         vox_badge="[VOX Loading...] " ;;
+            recording)       vox_badge="[VOX] " ;;
+            recording+dump)  vox_badge="[VOX (recording...)] " ;;
+            *)               vox_badge="[VOX] " ;;
         esac
     else
         vox_badge=""

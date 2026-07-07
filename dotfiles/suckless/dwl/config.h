@@ -133,6 +133,7 @@ static const Key keys[] = {
 	{ MODKEY,                       XKB_KEY_h,                     spawn,  SHCMD("/usr/local/bin/toggle-hide-mode.sh") },
 	{ MODKEY,                       XKB_KEY_b,                     spawn,  SHCMD("/usr/local/bin/toggle-bar.sh") },
 	{ MODKEY,                       XKB_KEY_v,                     spawn,  SHCMD("/usr/local/bin/toggle-vox.sh") },
+	{ MODKEY|WLR_MODIFIER_SHIFT,    XKB_KEY_v,                     spawn,  SHCMD("/usr/local/bin/toggle-vox-record.sh") },
 };
 
 static const Button buttons[] = {

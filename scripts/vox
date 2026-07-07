@@ -1,5 +1,5 @@
 #!/bin/sh
-# vox — VOX voice dictation CLI
+# vox — VOX voice dictation CLI (sherpa-onnx streaming Zipformer)
 #
 # Usage:
 #   vox on        Start recording (Mod+V equivalent) — [VOX] appears in somebar
@@ -28,7 +28,7 @@ case "${1:-}" in
         ;;
     --help|-h|help|"")
         cat << 'HELP'
-vox — voice dictation
+vox — voice dictation (streaming Zipformer via sherpa-onnx)
 
 USAGE
   vox on           Start recording — [VOX] appears in somebar
@@ -44,7 +44,7 @@ LOGS
   ~/logs/vox.log   Detailed session log (toggle on/off, transcription, timing)
 
 REQUIRES
-  whisper-cpp + whisper-tiny.en model (installed by whisper-cpp-vox step)
+  sherpa-onnx + streaming Zipformer EN 20M model (installed by vox-sherpa step)
 HELP
         ;;
     *)

@@ -18,12 +18,13 @@ echo "Log: $LOGFILE"
 echo "========================================"
 
 cleanup() {
-    echo "  · cleaning up audio..."
+    echo "  · cleaning up..."
+    pkill -x voxd              2>/dev/null || true
+    rm -f "$XDG_RUNTIME_DIR/vox_state" 2>/dev/null || true
     pkill -x pipewire-pulse       2>/dev/null || true
     pkill -x pipewire-media-session 2>/dev/null || true
     pkill -x wireplumber          2>/dev/null || true
     pkill -x pipewire             2>/dev/null || true
-
 }
 trap cleanup EXIT
 

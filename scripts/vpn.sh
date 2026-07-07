@@ -62,6 +62,14 @@ is_vpn_alive() {
     ping -c1 -W2 1.1.1.1 >/dev/null 2>&1
 }
 
+# Check if the current user owns the running openvpn process
+owns_vpn() {
+    local ovpn_pid
+    ovpn_pid=$(pgrep -x openvpn | head -1)
+    [ -z "$ovpn_pid" ] && return 0   # no process = not owned by anyone = safe to take over
+    [ "$(ps -o user= -p "$ovpn_pid" 2>/dev/null)" = "$(whoami)" ]
+}
+
 has_configs() {
     [ -d "$CONFIG_DIR" ] && ls "$CONFIG_DIR"/*.ovpn >/dev/null 2>&1
 }
@@ -243,9 +251,15 @@ run_cli() {
                 exit 1
             fi
             if is_connected; then
-                log_msg INFO "already connected — disconnecting first"
-                disconnect_vpn
-                sleep 1
+                if owns_vpn; then
+                    log_msg INFO "already connected — disconnecting first"
+                    disconnect_vpn
+                    sleep 1
+                else
+                    log_msg ERROR "VPN is active under another user — refusing to disconnect"
+                    echo "VPN is connected by another user. Run 'vpn disconnect' as that user first."
+                    exit 1
+                fi
             fi
             if connect_country "$1"; then
                 echo "$1" > "$STATE_FILE"

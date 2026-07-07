@@ -113,17 +113,13 @@ if $ok; then
     chmod +x /usr/local/bin/toggle-hide-mode.sh
     cp "$REPO_DIR/scripts/toggle-bar.sh" /usr/local/bin/toggle-bar.sh
     chmod +x /usr/local/bin/toggle-bar.sh
-    cp "$REPO_DIR/scripts/toggle-vox.sh" /usr/local/bin/toggle-vox.sh
-    chmod +x /usr/local/bin/toggle-vox.sh
-    cp "$REPO_DIR/scripts/vox" /usr/local/bin/vox
-    chmod +x /usr/local/bin/vox
+
     echo "  dwl-start deployed to /usr/local/bin/dwl-start"
     echo "  dwl-status deployed to /usr/local/bin/dwl-status"
     echo "  temp-msg deployed to /usr/local/bin/temp-msg.sh"
     echo "  toggle-hide-mode deployed to /usr/local/bin/toggle-hide-mode.sh"
     echo "  toggle-bar deployed to /usr/local/bin/toggle-bar.sh"
-    echo "  toggle-vox deployed to /usr/local/bin/toggle-vox.sh"
-    echo "  vox deployed to /usr/local/bin/vox"
+
     echo "Installing shell shortcuts + neofetch launcher..."
     cp "$REPO_DIR/scripts/g" /usr/local/bin/g
     chmod +x /usr/local/bin/g

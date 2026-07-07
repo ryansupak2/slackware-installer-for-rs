@@ -447,6 +447,9 @@ void onStatus()
 	},
 	[](const char* buffer, size_t n) {
 		auto str = std::string {buffer, n};
+		// Strip null bytes that corrupt prefix matching
+		str.erase(std::remove(str.begin(), str.end(), '\0'), str.end());
+		if (str.empty()) return;
 		if (str.rfind(prefixStatus, 0) == 0) {
 			lastStatus = str.substr(prefixStatus.size());
 			for (auto &monitor : monitors) {
@@ -690,11 +693,10 @@ int main(int argc, char* argv[])
 				if (hideMode && !modKeyHeld) {
 					fprintf(stderr, "[somebar] auto-hide timer expired: re-hiding all monitors\n");
 					for (auto &monitor : monitors) {
-						fprintf(stderr, "[somebar] auto-hide: calling bar.hide() directly\n");
-						monitor.bar.hide();
+						fprintf(stderr, "[somebar] auto-hide: calling updatemon() for state sync\n");
+						updatemon(monitor);
 					}
 				} else if (modKeyHeld) {
-					fprintf(stderr, "[somebar] auto-hide timer expired but modKeyHeld=true, skipping hide\n");
 					fprintf(stderr, "[somebar] auto-hide timer expired but modKeyHeld=true, skipping hide\n");
 				}
 			} else {
