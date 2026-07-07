@@ -95,7 +95,7 @@ fi
 #
 # Source the common helpers (already done above for the main script itself).
 # Category definitions (for Slackware: removed glibc-compat, renamed apk step)
-core_prereqs=("slackpkg-setup" "console-font" "ca-certificates" "wayland-base")
+core_prereqs=("slackpkg-setup" "console-font" "ca-certificates" "wayland-base" "root-dotfiles")
 networking=("wifi" "openvpn" "vnc" "remote-desktop")
 hardware_config=("input-hardware" "screen-locking" "acpi-wakeup" "audio-volume" "brightness" "clipboard-wayland")
 security_access=("root-ssh-key" "keychain" "github-ssh")
@@ -103,7 +103,7 @@ dev_tools=("suckless-foot" "vim" "git-lfs")
 ui_appearance=("neofetch" "additional-fonts" "suckless-dwl")
 applications=("firefox" "inkscape" "yad" "root-shortcuts" "slskd")
 utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux")
-audio_dsp=("sox")
+audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox")
 
 categories=("Core" "Networking" "Hardware Configuration" "Security & Access" "Development Tools" "User Interface & Appearance" "Applications" "Utilities" "Audio/DSP")
 
@@ -236,6 +236,13 @@ for section in "${selected[@]}"; do
             ;;
         "wayland-base")
             if ./steps/wayland-base.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        "root-dotfiles")
+            if ./steps/root-dotfiles.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))
@@ -396,8 +403,22 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
+        "sof-firmware")
+            if ./steps/sof-firmware.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
         "sox")
             if ./steps/sox.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        "whisper-cpp-vox")
+            if ./steps/whisper-cpp-vox.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))

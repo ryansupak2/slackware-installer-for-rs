@@ -20,18 +20,21 @@ setup_bashrc() {
     target="$HOME_TARGET/.bashrc"
     src="$REPO_DIR/dotfiles/shell/bashrc"
 
+    should_deploy=1
     if [ -f "$target" ]; then
-        if ! cmp -s "$src" "$target" 2>/dev/null; then
+        if cmp -s "$src" "$target" 2>/dev/null; then
+            echo "  .bashrc unchanged from template — skipping"
+            should_deploy=0
+        else
             backup="$HOME_TARGET/.bashrc.backup-$(date +%Y%m%d-%H%M%S)"
             cp "$target" "$backup"
             echo "  Existing .bashrc differs from template — backed up to $(basename "$backup")"
-        else
-            echo "  .bashrc unchanged from template — skipping"
-            return
         fi
     fi
-    cp "$src" "$target"
-    echo "  Deployed $target"
+    if [ "$should_deploy" = 1 ]; then
+        cp "$src" "$target"
+        echo "  Deployed $target"
+    fi
 
     # .bash_profile for login shells
     bp_target="$HOME_TARGET/.bash_profile"
@@ -51,11 +54,30 @@ setup_bashrc() {
         echo "  Deployed $bp_target"
     fi
     chmod 600 "$bp_target" 2>/dev/null || true
+
+    # .bash_logout for login shell exit (text console only)
+    bl_target="$HOME_TARGET/.bash_logout"
+    bl_src="$REPO_DIR/dotfiles/shell/bash_logout"
+    if [ -f "$bl_target" ]; then
+        if ! cmp -s "$bl_src" "$bl_target" 2>/dev/null; then
+            bl_backup="$HOME_TARGET/.bash_logout.backup-$(date +%Y%m%d-%H%M%S)"
+            cp "$bl_target" "$bl_backup"
+            echo "  Existing .bash_logout differs from template — backed up to $(basename "$bl_backup")"
+            cp "$bl_src" "$bl_target"
+            echo "  Deployed $bl_target"
+        else
+            echo "  .bash_logout unchanged from template — skipping"
+        fi
+    else
+        cp "$bl_src" "$bl_target" 2>/dev/null || true
+        echo "  Deployed $bl_target"
+    fi
+    chmod 600 "$bl_target" 2>/dev/null || true
 }
 
 setup_bashrc
 
-chown "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.bashrc" "$HOME_TARGET/.bash_profile" 2>/dev/null || true
+chown "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.bashrc" "$HOME_TARGET/.bash_profile" "$HOME_TARGET/.bash_logout" 2>/dev/null || true
 
 echo "SUCCESS: Bashrc configured for $TARGET_USER."
 exit 0

@@ -15,11 +15,11 @@ echo "*****************************************************"
 # ALSA is always present on Slackware base
 install_pkg "alsa-utils"
 
-# Force legacy HDA driver on Intel Skylake+ (SOF firmware not in base Slackware)
-ELILO_CONF="/boot/efi/EFI/Slackware/elilo.conf"
-if [ -f "$ELILO_CONF" ] && ! grep -q "snd-intel-dspcfg.dsp_driver" "$ELILO_CONF" 2>/dev/null; then
-    sed -i 's/append="\(.*\)"/append="\1 snd-intel-dspcfg.dsp_driver=1"/' "$ELILO_CONF"
-    echo "  Added snd-intel-dspcfg.dsp_driver=1 to elilo"
+# The SOF firmware IS present on this system (see /lib/firmware/intel/sof/).
+# Do NOT force legacy HDA — the internal DMIC requires the SOF DSP driver.
+if [ -f "$ELILO_CONF" ]; then
+    sed -i 's/ snd-intel-dspcfg.dsp_driver=[0-9]//g' "$ELILO_CONF"
+    echo "  Removed any snd-intel-dspcfg.dsp_driver override from elilo"
 fi
 
 # Add audio group
@@ -34,6 +34,11 @@ amixer -c0 cset numid=4  on,on        2>/dev/null || true  # Speaker Playback Sw
 for nid in 35 38 39 40 46 47; do
     amixer -c0 cset numid=$nid 32,32 2>/dev/null || true   # PGA gains
 done
+
+# Mic capture: max boost + max volume for VOX voice dictation
+amixer -c0 cset numid=6  63,63       2>/dev/null || true  # Capture Volume
+amixer -c0 cset numid=7  on,on       2>/dev/null || true  # Capture Switch
+amixer -c0 cset numid=8  3,3         2>/dev/null || true  # Mic Boost Volume
 alsactl store 2>/dev/null || true
 
 # Disable PulseAudio autospawn (PipeWire handles audio instead)

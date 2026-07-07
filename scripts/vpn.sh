@@ -52,7 +52,7 @@ as_root() {
 
 # ── State checks ───────────────────────────────────────────────────────
 is_connected() {
-    ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'
+    /usr/sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'
 }
 
 has_configs() {
@@ -62,13 +62,13 @@ has_configs() {
 # ── IPv6 leak prevention ───────────────────────────────────────────────
 block_ipv6() {
     for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
-        as_root sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=1" >/dev/null 2>&1
+        as_root /sbin/sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=1" >/dev/null 2>&1
     done
 }
 
 restore_ipv6() {
     for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
-        as_root sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=0" >/dev/null 2>&1
+        as_root /sbin/sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=0" >/dev/null 2>&1
     done
 }
 
@@ -115,7 +115,7 @@ connect_country() {
         echo "redirect-gateway ipv6" >> "$tmpcfg"
 
         # Launch daemonized
-        if ! as_root openvpn --config "$tmpcfg" --daemon; then
+        if ! as_root /usr/sbin/openvpn --config "$tmpcfg" --daemon; then
             log_msg ERROR "openvpn failed to start for $server"
             continue
         fi
@@ -133,7 +133,7 @@ connect_country() {
         done
 
         echo -e "${RED}timeout${NC}"
-        as_root pkill openvpn 2>/dev/null || true
+        as_root /usr/bin/pkill openvpn 2>/dev/null || true
     done
 
     log_msg ERROR "failed to connect after $tried attempt(s)"
@@ -143,11 +143,11 @@ connect_country() {
 # ── Disconnect ─────────────────────────────────────────────────────────
 disconnect_vpn() {
     restore_ipv6
-    as_root pkill openvpn 2>/dev/null || true
+    as_root /usr/bin/pkill openvpn 2>/dev/null || true
     sleep 0.5
-    as_root pkill -f 'openvpn.*ovpn' 2>/dev/null || true
+    as_root /usr/bin/pkill -f 'openvpn.*ovpn' 2>/dev/null || true
     sleep 1
-    as_root pkill -9 openvpn 2>/dev/null || true
+    as_root /usr/bin/pkill -9 openvpn 2>/dev/null || true
     sleep 1
 
     if ! is_connected; then

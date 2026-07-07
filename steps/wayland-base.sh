@@ -22,8 +22,9 @@ install_sbo "bemenu seatd" || { echo "ERROR: SBo packages failed"; ok=false; }
 # Allow tty group read access to console TTYs so seatd-launch works without SUID
 mkdir -p /etc/udev/rules.d
 cp "$REPO_DIR/dotfiles/udev/99-tty-group-read.rules" /etc/udev/rules.d/ 2>/dev/null || true
-chmod 620 /dev/tty0 /dev/tty1 2>/dev/null || true
+chmod 660 /dev/tty0 /dev/tty1 2>/dev/null || true
 udevadm control --reload-rules 2>/dev/null || true
+udevadm trigger --subsystem-match=tty 2>/dev/null || true
 
 # --- 3. meson ---
 echo "Installing latest meson via pip..."

@@ -92,12 +92,24 @@ while true; do
 
     # VPN detection (tun0)
     if [ $((now - last_vpn_check)) -ge 1 ]; then
-        if ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
+        if /usr/sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
             vpn_status="[VPN] "
         else
             vpn_status=""
         fi
         last_vpn_check=$now
+    fi
+
+    # VOX voice dictation state (Mod+V toggle)
+    vox_file="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/vox_state"
+    if [ -f "$vox_file" ]; then
+        case "$(cat "$vox_file" 2>/dev/null)" in
+            loading)   vox_badge="[VOX Loading...] " ;;
+            recording) vox_badge="[VOX] " ;;
+            *)         vox_badge="[VOX] " ;;
+        esac
+    else
+        vox_badge=""
     fi
 
     # Ping check (every 5s, backgrounded — never blocks the loop)
@@ -112,11 +124,11 @@ while true; do
     fi
 
     # Build status line
-    full_line="${vnc_status}${vpn_status}${no_internet_prefix}${bat_part} | $(date +'%a, %d %b %Y | %T')"
+    full_line="${vox_badge}${vnc_status}${vpn_status}${no_internet_prefix}${bat_part} | $(date +'%a, %d %b %Y | %T')"
 
     # Build a "signal" line for change detection (strips clock and BAT % digits)
     bat_signal=$(echo "$bat_part" | sed 's/[0-9]\+%/%/g' | sed 's/BAT:+/BAT:/')
-    signal_line="${vnc_status}${vpn_status}${no_internet_prefix}${bat_signal}"
+    signal_line="${vox_badge}${vnc_status}${vpn_status}${no_internet_prefix}${bat_signal}"
 
     hide_mode_on=0
     [ -f "$HIDE_MODE_FILE" ] && hide_mode_on=1

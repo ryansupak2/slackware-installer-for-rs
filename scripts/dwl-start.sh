@@ -23,13 +23,18 @@ cleanup() {
     pkill -x pipewire-media-session 2>/dev/null || true
     pkill -x wireplumber          2>/dev/null || true
     pkill -x pipewire             2>/dev/null || true
+
 }
 trap cleanup EXIT
 
+
 # ── Runtime dir ───────────────────────────────────────────────
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-mkdir -p "$XDG_RUNTIME_DIR"
-chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+if [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    sudo mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    sudo chown $(whoami):$(whoami) "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+fi
 export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
 
 # ── Helper: start a daemon and wait for it ────────────────────

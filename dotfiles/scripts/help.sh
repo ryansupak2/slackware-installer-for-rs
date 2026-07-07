@@ -18,6 +18,7 @@ echo "  Mod+Shift+Z                -> Kill current window"
 echo "  Mod+Ctrl+Shift+Q           -> Quit dwm"
 echo "  Mod+Esc                    -> Lock screen"
 echo "  Mod+B                      -> Toggle bar"
+  Mod+V                      -> VOX voice dictation (vox on/off)
 echo ""
 echo "  LAYOUT"
 echo "  Mod+M                      -> Monocle layout"

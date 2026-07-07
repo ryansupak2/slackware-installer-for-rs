@@ -1,0 +1,54 @@
+#!/bin/sh
+# vox — VOX voice dictation CLI
+#
+# Usage:
+#   vox on        Start recording (Mod+V equivalent) — [VOX] appears in somebar
+#   vox off       Stop recording, transcribe, type at cursor
+#   vox --help    Show this help
+#
+# Also aliased: vox start / vox stop
+
+XDG_RT="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+STATE_FILE="$XDG_RT/vox_state"
+
+case "${1:-}" in
+    on|start)
+        if [ -f "$STATE_FILE" ]; then
+            echo "vox is already ON. Use 'vox off' to stop."
+            exit 1
+        fi
+        exec /usr/local/bin/toggle-vox.sh
+        ;;
+    off|stop)
+        if [ ! -f "$STATE_FILE" ]; then
+            echo "vox is already OFF. Use 'vox on' to start."
+            exit 1
+        fi
+        exec /usr/local/bin/toggle-vox.sh
+        ;;
+    --help|-h|help|"")
+        cat << 'HELP'
+vox — voice dictation
+
+USAGE
+  vox on           Start recording — [VOX] appears in somebar
+  vox off          Stop recording — transcribes and types at cursor
+  vox start        Same as 'vox on'
+  vox stop         Same as 'vox off'
+  vox --help       Show this help
+
+KEYBINDING
+  Mod+V            Toggles recording on/off (same as vox on / vox off)
+
+LOGS
+  ~/logs/vox.log   Detailed session log (toggle on/off, transcription, timing)
+
+REQUIRES
+  whisper-cpp + whisper-tiny.en model (installed by whisper-cpp-vox step)
+HELP
+        ;;
+    *)
+        echo "vox: unknown command '$1'. Use 'vox --help' for usage." >&2
+        exit 1
+        ;;
+esac

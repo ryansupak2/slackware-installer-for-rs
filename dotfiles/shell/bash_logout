@@ -1,0 +1,5 @@
+# .bash_logout — sourced when login shell exits (text console only)
+# dwl sessions use dwl-start's cleanup trap instead (exec replaces bash)
+
+# Flush VPN on logout
+sudo /usr/bin/pkill openvpn 2>/dev/null || true

@@ -1,3 +1,4 @@
+
 alias vi='vim'  #help:vi=vim
 alias draw='inkscape & exit'  #help:draw=inkscape
 w() { /usr/local/bin/w "$@" & disown; exit; }  #help:w=firefox (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
