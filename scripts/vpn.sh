@@ -13,6 +13,7 @@ export PATH="/usr/sbin:/sbin:$PATH"
 CONFIG_DIR="/etc/openvpn/configs/udp/ovpn_udp"
 AUTH_FILE="/etc/openvpn/nordvpn-auth.txt"
 DNS_FILE="/etc/openvpn/nordvpn-dns-by-country.txt"
+STATE_FILE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/vpn_state"
 MAX_TRIES=5
 CONNECT_TIMEOUT=15
 LOG_DIR="$HOME/logs"
@@ -53,6 +54,12 @@ as_root() {
 # ── State checks ───────────────────────────────────────────────────────
 is_connected() {
     /usr/sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'
+}
+
+# Check if tun0 is UP AND the VPN tunnel actually passes traffic
+is_vpn_alive() {
+    is_connected || return 1
+    ping -c1 -W2 1.1.1.1 >/dev/null 2>&1
 }
 
 has_configs() {
@@ -128,6 +135,7 @@ connect_country() {
             if is_connected; then
                 echo -e "${GREEN}done${NC} (${waited}s)"
                 block_ipv6
+                echo "$cc" > "$STATE_FILE"
                 return 0
             fi
         done
@@ -143,6 +151,7 @@ connect_country() {
 # ── Disconnect ─────────────────────────────────────────────────────────
 disconnect_vpn() {
     restore_ipv6
+    rm -f "$STATE_FILE"
     as_root /usr/bin/pkill openvpn 2>/dev/null || true
     sleep 0.5
     as_root /usr/bin/pkill -f 'openvpn.*ovpn' 2>/dev/null || true
@@ -168,7 +177,11 @@ interactive_menu() {
         echo ""
 
         if is_connected; then
-            echo -e "Status: ${GREEN}CONNECTED${NC}"
+            if is_vpn_alive; then
+                echo -e "Status: ${GREEN}CONNECTED${NC}"
+            else
+                echo -e "Status: ${RED}STALE${NC} (tun0 UP, no internet — press 1 to disconnect)"
+            fi
             echo ""
             echo "1. Disconnect"
             echo "2. Exit"
@@ -210,7 +223,11 @@ run_cli() {
             ;;
         status|st|s)
             if is_connected; then
-                echo -e "VPN: ${GREEN}CONNECTED${NC} (tun0 is UP)"
+                if is_vpn_alive; then
+                    echo -e "VPN: ${GREEN}CONNECTED${NC} (tun0 is UP)"
+                else
+                    echo -e "VPN: ${RED}STALE${NC} (tun0 is UP, but no internet — run 'vpn disconnect' to recover)"
+                fi
                 ip addr show tun0 2>/dev/null | grep inet
             else
                 echo -e "VPN: ${RED}DISCONNECTED${NC}"
@@ -231,6 +248,7 @@ run_cli() {
                 sleep 1
             fi
             if connect_country "$1"; then
+                echo "$1" > "$STATE_FILE"
                 echo "Run 'vpn disconnect' to stop."
             else
                 exit 1

@@ -66,9 +66,11 @@ if [ -f /etc/rc.d/rc.local ]; then
         cat >> /etc/rc.d/rc.local << 'EOF'
 
 # Disable ACPI wakeup devices (added by post-install-global.sh)
-for dev in XHC RP01 RP02 RP03 RP04 RP05 RP06 RP07 RP08; do
+for dev in LID XHC RP01 RP02 RP03 RP04 RP05 RP06 RP07 RP08; do
     [ -f "/proc/acpi/wakeup" ] && grep -q "^$dev" /proc/acpi/wakeup && echo "$dev" > /proc/acpi/wakeup 2>/dev/null || true
 done
+# Also disable lid via sysfs (belt-and-suspenders)
+[ -f /sys/devices/LNXSYSTM:00/LNXSYBUS:00/PNP0C0D:00/power/wakeup ] && echo disabled > /sys/devices/LNXSYSTM:00/LNXSYBUS:00/PNP0C0D:00/power/wakeup 2>/dev/null || true
 EOF
         echo "  Added acpi-wakeup hook to rc.local."
     else

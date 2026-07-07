@@ -70,6 +70,28 @@ AUTH
     cp "$REPO_DIR/scripts/vpn.sh" /usr/local/bin/vpn || { echo "ERROR: Failed to copy vpn script"; ok=false; }
     chmod +x /usr/local/bin/vpn 2>/dev/null || true
 
+    # Deploy VPN suspend/resume handler (disconnect on sleep, reconnect on wake)
+    echo "Deploying VPN suspend/resume handler..."
+    cp "$REPO_DIR/scripts/vpn-resume.sh" /usr/local/bin/vpn-suspend 2>/dev/null || true
+    chmod +x /usr/local/bin/vpn-suspend 2>/dev/null || true
+
+    # Install elogind system-sleep hook (handles both pre-suspend and post-resume)
+    if [ -d "/lib64/elogind/system-sleep" ]; then
+        cat > /lib64/elogind/system-sleep/vpn-suspend.sh << 'SLEEPHOOK'
+#!/bin/bash
+case "$1" in
+  pre)
+    /usr/local/bin/vpn-suspend pre &
+    ;;
+  post)
+    /usr/local/bin/vpn-suspend post &
+    ;;
+esac
+SLEEPHOOK
+        chmod +x /lib64/elogind/system-sleep/vpn-suspend.sh
+        echo "  VPN suspend hook installed: /lib64/elogind/system-sleep/vpn-suspend.sh"
+    fi
+
     # Deploy sudoers so wheel users can manage OpenVPN without a password prompt
     echo "Deploying sudoers for OpenVPN access..."
     mkdir -p /etc/sudoers.d

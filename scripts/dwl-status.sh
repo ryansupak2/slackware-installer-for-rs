@@ -94,6 +94,8 @@ while true; do
     if [ $((now - last_vpn_check)) -ge 1 ]; then
         if /usr/sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
             vpn_status="[VPN] "
+        elif [ -f "${XDG_RUNTIME_DIR}/vpn_state" ]; then
+            vpn_status="[VPN Reconnecting...] "
         else
             vpn_status=""
         fi
@@ -139,7 +141,7 @@ while true; do
     msg=""
     if [ -f "$XDG_RUNTIME_DIR/status_msg" ] && [ "$now" -lt $(cat "$XDG_RUNTIME_DIR/status_end" 2>/dev/null || echo 0) ]; then
         msg=$(cat "$XDG_RUNTIME_DIR/status_msg")
-        line="${vnc_status}${vpn_status}${msg} | $(date +'%T')"
+        line="${msg} | $(date +'%T')"
         msg_active=1
     else
         rm -f "$XDG_RUNTIME_DIR/status_msg" "$XDG_RUNTIME_DIR/status_end" 2>/dev/null || true
