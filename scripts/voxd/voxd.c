@@ -417,7 +417,9 @@ static void run_alsa_mode(void) {
 
     snd_pcm_t *alsa = NULL;
     const SherpaOnnxOnlineStream *stream = NULL;
-    int recording = 0, segment_id = 0, last_partial_len = 0, suppress_first = 0;
+    int recording = 0, segment_id = 0, last_partial_len = 0, suppress_first = 0, did_warmup = 0;
+    time_t suppress_until = 0;
+
     char last_text[4096] = {0};
 
     while (g_running) {
@@ -427,10 +429,10 @@ static void run_alsa_mode(void) {
                 /* --- TOGGLE ON --- */
                 log_msg("ON"); state_write("loading");
                 if (g_dump_audio) dump_open();
-                stream = SherpaOnnxCreateOnlineStream(recognizer);
+                if (!stream) stream = SherpaOnnxCreateOnlineStream(recognizer);
+                else SherpaOnnxOnlineStreamReset(recognizer, stream);
 
-                /* Warmup: feed 5s audio to prime model */
-                if (g_warmup && g_warmup_count > 0) {
+                if (!did_warmup && g_warmup && g_warmup_count > 0) {
                     int pos = 0, chunk = CHUNK_SAMPLES;
                     while (pos < g_warmup_count) {
                         int n = (pos+chunk > g_warmup_count) ? g_warmup_count-pos : chunk;
@@ -448,25 +450,31 @@ static void run_alsa_mode(void) {
                           if (SherpaOnnxOnlineStreamIsEndpoint(recognizer, stream)) {
                               const SherpaOnnxOnlineRecognizerResult *wr = SherpaOnnxGetOnlineStreamResult(recognizer, stream);
                               if (wr) { log_msg("  [flushed] %s", wr->text); SherpaOnnxDestroyOnlineRecognizerResult(wr); }
-                              SherpaOnnxOnlineStreamReset(recognizer, stream);
+                              /* Don't reset — keep stream warm for user audio */
                               flushed = 1;
                           }
                       }
                     }
                     log_msg("Warmup complete — stream primed");
+                    did_warmup = 1;
                 }
 
                 /* Open ALSA AFTER warmup so ring buffer doesn't overflow */
+                log_msg("Opening ALSA...");
                 alsa = alsa_open();
                 if (!alsa) {
                     SherpaOnnxDestroyOnlineStream(stream); stream = NULL;
                     state_clear(); continue;
                 }
 
+                /* NOW we're truly ready */
+                log_msg("ALSA ready — starting capture");
+
+                if (!did_warmup) suppress_until = time(NULL) + 3;
                 recording = 1; segment_id = 0; last_partial_len = 0;
-                suppress_first = 1; last_text[0] = '\0';
-                state_write(g_dump_audio ? "recording+dump" : "recording");
-                log_msg("Recording started (streaming Zipformer)%s", g_dump_audio?" [audio dump enabled]":"");
+                if (did_warmup) { state_write(g_dump_audio ? "recording+dump" : "recording"); log_msg("Hot start — ready"); }
+                last_text[0] = '\0';
+
             } else {
                 /* --- TOGGLE OFF --- */
                 log_msg("OFF");
@@ -480,7 +488,7 @@ static void run_alsa_mode(void) {
                         type_append(last_text, last_partial_len, final_buf);
                     }
                     if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
-                    SherpaOnnxDestroyOnlineStream(stream); stream = NULL;
+                    /* Keep stream alive — it stays warm between sessions */
                 }
                 if (alsa) { snd_pcm_close(alsa); alsa = NULL; }
                 if (g_dump_audio) dump_close();
@@ -490,6 +498,20 @@ static void run_alsa_mode(void) {
         }
 
         if (!recording || !alsa) { usleep(50000); continue; }
+
+        /* Transition loading→recording when suppression window expires */
+        if (suppress_until && time(NULL) >= suppress_until) {
+            FILE *sf = fopen(g_state_path, "r");
+            if (sf) {
+                char buf[64];
+                if (fgets(buf, sizeof(buf), sf) && strstr(buf, "loading")) {
+                    state_write(g_dump_audio ? "recording+dump" : "recording");
+                    log_msg("Ready for dictation");
+                }
+                fclose(sf);
+            }
+        }
+
 
         /* --- Audio capture --- */
         int16_t buf[CHUNK_SAMPLES];
@@ -509,11 +531,25 @@ static void run_alsa_mode(void) {
         int is_endpoint = SherpaOnnxOnlineStreamIsEndpoint(recognizer, stream);
         /* Partial update */
         if (strlen(text) && strcmp(text, last_text) != 0) {
-    log_msg("  [DBG] suppress_first=%d text=%s", suppress_first, text);
-            if (suppress_first) {
-                suppress_first = 0;
+            if (time(NULL) < suppress_until) {
+                // cleared in endpoint
+                last_partial_len = strlen(text);
+                strncpy(last_text, text, sizeof(last_text)-1);
                 log_msg("  [suppressed] partial: %s", text);
+                continue;
             } else {
+                /* First real partial — mark as recording */
+                if (g_state_path) {
+                    FILE *sf = fopen(g_state_path, "r");
+                    if (sf) {
+                        char buf[64];
+                        if (fgets(buf, sizeof(buf), sf) && strstr(buf, "loading")) {
+                            state_write(g_dump_audio ? "recording+dump" : "recording");
+                            log_msg("Ready for dictation");
+                        }
+                        fclose(sf);
+                    }
+                }
                 if (g_dump_audio) dump_log_text("PARTIAL", last_partial_len, last_text, text);
                 type_append(last_text, last_partial_len, text);
                 last_partial_len = strlen(text);
@@ -525,9 +561,7 @@ static void run_alsa_mode(void) {
         /* Endpoint */
         if (is_endpoint) {
             if (strlen(text)) {
-    log_msg("  [DBG] suppress_first=%d text=%s", suppress_first, text);
-                if (suppress_first) {
-                    suppress_first = 0;
+                if (time(NULL) < suppress_until) {
                     log_msg("  [suppressed] endpoint: %s", text);
                 } else {
                     char spaced[4096]; snprintf(spaced, sizeof(spaced), "%s ", text);
@@ -535,6 +569,10 @@ static void run_alsa_mode(void) {
                     type_append(last_text, last_partial_len, spaced);
                 }
                 last_partial_len = 0;
+                last_text[0] = '\0';
+                segment_id++;
+                log_msg("  utterance %d complete: %s", segment_id, text);
+            }
             SherpaOnnxOnlineStreamReset(recognizer, stream);
         }
         if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
