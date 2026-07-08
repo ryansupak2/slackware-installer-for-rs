@@ -45,7 +45,7 @@
 #define CHUNK_MS         100
 #define CHUNK_SAMPLES    (SAMPLE_RATE * CHUNK_MS / 1000)
 
-#define ENDPOINT_SILENCE 1.2
+#define ENDPOINT_SILENCE 0.6
 #define MAX_UTTERANCE 20.0
 #define NUM_THREADS      2
 
@@ -417,7 +417,7 @@ static void run_alsa_mode(void) {
 
     snd_pcm_t *alsa = NULL;
     const SherpaOnnxOnlineStream *stream = NULL;
-    int recording = 0, segment_id = 0, last_partial_len = 0;
+    int recording = 0, segment_id = 0, last_partial_len = 0, suppress_first = 0;
     char last_text[4096] = {0};
 
     while (g_running) {
@@ -426,8 +426,6 @@ static void run_alsa_mode(void) {
             if (!recording) {
                 /* --- TOGGLE ON --- */
                 log_msg("ON"); state_write("loading");
-                alsa = alsa_open();
-                if (!alsa) { state_clear(); continue; }
                 if (g_dump_audio) dump_open();
                 stream = SherpaOnnxCreateOnlineStream(recognizer);
 
@@ -458,7 +456,15 @@ static void run_alsa_mode(void) {
                     log_msg("Warmup complete — stream primed");
                 }
 
-                recording = 1; segment_id = 0; last_partial_len = 0; last_text[0] = '\0';
+                /* Open ALSA AFTER warmup so ring buffer doesn't overflow */
+                alsa = alsa_open();
+                if (!alsa) {
+                    SherpaOnnxDestroyOnlineStream(stream); stream = NULL;
+                    state_clear(); continue;
+                }
+
+                recording = 1; segment_id = 0; last_partial_len = 0;
+                suppress_first = 1; last_text[0] = '\0';
                 state_write(g_dump_audio ? "recording+dump" : "recording");
                 log_msg("Recording started (streaming Zipformer)%s", g_dump_audio?" [audio dump enabled]":"");
             } else {
@@ -501,27 +507,34 @@ static void run_alsa_mode(void) {
         sanitize(text_buf);
         const char *text = text_buf;
         int is_endpoint = SherpaOnnxOnlineStreamIsEndpoint(recognizer, stream);
-
         /* Partial update */
         if (strlen(text) && strcmp(text, last_text) != 0) {
-            if (g_dump_audio) dump_log_text("PARTIAL", last_partial_len, last_text, text);
-            type_append(last_text, last_partial_len, text);
-            last_partial_len = strlen(text);
-            strncpy(last_text, text, sizeof(last_text)-1);
-            log_msg("  partial: %s", text);
+    log_msg("  [DBG] suppress_first=%d text=%s", suppress_first, text);
+            if (suppress_first) {
+                suppress_first = 0;
+                log_msg("  [suppressed] partial: %s", text);
+            } else {
+                if (g_dump_audio) dump_log_text("PARTIAL", last_partial_len, last_text, text);
+                type_append(last_text, last_partial_len, text);
+                last_partial_len = strlen(text);
+                strncpy(last_text, text, sizeof(last_text)-1);
+                log_msg("  partial: %s", text);
+            }
         }
 
         /* Endpoint */
         if (is_endpoint) {
             if (strlen(text)) {
-                char spaced[4096]; snprintf(spaced, sizeof(spaced), "%s ", text);
-                if (g_dump_audio) dump_log_text("ENDPOINT", last_partial_len, last_text, spaced);
-                type_append(last_text, last_partial_len, spaced);
+    log_msg("  [DBG] suppress_first=%d text=%s", suppress_first, text);
+                if (suppress_first) {
+                    suppress_first = 0;
+                    log_msg("  [suppressed] endpoint: %s", text);
+                } else {
+                    char spaced[4096]; snprintf(spaced, sizeof(spaced), "%s ", text);
+                    if (g_dump_audio) dump_log_text("ENDPOINT", last_partial_len, last_text, spaced);
+                    type_append(last_text, last_partial_len, spaced);
+                }
                 last_partial_len = 0;
-                last_text[0] = '\0';
-                segment_id++;
-                log_msg("  utterance %d complete: %s", segment_id, text);
-            }
             SherpaOnnxOnlineStreamReset(recognizer, stream);
         }
         if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
