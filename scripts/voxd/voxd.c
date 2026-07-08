@@ -428,9 +428,20 @@ static void run_alsa_mode(void) {
             if (!recording) {
                 /* --- TOGGLE ON --- */
                 log_msg("ON"); state_write("loading");
+                if (!did_warmup) suppress_until = time(NULL) + 3;
                 if (g_dump_audio) dump_open();
                 if (!stream) stream = SherpaOnnxCreateOnlineStream(recognizer);
                 else SherpaOnnxOnlineStreamReset(recognizer, stream);
+                /* Brief silence flush to clear residual state from previous session */
+                { float z[1600] = {0};
+                  SherpaOnnxOnlineStreamAcceptWaveform(stream, SAMPLE_RATE, z, 1600);
+                  while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
+                      SherpaOnnxDecodeOnlineStream(recognizer, stream);
+                  const SherpaOnnxOnlineRecognizerResult *fr =
+                      SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+                  if (fr) { if (strlen(fr->text)) log_msg("  [flushed] %s", fr->text);
+                            SherpaOnnxDestroyOnlineRecognizerResult(fr); }
+                }
 
                 if (!did_warmup && g_warmup && g_warmup_count > 0) {
                     int pos = 0, chunk = CHUNK_SAMPLES;
@@ -472,7 +483,7 @@ static void run_alsa_mode(void) {
 
                 if (!did_warmup) suppress_until = time(NULL) + 3;
                 recording = 1; segment_id = 0; last_partial_len = 0;
-                if (did_warmup) { state_write(g_dump_audio ? "recording+dump" : "recording"); log_msg("Hot start — ready"); }
+                if (suppress_until == 0) { state_write(g_dump_audio ? "recording+dump" : "recording"); log_msg("Hot start — ready immediately"); }
                 last_text[0] = '\0';
 
             } else {
