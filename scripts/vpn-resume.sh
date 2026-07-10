@@ -78,7 +78,6 @@ if [ "$1" = "pre" ]; then
 
     # Notify the user (find user from .vpn-state which survives the kill)
     user_info=$(find_vpn_user)
-    user_info=$(find_vpn_user)
     if [ -n "$user_info" ]; then
     read -r user uid sf <<< "$user_info"
         notify_user "$uid" "VPN paused for sleep" 4
@@ -93,7 +92,6 @@ if [ "$1" = "post" ]; then
     log_msg INFO "post-resume: checking for VPN to restore"
 
     user_info=$(find_vpn_user)
-    user_info=$(find_vpn_user)
     if [ -z "$user_info" ]; then
         log_msg INFO "no vpn_state file found — nothing to restore"
         exit 0
@@ -103,6 +101,12 @@ if [ "$1" = "post" ]; then
     cc=$(cat "$sf" 2>/dev/null)
     if [ -z "$cc" ]; then
         log_msg WARN "empty .vpn-state — nothing to restore"
+        exit 0
+    fi
+
+    # vpn-suspend-fix: already-connected guard — skip restore if user reconnected manually
+    if ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
+        log_msg INFO "tun0 already UP — user already reconnected manually; skipping restore"
         exit 0
     fi
 

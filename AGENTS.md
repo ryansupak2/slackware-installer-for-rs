@@ -48,6 +48,9 @@ Rules:
 - Never run raw `make install`, `cp`, `ldconfig`, or `systemctl` directly in agent
   tool calls — write the step, then execute the step
 - Step naming: `steps/<subsystem>.sh`
+- **Fix source files directly** — edit the canonical file under `scripts/`, `dotfiles/`,
+  `lib/`, etc., then have the step `cp` it. Never use dynamic patching (sed, Python
+  text replacement, marker-based injection) when you can just fix the file in place.
 
 Counter-examples (do NOT do):
 ```bash

@@ -5,10 +5,9 @@ Streaming speech-to-text for dwl/somebar using sherpa-onnx (Zipformer EN 20M).
 ## How it works
 
 1. Press **Mod+V** to toggle dictation on/off
-2. Press **Mod+Shift+V** for dictation with audio recording saved to `~/logs/`
-3. Words appear incrementally as you speak — no backspacing, only append
-4. A trailing space is added after each utterance (0.6s pause)
-5. The first phantom word after warmup is silently suppressed
+2. Words appear incrementally as you speak — no backspacing, only append
+3. A trailing space is added after each utterance (0.6s pause)
+4. Use `voxd --dump-audio` to save audio recordings to `~/logs/`
 
 ## Architecture
 
@@ -28,11 +27,11 @@ Mod+V → toggle-vox.sh → SIGUSR1 → voxd daemon
 ## Key behaviors
 
 - **No backspaces.** The model never revises earlier words — each new partial is the old partial plus new words. Only the new suffix is typed.
-- **Warmup on start.** 5s of newyorkgroove.wav primes the model at daemon startup. Residue is flushed with silence before user audio begins.
-- **First-word suppression.** The very first partial+endpoint after warmup is suppressed (ambient noise can produce a spurious word).
+- **No warmup.** The streaming Zipformer model produces results from the first audio chunk — no priming or delays needed. Verified against official sherpa-onnx examples.
+- **Immediate.** Once you see the [VOX] badge, dictation is already active and processing.
 - **Utterance spacing.** A single trailing space is added when the model detects 0.6s of silence (endpoint). Between utterances, the space provides natural separation.
 - **Idempotent install.** `steps/vox-sherpa.sh` handles everything — models, library, binary, wrappers. Safe to rerun.
-- **Audio recording.** Mod+Shift+V saves matching `.wav` and `.txt` files with synchronized timestamps and full backspace/revision tracking.
+- **Audio recording.** Start with `voxd --dump-audio` to save matching `.wav` and `.txt` files with synchronized timestamps.
 
 ## Files
 
@@ -40,13 +39,11 @@ Mod+V → toggle-vox.sh → SIGUSR1 → voxd daemon
 |------|---------|
 | `/usr/local/bin/voxd` | Daemon binary (C, sherpa-onnx) |
 | `/usr/local/bin/toggle-vox.sh` | Mod+V handler |
-| `/usr/local/bin/toggle-vox-record.sh` | Mod+Shift+V handler |
 | `/usr/local/bin/vox` | CLI wrapper (`vox on`/`vox off`) |
 | `~/logs/vox.log` | Session log |
-| `~/logs/vox-YYYYMMDD-HHMMSS.wav` | Audio recording |
-| `~/logs/vox-YYYYMMDD-HHMMSS.txt` | Transcription log |
+| `~/logs/vox-YYYYMMDD-HHMMSS.wav` | Audio recording (`--dump-audio` mode) |
+| `~/logs/vox-YYYYMMDD-HHMMSS.txt` | Transcription log (`--dump-audio` mode) |
 | `/usr/local/share/vox/` | Model files |
-| `/tmp/warmup.raw` | Warmup audio (generated from newyorkgroove.wav) |
 
 ## Commands
 
@@ -62,7 +59,6 @@ pkill -USR1 voxd                # Toggle via signal
 ## Sim verification
 
 ```bash
-voxd --sim /tmp/newyorkgroove.wav    # 0 SIM ERRORs expected
 voxd --sim /path/to/recording.wav    # Reproduce bugs from recorded audio
 ```
 

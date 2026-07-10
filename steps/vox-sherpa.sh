@@ -113,21 +113,6 @@ else
     fi
 fi
 
-# ── Model warmup file (5s of newyorkgroove.wav as raw float) ─────
-WARMUP_RAW=/tmp/warmup.raw
-if [ -f "$WARMUP_RAW" ]; then
-    echo "Warmup file already present."
-else
-    echo "Generating warmup file from newyorkgroove.wav..."
-    if [ -f /tmp/newyorkgroove.wav ]; then
-        sox /tmp/newyorkgroove.wav -t raw -e float -b 32 -r 16000 -c 1 "$WARMUP_RAW" trim 0 5 2>/dev/null || OK=false
-        echo "  Warmup: $WARMUP_RAW ($(stat -c%s $WARMUP_RAW 2>/dev/null || echo 0) bytes)"
-    else
-        echo "  WARNING: /tmp/newyorkgroove.wav not found — warmup disabled"
-    fi
-fi
-
-
 # ── voxd daemon ──────────────────────────────────────────────────
 
 VOXD_SRC="$REPO_DIR/scripts/voxd/voxd.c"
@@ -181,15 +166,8 @@ else
     kill -USR1 $(pgrep -x voxd) 2>/dev/null
 fi
 TOGGLE_EOF
-TOGGLE_EOF
 chmod +x "$TOGGLE"
 echo "  toggle-vox.sh → $TOGGLE"
-
-# ── toggle-vox-record.sh (Mod+Shift+V) ─────────────────────
-RECORD_TOGGLE=/usr/local/bin/toggle-vox-record.sh
-cp "$REPO_DIR/scripts/toggle-vox-record.sh" "$RECORD_TOGGLE" 2>/dev/null || true
-chmod +x "$RECORD_TOGGLE" 2>/dev/null || true
-echo "  toggle-vox-record.sh → $RECORD_TOGGLE"
 
 # ── Result ───────────────────────────────────────────────────────
 
