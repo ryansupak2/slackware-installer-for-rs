@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# XLibre Xserver wrapper.
+# Original Xorg wrapper backed up to /usr/bin/Xorg.stock-xorg-backup
+# Original Xorg binary preserved at /usr/libexec/Xorg.orig (if saved).
+
+XLIBRE_BIN="/usr/local/bin/Xorg"
+
+if [ -x "$XLIBRE_BIN" ]; then
+    exec "$XLIBRE_BIN" "$@"
+else
+    echo "XLibre not found at $XLIBRE_BIN, falling back to stock Xorg" >&2
+    exec /usr/libexec/Xorg "$@"
+fi

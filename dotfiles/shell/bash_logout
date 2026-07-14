@@ -1,5 +1,9 @@
-# .bash_logout — sourced when login shell exits (text console only)
-# dwl sessions use dwl-start's cleanup trap instead (exec replaces bash)
+# .bash_logout — sourced when login shell exits
+# Only flush VPN on real text console logouts (tty1-6), not terminal emulators.
 
-# Flush VPN on logout
-sudo /usr/bin/pkill openvpn 2>/dev/null || true
+# Flush VPN on text console logout
+case "$(tty 2>/dev/null)" in
+    /dev/tty*)
+        sudo /usr/bin/pkill openvpn 2>/dev/null || true
+        ;;
+esac

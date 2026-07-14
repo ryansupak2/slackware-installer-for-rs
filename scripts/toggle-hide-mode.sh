@@ -2,8 +2,10 @@
 # toggle-hide-mode.sh — toggle Hide Mode for somebar
 # Mod+H keybinding in dwl triggers this
 
-FIFO="${XDG_RUNTIME_DIR}/somebar-0"
-HIDE_MODE_FILE="$XDG_RUNTIME_DIR/hide_mode"
+# Detect bar type: somebar-0 (Wayland) or dwmbar-0 (X11 dwm)
+BAR_FIFO="${XDG_RUNTIME_DIR}/somebar-0"
+[ ! -p "$BAR_FIFO" ] && BAR_FIFO="${XDG_RUNTIME_DIR}/dwmbar-0"
+FIFO="$BAR_FIFO"
 
 # Source shared temp-msg helper
 if [ -f /usr/local/bin/temp-msg.sh ]; then

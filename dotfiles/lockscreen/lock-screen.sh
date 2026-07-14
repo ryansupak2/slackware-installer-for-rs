@@ -1,11 +1,12 @@
 #!/bin/bash
-# lock-screen.sh — screen locker for dwl (wlock) + TTY consoles (physlock)
-# Called from dwl keybinds (has WAYLAND_DISPLAY) and from ACPI/elogind
-# hooks (system context, no env).
+# lock-screen.sh — screen locker for dwl (wlock) + dwm (xlock) + TTY (physlock)
+# Called from keybinds and from ACPI/elogind hooks (system context, no env).
 #
 # Strategy:
-#   - In-session (Mod+Esc): lock the Wayland session with wlock
-#   - System (lid close/sleep): if dwl is running, lock it with wlock;
+#   - In-session (Mod+Esc): lock the graphical session:
+#       · Wayland (dwl) → wlock
+#       · X11 (dwm)     → xlock
+#   - System (lid close/sleep): if a graphical session is running, lock it;
 #     otherwise, lock TTY consoles with physlock.
 #   - physlock's VT acquisition conflicts with the compositor's DRM master,
 #     so we never run physlock while a graphical session is active.
@@ -38,7 +39,7 @@ LOG="$LOG_DIR/lock-screen-$(date +%Y%m%d-%H%M%S).log"
 exec >> "$LOG" 2>&1
 
 CURRENT_TTY=$(tty 2>/dev/null || echo "none")
-echo "$(date) lock-screen: WAYLAND='${WAYLAND_DISPLAY:-none}' USER=$USER TTY=$CURRENT_TTY dwl=$(pgrep -c dwl 2>/dev/null || echo 0) physlock_running=$(pgrep -c physlock 2>/dev/null || echo 0)"
+echo "$(date) lock-screen: WAYLAND='${WAYLAND_DISPLAY:-none}' DISPLAY='${DISPLAY:-none}' USER=$USER TTY=$CURRENT_TTY dwl=$(pgrep -c dwl 2>/dev/null || echo 0) dwm=$(pgrep -c dwm 2>/dev/null || echo 0) physlock_running=$(pgrep -c physlock 2>/dev/null || echo 0)"
 
 # ── Helper: start physlock if available and not already running ──
 try_physlock() {
@@ -71,6 +72,20 @@ if [ -n "$WAYLAND_DISPLAY" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
     wlock &
     wait $! 2>/dev/null
     exit 0
+fi
+
+# ── In-session call (Mod+Esc from dwm) ─────────────────────────
+# Lock the current X11 session with xlock and block until it exits.
+if [ -n "$DISPLAY" ] && pgrep dwm >/dev/null 2>&1; then
+    if command -v xlock >/dev/null 2>&1; then
+        echo "$(date) branch: X11 in-session, using xlock"
+        xlock -mode blank -bg black -fg white
+        exit 0
+    else
+        echo "$(date) xlock not found, falling back to physlock"
+        try_physlock
+        exit 0
+    fi
 fi
 
 # ── System call (acpid / elogind / manual) ─────────────────────
@@ -119,6 +134,21 @@ if pgrep dwl >/dev/null 2>&1; then
     echo "$(date) waiting for wlock..."
     wait 2>/dev/null
     echo "$(date) wlock finished"
+elif pgrep dwm >/dev/null 2>&1; then
+    echo "$(date) branch: dwm detected, trying xlock"
+    if command -v xlock >/dev/null 2>&1; then
+        # When called from system context, DISPLAY may not be set.
+        # Try :0 as default for the running X session.
+        export DISPLAY="${DISPLAY:-:0}"
+        xlock -mode blank -bg black -fg white &
+        wait $! 2>/dev/null
+        echo "$(date) xlock finished"
+        exit 0
+    else
+        echo "$(date) xlock not found, falling back to physlock"
+        try_physlock
+        exit 0
+    fi
 else
     echo "$(date) branch: no dwl, using physlock"
     # No graphical session — lock TTY consoles with physlock

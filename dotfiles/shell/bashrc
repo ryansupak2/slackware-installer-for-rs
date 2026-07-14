@@ -1,7 +1,7 @@
 
 alias vi='vim'  #help:vi=vim
 alias draw='inkscape & exit'  #help:draw=inkscape
-w() { /usr/local/bin/w "$@" & disown; exit; }  #help:w=firefox (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
+w() { exec /usr/local/bin/w "$@"; }  #help:w=firefox (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
 alias 'w?'='/usr/local/bin/w?'  #help:w?=list url shortcuts
 alias f='yad --file & exit'  #help:f=file chooser
 alias help='/usr/local/bin/help.sh'  #help:help=this screen
