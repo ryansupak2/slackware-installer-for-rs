@@ -63,7 +63,8 @@ if $ok; then
     if [ -x /usr/local/bin/st ] && \
        cmp -s "$REPO_DIR/dotfiles/suckless/st/config.h" /usr/local/src/suckless/st-stamp/config.h 2>/dev/null && \
        cmp -s "$REPO_DIR/dotfiles/suckless/st/st.c" /usr/local/src/suckless/st-stamp/st.c 2>/dev/null && \
-       cmp -s "$REPO_DIR/dotfiles/suckless/st/st.h" /usr/local/src/suckless/st-stamp/st.h 2>/dev/null; then
+       cmp -s "$REPO_DIR/dotfiles/suckless/st/st.h" /usr/local/src/suckless/st-stamp/st.h 2>/dev/null && \
+       cmp -s "$REPO_DIR/dotfiles/suckless/st/x.c" /usr/local/src/suckless/st-stamp/x.c 2>/dev/null; then
         echo "st already installed — skipping"
     else
         echo "Installing Suckless st..."
@@ -76,6 +77,7 @@ if $ok; then
             cp -f "$REPO_DIR/dotfiles/suckless/st/config.h" config.h
             cp -f "$REPO_DIR/dotfiles/suckless/st/st.c" st.c
             cp -f "$REPO_DIR/dotfiles/suckless/st/st.h" st.h
+            cp -f "$REPO_DIR/dotfiles/suckless/st/x.c" x.c
             if ! make clean install; then
                 echo "ERROR: make clean install for st failed."
                 ok=false
@@ -84,6 +86,7 @@ if $ok; then
                 cp -f "$REPO_DIR/dotfiles/suckless/st/config.h" /usr/local/src/suckless/st-stamp/config.h
                 cp -f "$REPO_DIR/dotfiles/suckless/st/st.c" /usr/local/src/suckless/st-stamp/st.c
                 cp -f "$REPO_DIR/dotfiles/suckless/st/st.h" /usr/local/src/suckless/st-stamp/st.h
+                cp -f "$REPO_DIR/dotfiles/suckless/st/x.c" /usr/local/src/suckless/st-stamp/x.c
             fi
             cd ..
         fi
