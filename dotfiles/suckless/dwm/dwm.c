@@ -1036,15 +1036,30 @@ grabkeys(void)
 		syms = XGetKeyboardMapping(dpy, start, end - start + 1, &skip);
 		if (!syms)
 			return;
-		for (k = start; k <= end; k++)
+
+		/* Re-grab all keybindings AND bare Super keys for hide-mode temp-bar-reveal.
+		 * We must grab ALL keycodes that produce Super_L/Super_R (e.g. Caps Lock
+		 * remapped to Super_L) so bare Mod presses always reach dwm.  This is
+		 * called from mappingnotify() too, so grabs survive keyboard remaps. */
+		for (k = start; k <= end; k++) {
+			KeySym ks = syms[(k - start) * skip];
+
+			/* Bare Super keys: grab with no modifiers so bare Mod press reaches dwm */
+			if (ks == XK_Super_L || ks == XK_Super_R) {
+				for (j = 0; j < LENGTH(modifiers); j++)
+					XGrabKey(dpy, k, modifiers[j], root, True, GrabModeAsync, GrabModeAsync);
+			}
+
+			/* Keybinding keys: grab key+modifier combos from config */
 			for (i = 0; i < LENGTH(keys); i++)
 				/* skip modifier codes, we do that ourselves */
-				if (keys[i].keysym == syms[(k - start) * skip])
+				if (keys[i].keysym == ks)
 					for (j = 0; j < LENGTH(modifiers); j++)
 						XGrabKey(dpy, k,
 							 keys[i].mod | modifiers[j],
 							 root, True,
 							 GrabModeAsync, GrabModeAsync);
+		}
 		XFree(syms);
 	}
 }
@@ -1071,10 +1086,10 @@ keypress(XEvent *e)
 	ev = &e->xkey;
 	keysym = XKeycodeToKeysym(dpy, (KeyCode)ev->keycode, 0);
 
-	/* Hide Mode: reconcile modkeyheld with actual keyboard state.
-	 * If Mod is NOT held but we think it is, the release event was lost
-	 * (e.g. after suspend/resume, or the release went to a different window).
-	 * Only trigger auto-hide behaviour when hide mode is actually on. */
+	/* Diagnostic: log every keypress with hidemode/modkeyheld state for debugging */
+	fprintf(stderr, "[dwm] keypress: keysym=0x%lx state=0x%x hidemode=%d modkeyheld=%d\n",
+		(unsigned long)keysym, ev->state, hidemode, modkeyheld);
+	/* Hide Mode: reconcile lost Mod release events (suspend/resume). */
 	if (!(ev->state & Mod4Mask) && modkeyheld) {
 		fprintf(stderr, "[dwm] reconcile (keypress): Mod released (lost event)\n");
 		modkeyheld = 0;
@@ -1086,35 +1101,58 @@ keypress(XEvent *e)
 		}
 	}
 
+	/* Hide Mode: ANY key with Mod held temp-shows the bar immediately.
+	 * This fires before keybinding matching so chords (Mod+h, Mod+Return)
+	 * always reveal the bar. */
+	if ((ev->state & Mod4Mask) && hidemode && !modkeyheld) {
+		Monitor *m;
+		fprintf(stderr, "[dwm] Mod chord: showing bar (keysym=0x%lx state=0x%x)\n",
+			(unsigned long)keysym, ev->state);
+		modkeyheld = 1;
+		autoshowuntil = 0;
+		for (m = mons; m; m = m->next) {
+			m->showbar = 1;
+			updatebarpos(m);
+			XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
+		}
+		drawbars();
+	}
+
+	/* Match keybindings. */
 	for (i = 0; i < LENGTH(keys); i++)
 		if (keysym == keys[i].keysym
 		&& CLEANMASK(keys[i].mod) == CLEANMASK(ev->state)
 		&& keys[i].func) {
 			keys[i].func(&(keys[i].arg));
-			break;  /* only fire first matching binding */
+			break;
 		}
 
-	/* Hide Mode: bare Super_L/Super_R press.
-	 * Only process if no keybinding consumed this keysym. */
+	/* Bare Super press: log it (bar already shown above if in hidemode).
+	 * Ignore if this keysym was consumed by a binding. */
 	for (i = 0; i < LENGTH(keys); i++) {
 		if (keysym == keys[i].keysym && keys[i].func)
-			return; /* handled by binding above */
+			return;
 	}
 
 	if (keysym == XK_Super_L || keysym == XK_Super_R) {
 		fprintf(stderr, "[dwm] Mod PRESS (hidemode=%d modkeyheld=%d)\n", hidemode, modkeyheld);
-		modkeyheld = 1;
-		autoshowuntil = 0;
-		if (hidemode) {
-			Monitor *m;
-			fprintf(stderr, "[dwm] Mod press: showing bar on all monitors\n");
-			for (m = mons; m; m = m->next) {
-				m->showbar = 1;
-				updatebarpos(m);
-				XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
+		/* modkeyheld and bar-show already handled by the generic Mod4Mask
+		 * check above; this path is only reached for bare Super with no
+		 * chord — the bar was shown in the generic check. */
+		if (!(ev->state & Mod4Mask) && !modkeyheld) {
+			/* Bare Super without Mod4Mask in state (shouldn't happen
+			 * if grab is working, but handle gracefully). */
+			modkeyheld = 1;
+			autoshowuntil = 0;
+			if (hidemode) {
+				Monitor *m;
+				for (m = mons; m; m = m->next) {
+					m->showbar = 1;
+					updatebarpos(m);
+					XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
+				}
+				drawbars();
 			}
-			arrange(NULL);
-			drawbars();
 		}
 	}
 }
@@ -1241,8 +1279,10 @@ mappingnotify(XEvent *e)
 	XMappingEvent *ev = &e->xmapping;
 
 	XRefreshKeyboardMapping(ev);
-	if (ev->request == MappingKeyboard)
+	if (ev->request == MappingKeyboard) {
+		fprintf(stderr, "[dwm] mappingnotify: MappingKeyboard — re-grabbing ALL keys (incl bare Super)\n");
 		grabkeys();
+	}
 }
 
 void
@@ -1951,6 +1991,9 @@ setup(void)
 	XChangeWindowAttributes(dpy, root, CWEventMask|CWCursor, &wa);
 	XSelectInput(dpy, root, wa.event_mask);
 	grabkeys();
+	/* Bare Super keys for hide-mode are now grabbed inside grabkeys()
+	 * so they survive MappingNotify / keyboard remap events. */
+	fprintf(stderr, "[dwm] setup: grabkeys() handles bare Super + all keybindings\n");
 	focus(NULL);
 }
 
@@ -2186,7 +2229,9 @@ updatebarvisibility(void)
 			XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
 		}
 	}
-	arrange(NULL);
+	/* NO arrange — temp show/hide must not resize windows.
+	 * Only explicit toggles (togglebar, togglehidemode, FIFO commands)
+	 * call arrange() to resize the screen. */
 	drawbars();
 }
 

@@ -164,7 +164,6 @@ prev_kbd_brightness=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/de
 
 # ── Main loop ────────────────────────────────────────────────
 prev_signal=""
-prev_online=""
 prev_msg_active_val=0
 prev_msg_val=""
 while true; do
@@ -230,15 +229,7 @@ while true; do
     fi
     prev_signal="$signal_line"
 
-    # Detect physical charger plug/unplug
-    online=0
-    if grep -q '^1$' /sys/class/power_supply/*/online 2>/dev/null; then online=1; fi
-    if [ "$hide_mode_on" = 1 ] && [ "$online" != "$prev_online" ] && [ -n "$prev_online" ]; then
-        echo "$(date): POWER change: prev_online=$prev_online online=$online" >&2
-        signal_bar_show
-    fi
-    prev_online="$online"
-
+    # Write to xsetroot if status changed
     # Write to xsetroot if status changed
     if [ "$line" != "$prev_status" ]; then
         xsetroot -name "$line" 2>/dev/null

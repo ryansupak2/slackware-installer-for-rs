@@ -54,12 +54,15 @@ export GDK_DPI_SCALE=1.5
 export PATH=/usr/local/node-v22.19.0-linux-x64/bin:$PATH
 # screen locking: 'lock' works in dwl (wlock) and on TTY (physlock)
 alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (wlock in dwl, physlock on TTY)
+LOG="$HOME/logs/shell-init.log"
+mkdir -p "$HOME/logs" 2>/dev/null
 
 # First X terminal: neofetch + audio device log (once per session)
 if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
+    echo "[$(date '+%H:%M:%S')] first-terminal: running neofetch" >> "$LOG"
     echo
     neofetch
-    echo -e "\nNeed Help? Try the Following: help"
+    # "Need Help?" message is appended by the neofetch alias (line 9)
     # Log audio capture devices for post-boot diagnosis
     AUDIO_LOG="$HOME/logs/audio-boot-$(date +%Y%m%d-%H%M%S).log"
     echo "=== $(date) ===" >> "$AUDIO_LOG"
@@ -67,4 +70,10 @@ if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
     echo "arecord -l:" >> "$AUDIO_LOG"
     arecord -l >> "$AUDIO_LOG" 2>/dev/null
     unset DWL_FIRST_TERMINAL
+# Hide mode: add newline so prompt isn't at top of screen
+elif [ -f "$XDG_RUNTIME_DIR/hide_mode" ]; then
+    echo "[$(date '+%H:%M:%S')] hide-mode newline" >> "$LOG"
+    echo
+else
+    echo "[$(date '+%H:%M:%S')] normal start (no newline)" >> "$LOG"
 fi

@@ -11,16 +11,12 @@ fi
 LOG="$HOME/logs/shell-init.log"
 mkdir -p "$HOME/logs" 2>/dev/null
 
-if [ -f "$XDG_RUNTIME_DIR/hide_mode" ]; then
-    echo "[$(date '+%H:%M:%S')] hide-mode newline" >> "$LOG"
-    echo
-else
-    echo "[$(date '+%H:%M:%S')] normal start (no newline)" >> "$LOG"
-    case "$(tty 2>/dev/null)" in
-        /dev/tty*)
-            # Real console login — flush any stale VPN
-            sudo /usr/bin/pkill openvpn 2>/dev/null || true
-            neofetch
-            ;;
-    esac
-fi
+# Login-only: bare TTY console → flush stale VPN + neofetch
+# (DWL_FIRST_TERMINAL and hide_mode newline are handled by .bashrc)
+case "$(tty 2>/dev/null)" in
+    /dev/tty*)
+        echo "[$(date '+%H:%M:%S')] tty-login: flushing VPN + neofetch" >> "$LOG"
+        sudo /usr/bin/pkill openvpn 2>/dev/null || true
+        neofetch
+        ;;
+esac

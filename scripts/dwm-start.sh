@@ -121,8 +121,7 @@ eval $(dbus-launch --sh-syntax) 2>/dev/null || true
 /usr/local/bin/net-watch &
 
 # First terminal: neofetch runs via bashrc DWL_FIRST_TERMINAL hook
-export DWL_FIRST_TERMINAL=1
-st &
+DWL_FIRST_TERMINAL=1 st &
 
 # Start dwm
 exec dwm
