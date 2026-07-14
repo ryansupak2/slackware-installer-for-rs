@@ -1128,7 +1128,25 @@ keyrelease(XEvent *e)
 	ev = &e->xkey;
 	keysym = XKeycodeToKeysym(dpy, (KeyCode)ev->keycode, 0);
 
-	/* Hide Mode: reconcile modkeyheld (same as in keypress) */
+	/* Hide Mode: handle Mod key releases.
+	 * Normal Super key release → start auto-hide timer.
+	 * Reconciliation only fires for non-Super keys (genuinely lost Mod events). */
+	if (keysym == XK_Super_L || keysym == XK_Super_R) {
+		if (modkeyheld) {
+			fprintf(stderr, "[dwm] Mod RELEASE (hidemode=%d) — starting auto-hide timer\n", hidemode);
+			modkeyheld = 0;
+			if (hidemode) {
+				autoshowuntil = time(NULL) + 3;
+				updatebarvisibility();
+			}
+		} else {
+			fprintf(stderr, "[dwm] Mod RELEASE ignored (modkeyheld already 0)\n");
+		}
+		return;
+	}
+
+	/* Reconciliation: a non-Super key was released without Mod4Mask
+	 * in state, meaning a Mod release event was lost (suspend/resume). */
 	if (!(ev->state & Mod4Mask) && modkeyheld) {
 		fprintf(stderr, "[dwm] reconcile (keyrelease): Mod released (lost event)\n");
 		modkeyheld = 0;
@@ -1138,21 +1156,6 @@ keyrelease(XEvent *e)
 		} else {
 			autoshowuntil = 0;
 		}
-	}
-
-	/* Only handle Mod key releases for hide mode. */
-	if (keysym != XK_Super_L && keysym != XK_Super_R)
-		return;  /* ignore releases of all other keys */
-
-	if (modkeyheld) {
-		fprintf(stderr, "[dwm] Mod RELEASE (hidemode=%d) — starting auto-hide timer\n", hidemode);
-		modkeyheld = 0;
-		if (hidemode) {
-			autoshowuntil = time(NULL) + 3;
-			updatebarvisibility();
-		}
-	} else {
-		fprintf(stderr, "[dwm] Mod RELEASE ignored (modkeyheld already 0)\n");
 	}
 }
 
@@ -2053,42 +2056,47 @@ tile(Monitor *m)
 void
 togglebar(const Arg *arg)
 {
-	Monitor *m;
 	const char *rt = getenv("XDG_RUNTIME_DIR");
 	char f[256];
+	int was_hidemode = hidemode;
 
+	/* Always exit hide mode if it's on (matches dwl toggle-bar.sh behaviour). */
 	if (hidemode) {
-		/* Exit hide mode + show all bars */
-		fprintf(stderr, "[dwm] togglebar: exiting hide mode + showing all bars\n");
+		fprintf(stderr, "[dwm] togglebar: exiting hide mode\n");
 		hidemode = 0;
 		autoshowuntil = 0;
 		modkeyheld = 0;
 		if (rt) { snprintf(f, sizeof(f), "%s/hide_mode", rt); unlink(f); }
-		for (m = mons; m; m = m->next) {
-			m->showbar = 1;
-			updatebarpos(m);
-			XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
-		}
-		/* Sync state: bar is shown */
-		if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); }
-		arrange(NULL);
-		drawbars();
-	} else {
-		/* Normal toggle: flip visibility on selected monitor */
-		selmon->showbar = !selmon->showbar;
-		fprintf(stderr, "[dwm] togglebar: %s bar on monitor %d\n",
-			selmon->showbar ? "showing" : "hiding", selmon->num);
-		updatebarpos(selmon);
-		XMoveResizeWindow(dpy, selmon->barwin, selmon->wx, selmon->by, selmon->ww, bh);
-		arrange(selmon);
-		drawbars();
-		/* Sync state file so toggle-bar.sh knows bar state */
-		if (rt) {
-			snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt);
-			if (selmon->showbar)
-				close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644));
-			else
-				unlink(f);
+	}
+
+	/* Toggle bar visibility on selected monitor. */
+	selmon->showbar = !selmon->showbar;
+	fprintf(stderr, "[dwm] togglebar: %s bar on monitor %d%s\n",
+		selmon->showbar ? "showing" : "hiding", selmon->num,
+		was_hidemode ? " (exited hide mode)" : "");
+
+	updatebarpos(selmon);
+	XMoveResizeWindow(dpy, selmon->barwin, selmon->wx, selmon->by, selmon->ww, bh);
+	arrange(selmon);
+	drawbars();
+
+	/* Sync state file + temp message for scripts. */
+	if (rt) {
+		snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt);
+		if (selmon->showbar) {
+			close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644));
+			/* Temp message: "(Hide Mode Off + Bar Visible [Mod+B])" for 4s */
+			if (was_hidemode) {
+				FILE *fp;
+				snprintf(f, sizeof(f), "%s/status_msg", rt);
+				fp = fopen(f, "w");
+				if (fp) { fprintf(fp, "(Hide Mode Off + Bar Visible [Mod+B])"); fclose(fp); }
+				snprintf(f, sizeof(f), "%s/status_end", rt);
+				fp = fopen(f, "w");
+				if (fp) { fprintf(fp, "%ld", (long)time(NULL) + 4); fclose(fp); }
+			}
+		} else {
+			unlink(f);
 		}
 	}
 }
@@ -2110,10 +2118,21 @@ togglehidemode(const Arg *arg)
 		}
 		arrange(NULL);
 		drawbars();
-		/* sync state files for scripts */
+		/* sync state files + temp message for scripts */
 		{ const char *rt = getenv("XDG_RUNTIME_DIR"); char f[256];
 		  if (rt) { snprintf(f, sizeof(f), "%s/hide_mode", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); }
-		  if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); unlink(f); } }
+		  if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); unlink(f); }
+		  /* Temp message: "(Hide Mode On [Mod+H])" for 4s */
+		  if (rt) {
+		    FILE *fp;
+		    snprintf(f, sizeof(f), "%s/status_msg", rt);
+		    fp = fopen(f, "w");
+		    if (fp) { fprintf(fp, "(Hide Mode On [Mod+H])"); fclose(fp); }
+		    snprintf(f, sizeof(f), "%s/status_end", rt);
+		    fp = fopen(f, "w");
+		    if (fp) { fprintf(fp, "%ld", (long)time(NULL) + 4); fclose(fp); }
+		  }
+		}
 	} else {
 		fprintf(stderr, "[dwm] togglehidemode: OFF — showing bar\n");
 		/* Turning hide mode OFF: show bar permanently */
@@ -2124,10 +2143,21 @@ togglehidemode(const Arg *arg)
 		}
 		arrange(NULL);
 		drawbars();
-		/* sync state files for scripts */
+		/* sync state files + temp message for scripts */
 		{ const char *rt = getenv("XDG_RUNTIME_DIR"); char f[256];
 		  if (rt) { snprintf(f, sizeof(f), "%s/hide_mode", rt); unlink(f); }
-		  if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); } }
+		  if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); }
+		  /* Temp message: "(Hide Mode Off [Mod+H])" for 4s */
+		  if (rt) {
+		    FILE *fp;
+		    snprintf(f, sizeof(f), "%s/status_msg", rt);
+		    fp = fopen(f, "w");
+		    if (fp) { fprintf(fp, "(Hide Mode Off [Mod+H])"); fclose(fp); }
+		    snprintf(f, sizeof(f), "%s/status_end", rt);
+		    fp = fopen(f, "w");
+		    if (fp) { fprintf(fp, "%ld", (long)time(NULL) + 4); fclose(fp); }
+		  }
+		}
 	}
 }
 
