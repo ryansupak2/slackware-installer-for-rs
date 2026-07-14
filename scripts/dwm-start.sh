@@ -114,14 +114,20 @@ xmodmap -e "add mod4 = Super_L" 2>/dev/null || true
 # dbus session (for notifications, etc.)
 eval $(dbus-launch --sh-syntax) 2>/dev/null || true
 
+# Hide Mode notification at session start
+if [ -f /usr/local/bin/temp-msg.sh ]; then
+    . /usr/local/bin/temp-msg.sh
+    set_temp_msg "(Hide Mode [Mod+H])" 4
+fi
 # Status bar content generator (battery, vpn, time)
 /usr/local/bin/dwm-status &
 
 # Network watcher (idempotent)
 /usr/local/bin/net-watch &
 
-# Launch neofetch in st as first terminal (mirrors dwl-start's foot neofetch)
-st -e sh -c 'neofetch && echo -e "\nNeed Help? Try the Following: help" && exec $SHELL' &
+# First terminal: neofetch runs via bashrc DWL_FIRST_TERMINAL hook
+export DWL_FIRST_TERMINAL=1
+st &
 
 # Start dwm
 exec dwm

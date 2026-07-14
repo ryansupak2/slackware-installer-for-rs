@@ -1,0 +1,52 @@
+CRASHLOG.TXT — pi.dev crash summary (2026-07-14, ~20:00–21:15 UTC)
+====================================================================
+
+All crashes occurred in sessions under:
+  ~/.pi/agent/sessions/--root-Development-slackware-installer-for-rs--/
+
+Pattern: the agent issues tool calls, the provider returns with
+stopReason=toolUse, and pi.dev crashes before the tool results are
+displayed.  This looks like a pi.dev TUI issue, not a dwm/X11 crash.
+
+---
+
+Session: 2026-07-14T20-12-52-806Z (501 lines, 27 user messages)
+  Crash 1: line  97 — after grep+read tool calls, tokens 4.6K/1.7K/83.5K
+  Crash 2: line  99 — same tool call batch (duplicate crash report)
+  Crash 3: line 101 — same (triplicate)
+  Crash 4: line 499 — after assistant text response (stopReason=stop),
+            tokens 227/200, cache 235K (!)
+
+Session: 2026-07-14T20-58-50-529Z (192 lines, 9 user messages)
+  Crash 1: line 152 — after bash tool call, tokens 360/516/67.8K
+  Crash 2: line 163 — after bash tool call, tokens  57/ 91/68.7K
+  Crash 3: line 180 — after bash tool call, tokens 505/174/72.6K
+
+Session: 2026-07-14T21-10-48-812Z (238 lines, 6 user messages)
+  Crash 1: line 227 — after read tool call, tokens 262/100/98.9K
+  Crash 2: line 229 — same (duplicate crash report)
+
+---
+
+Common factors:
+  - All crashes occur right after the LLM returns (stopReason=toolUse)
+  - Cache read values are very high (67K–235K tokens) — the conversation
+    context is growing large with each tool call result
+  - Crashes often reported 2-3 times in quick succession for the same
+    event (likely the user retrying / pi.dev re-rendering)
+  - No system-level segfaults or OOM kills in dmesg
+
+Likely cause:
+  - The conversation context is ballooning.  Each file read (e.g. dwm.c
+    at 65KB) gets cached and re-sent on every subsequent request.
+    After many reads, the context window fills up and something in the
+    pi.dev TUI or LLM pipeline breaks.
+  - The deepseek-v4-pro model may have tighter context limits than
+    expected, or pi.dev's context management may not be trimming
+    aggressively enough.
+
+Mitigation ideas:
+  - Use raw reads (raw: true) for large files — saves LINE#HASH overhead
+  - Periodically start fresh sessions to reset context
+  - Avoid reading large files repeatedly; use grep to target specific
+    sections

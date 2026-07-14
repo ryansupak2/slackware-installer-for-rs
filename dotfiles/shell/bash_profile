@@ -11,19 +11,7 @@ fi
 LOG="$HOME/logs/shell-init.log"
 mkdir -p "$HOME/logs" 2>/dev/null
 
-if [ -n "$DWL_FIRST_TERMINAL" ]; then
-    echo "[$(date '+%H:%M:%S')] first-terminal newline" >> "$LOG"
-    echo
-    neofetch
-    # Log audio capture devices for post-boot diagnosis
-    AUDIO_LOG="$HOME/logs/audio-boot-$(date +%Y%m%d-%H%M%S).log"
-    echo "=== $(date) ===" >> "$AUDIO_LOG"
-    echo "dmesg audio:" >> "$AUDIO_LOG"
-    dmesg | grep -i "snd\|sof\|audio\|dmic\|microphone" >> "$AUDIO_LOG" 2>/dev/null
-    echo "arecord -l:" >> "$AUDIO_LOG"
-    arecord -l >> "$AUDIO_LOG" 2>/dev/null
-    unset DWL_FIRST_TERMINAL
-elif [ -f "$XDG_RUNTIME_DIR/hide_mode" ]; then
+if [ -f "$XDG_RUNTIME_DIR/hide_mode" ]; then
     echo "[$(date '+%H:%M:%S')] hide-mode newline" >> "$LOG"
     echo
 else

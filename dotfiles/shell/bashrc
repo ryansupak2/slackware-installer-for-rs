@@ -1,7 +1,8 @@
 
 alias vi='vim'  #help:vi=vim
 alias draw='inkscape & exit'  #help:draw=inkscape
-w() { exec /usr/local/bin/w "$@"; }  #help:w=firefox (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
+w() { /usr/local/bin/w "$@" & exit; }  #help:w=firefox (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
+alias firefox='/usr/local/bin/firefox & exit'  #help:firefox=launch firefox, close terminal
 alias 'w?'='/usr/local/bin/w?'  #help:w?=list url shortcuts
 alias f='yad --file & exit'  #help:f=file chooser
 alias help='/usr/local/bin/help.sh'  #help:help=this screen
@@ -54,4 +55,16 @@ export PATH=/usr/local/node-v22.19.0-linux-x64/bin:$PATH
 # screen locking: 'lock' works in dwl (wlock) and on TTY (physlock)
 alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (wlock in dwl, physlock on TTY)
 
-# System info on shell start — handled by dwl-start for first window only
+# First X terminal: neofetch + audio device log (once per session)
+if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
+    echo
+    neofetch
+    echo -e "\nNeed Help? Try the Following: help"
+    # Log audio capture devices for post-boot diagnosis
+    AUDIO_LOG="$HOME/logs/audio-boot-$(date +%Y%m%d-%H%M%S).log"
+    echo "=== $(date) ===" >> "$AUDIO_LOG"
+    dmesg | grep -i "snd\|sof\|audio\|dmic\|microphone" >> "$AUDIO_LOG" 2>/dev/null
+    echo "arecord -l:" >> "$AUDIO_LOG"
+    arecord -l >> "$AUDIO_LOG" 2>/dev/null
+    unset DWL_FIRST_TERMINAL
+fi

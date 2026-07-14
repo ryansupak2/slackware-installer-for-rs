@@ -180,6 +180,7 @@ static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
 static void grabbuttons(Client *c, int focused);
 static void grabkeys(void);
 static void keypress(XEvent *e);
+static void keyrelease(XEvent *e);
 static void killclient(const Arg *arg);
 static void manage(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
@@ -266,7 +267,7 @@ static void (*handler[LASTEvent]) (XEvent *) = {
 	[Expose] = expose,
 	[FocusIn] = focusin,
 	[KeyPress] = keypress,
-	[KeyRelease] = keypress,
+	[KeyRelease] = keyrelease,
 	[MappingNotify] = mappingnotify,
 	[MapRequest] = maprequest,
 	[MotionNotify] = motionnotify,
@@ -1084,10 +1085,12 @@ keypress(XEvent *e)
 	for (i = 0; i < LENGTH(keys); i++)
 		if (keysym == keys[i].keysym
 		&& CLEANMASK(keys[i].mod) == CLEANMASK(ev->state)
-		&& keys[i].func)
+		&& keys[i].func) {
 			keys[i].func(&(keys[i].arg));
+			break;  /* only fire first matching binding */
+		}
 
-	/* Hide Mode: bare Super_L/Super_R press/release.
+	/* Hide Mode: bare Super_L/Super_R press.
 	 * Only process if no keybinding consumed this keysym. */
 	for (i = 0; i < LENGTH(keys); i++) {
 		if (keysym == keys[i].keysym && keys[i].func)
@@ -1095,36 +1098,53 @@ keypress(XEvent *e)
 	}
 
 	if (keysym == XK_Super_L || keysym == XK_Super_R) {
-		if (ev->type == KeyPress) {
-			fprintf(stderr, "[dwm] Mod PRESS (hidemode=%d modkeyheld=%d)\n", hidemode, modkeyheld);
-			modkeyheld = 1;
-			autoshowuntil = 0;
-			if (hidemode) {
-				Monitor *m;
-				fprintf(stderr, "[dwm] Mod press: showing bar on all monitors\n");
-				for (m = mons; m; m = m->next) {
-					m->showbar = 1;
-					updatebarpos(m);
-					XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
-				}
-				arrange(NULL);
-				drawbars();
+		fprintf(stderr, "[dwm] Mod PRESS (hidemode=%d modkeyheld=%d)\n", hidemode, modkeyheld);
+		modkeyheld = 1;
+		autoshowuntil = 0;
+		if (hidemode) {
+			Monitor *m;
+			fprintf(stderr, "[dwm] Mod press: showing bar on all monitors\n");
+			for (m = mons; m; m = m->next) {
+				m->showbar = 1;
+				updatebarpos(m);
+				XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
 			}
-		} else {
-			/* KeyRelease — only act if modkeyheld is still set.
-			 * togglehidemode() clears modkeyheld so we don't re-show
-			 * the bar after Mod+H just turned hide mode ON. */
-			if (modkeyheld) {
-				fprintf(stderr, "[dwm] Mod RELEASE (hidemode=%d) — starting auto-hide timer\n", hidemode);
-				modkeyheld = 0;
-				if (hidemode) {
-					autoshowuntil = time(NULL) + 3;
-					updatebarvisibility();
-				}
-			} else {
-				fprintf(stderr, "[dwm] Mod RELEASE ignored (modkeyheld already 0)\n");
-			}
+			arrange(NULL);
+			drawbars();
 		}
+	}
+}
+
+void
+keyrelease(XEvent *e)
+{
+	KeySym keysym;
+	XKeyEvent *ev;
+
+	ev = &e->xkey;
+	keysym = XKeycodeToKeysym(dpy, (KeyCode)ev->keycode, 0);
+
+	/* Hide Mode: reconcile modkeyheld (same as in keypress) */
+	if (!(ev->state & Mod4Mask) && modkeyheld) {
+		fprintf(stderr, "[dwm] reconcile (keyrelease): Mod released (lost event), starting auto-hide\n");
+		modkeyheld = 0;
+		autoshowuntil = time(NULL) + 3;
+		updatebarvisibility();
+	}
+
+	/* Only handle Mod key releases for hide mode. */
+	if (keysym != XK_Super_L && keysym != XK_Super_R)
+		return;  /* ignore releases of all other keys */
+
+	if (modkeyheld) {
+		fprintf(stderr, "[dwm] Mod RELEASE (hidemode=%d) — starting auto-hide timer\n", hidemode);
+		modkeyheld = 0;
+		if (hidemode) {
+			autoshowuntil = time(NULL) + 3;
+			updatebarvisibility();
+		}
+	} else {
+		fprintf(stderr, "[dwm] Mod RELEASE ignored (modkeyheld already 0)\n");
 	}
 }
 

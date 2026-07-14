@@ -6,7 +6,7 @@
 BAR_FIFO="${XDG_RUNTIME_DIR}/somebar-0"
 [ ! -p "$BAR_FIFO" ] && BAR_FIFO="${XDG_RUNTIME_DIR}/dwmbar-0"
 FIFO="$BAR_FIFO"
-
+HIDE_MODE_FILE="$XDG_RUNTIME_DIR/hide_mode"
 # Source shared temp-msg helper
 if [ -f /usr/local/bin/temp-msg.sh ]; then
     . /usr/local/bin/temp-msg.sh
