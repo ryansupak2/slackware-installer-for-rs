@@ -114,12 +114,7 @@ xmodmap -e "add mod4 = Super_L" 2>/dev/null || true
 # dbus session (for notifications, etc.)
 eval $(dbus-launch --sh-syntax) 2>/dev/null || true
 
-# Hide Mode notification at session start
-if [ -f /usr/local/bin/temp-msg.sh ]; then
-    . /usr/local/bin/temp-msg.sh
-    set_temp_msg "(Hide Mode [Mod+H])" 4
-fi
-# Status bar content generator (battery, vpn, time)
+# Status bar content generator (battery, vpn, time) — also initializes hide mode
 /usr/local/bin/dwm-status &
 
 # Network watcher (idempotent)

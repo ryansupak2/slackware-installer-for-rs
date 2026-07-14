@@ -142,6 +142,8 @@ fi
 if [ -x "$NODE_DIR/bin/node" ]; then
     ln -sf "$NODE_DIR/bin/node" /usr/local/bin/node
     ln -sf "$NODE_DIR/bin/npm"  /usr/local/bin/npm
+    # Fix: prebuilt Node tarball has lib/ but npm internally references lib64/
+    [ -L "$NODE_DIR/lib64" ] || ln -sf lib "$NODE_DIR/lib64"
     ln -sf "$NODE_DIR/bin/npx"  /usr/local/bin/npx
     echo "Node.js $(/usr/local/bin/node --version) installed."
     success_count=$((success_count + 1))

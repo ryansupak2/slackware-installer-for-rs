@@ -1074,12 +1074,16 @@ keypress(XEvent *e)
 	/* Hide Mode: reconcile modkeyheld with actual keyboard state.
 	 * If Mod is NOT held but we think it is, the release event was lost
 	 * (e.g. after suspend/resume, or the release went to a different window).
-	 * Set autoShowUntil so the bar hides after 3 s. */
+	 * Only trigger auto-hide behaviour when hide mode is actually on. */
 	if (!(ev->state & Mod4Mask) && modkeyheld) {
-		fprintf(stderr, "[dwm] reconcile: Mod released (lost event), starting auto-hide\n");
+		fprintf(stderr, "[dwm] reconcile (keypress): Mod released (lost event)\n");
 		modkeyheld = 0;
-		autoshowuntil = time(NULL) + 3;
-		updatebarvisibility();
+		if (hidemode) {
+			autoshowuntil = time(NULL) + 3;
+			updatebarvisibility();
+		} else {
+			autoshowuntil = 0;
+		}
 	}
 
 	for (i = 0; i < LENGTH(keys); i++)
@@ -1126,10 +1130,14 @@ keyrelease(XEvent *e)
 
 	/* Hide Mode: reconcile modkeyheld (same as in keypress) */
 	if (!(ev->state & Mod4Mask) && modkeyheld) {
-		fprintf(stderr, "[dwm] reconcile (keyrelease): Mod released (lost event), starting auto-hide\n");
+		fprintf(stderr, "[dwm] reconcile (keyrelease): Mod released (lost event)\n");
 		modkeyheld = 0;
-		autoshowuntil = time(NULL) + 3;
-		updatebarvisibility();
+		if (hidemode) {
+			autoshowuntil = time(NULL) + 3;
+			updatebarvisibility();
+		} else {
+			autoshowuntil = 0;
+		}
 	}
 
 	/* Only handle Mod key releases for hide mode. */
@@ -1544,20 +1552,33 @@ handlefifo(void)
 					autoshowuntil = time(NULL) + 3;
 					updatebarvisibility();
 				} else {
+					/* Not in hide mode: only restore bars that weren't manually hidden.
+					 * We check the dwm_bar_shown state file to respect manual toggles. */
 					Monitor *m;
 					int showed = 0;
-					fprintf(stderr, "[dwm] FIFO: show all (hidemode=0) — showing bar\n");
-					for (m = mons; m; m = m->next) {
-						if (!m->showbar) {
-							m->showbar = 1;
-							updatebarpos(m);
-							XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
-							showed = 1;
-						}
+					const char *rt = getenv("XDG_RUNTIME_DIR");
+					char sf[256];
+					int bar_was_shown = 1;  /* default: don't fight the user */
+					if (rt) {
+						snprintf(sf, sizeof(sf), "%s/dwm_bar_shown", rt);
+						bar_was_shown = (access(sf, F_OK) == 0);
 					}
-					if (showed) {
-						arrange(NULL);
-						drawbars();
+					if (bar_was_shown || !rt) {
+						fprintf(stderr, "[dwm] FIFO: show all (hidemode=0) — restoring bars\n");
+						for (m = mons; m; m = m->next) {
+							if (!m->showbar) {
+								m->showbar = 1;
+								updatebarpos(m);
+								XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
+								showed = 1;
+							}
+						}
+						if (showed) {
+							arrange(NULL);
+							drawbars();
+						}
+					} else {
+						fprintf(stderr, "[dwm] FIFO: show all IGNORED (bar manually hidden)\n");
 					}
 				}
 		} else if (strncmp(p, "hidemode on", 11) == 0) {
@@ -1576,8 +1597,9 @@ handlefifo(void)
 				}
 				arrange(NULL);
 				drawbars();
-				/* sync state file for scripts */
+				/* sync state files for scripts */
 				if (rt) { snprintf(f, sizeof(f), "%s/hide_mode", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); }
+				if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); unlink(f); }
 			}
 		} else if (strncmp(p, "hidemode off", 12) == 0) {
 			if (hidemode) {
@@ -1595,10 +1617,13 @@ handlefifo(void)
 				}
 				arrange(NULL);
 				drawbars();
-				/* sync state file for scripts */
+				/* sync state files for scripts */
 				if (rt) { snprintf(f, sizeof(f), "%s/hide_mode", rt); unlink(f); }
+				if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); }
 			}
 			} else if (strncmp(p, "hide all", 8) == 0) {
+				const char *rt = getenv("XDG_RUNTIME_DIR");
+				char f[256];
 				Monitor *m;
 				int hidden = 0;
 				fprintf(stderr, "[dwm] FIFO: hide all\n");
@@ -1613,6 +1638,8 @@ handlefifo(void)
 				if (hidden) {
 					arrange(NULL);
 					drawbars();
+					/* sync state: bar is hidden */
+					if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); unlink(f); }
 				}
 			}
 
@@ -1621,6 +1648,9 @@ handlefifo(void)
 			i++;
 		}
 	}
+	/* Log unexpected read failures (EAGAIN is normal for non-blocking FIFO) */
+	if (n < 0 && errno != EAGAIN)
+		fprintf(stderr, "[dwm] handlefifo: read error: %s\n", strerror(errno));
 }
 
 void
@@ -1887,8 +1917,15 @@ setup(void)
 		char fifopath[256];
 		if (rundir) {
 			snprintf(fifopath, sizeof(fifopath), "%s/dwmbar-0", rundir);
-			mkfifo(fifopath, 0666);
+			if (mkfifo(fifopath, 0666) < 0 && errno != EEXIST)
+				fprintf(stderr, "[dwm] setup: mkfifo(%s) failed: %s\n", fifopath, strerror(errno));
 			fifofd = open(fifopath, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+			if (fifofd < 0)
+				fprintf(stderr, "[dwm] setup: open FIFO %s failed: %s\n", fifopath, strerror(errno));
+			else
+				fprintf(stderr, "[dwm] setup: FIFO %s opened (fd=%d)\n", fifopath, fifofd);
+		} else {
+			fprintf(stderr, "[dwm] setup: XDG_RUNTIME_DIR not set — FIFO disabled\n");
 		}
 	}
 	/* supporting window for NetWMCheck */
@@ -2017,10 +2054,11 @@ void
 togglebar(const Arg *arg)
 {
 	Monitor *m;
+	const char *rt = getenv("XDG_RUNTIME_DIR");
+	char f[256];
+
 	if (hidemode) {
-		/* Exit hide mode + show all bars (matches toggle-bar.sh Mod+B) */
-		const char *rt = getenv("XDG_RUNTIME_DIR");
-		char f[256];
+		/* Exit hide mode + show all bars */
 		fprintf(stderr, "[dwm] togglebar: exiting hide mode + showing all bars\n");
 		hidemode = 0;
 		autoshowuntil = 0;
@@ -2031,17 +2069,27 @@ togglebar(const Arg *arg)
 			updatebarpos(m);
 			XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
 		}
+		/* Sync state: bar is shown */
+		if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); }
 		arrange(NULL);
 		drawbars();
 	} else {
-		/* Normal toggle */
-		fprintf(stderr, "[dwm] togglebar: %s bar on selmon\n",
-			selmon->showbar ? "hiding" : "showing");
+		/* Normal toggle: flip visibility on selected monitor */
 		selmon->showbar = !selmon->showbar;
+		fprintf(stderr, "[dwm] togglebar: %s bar on monitor %d\n",
+			selmon->showbar ? "showing" : "hiding", selmon->num);
 		updatebarpos(selmon);
 		XMoveResizeWindow(dpy, selmon->barwin, selmon->wx, selmon->by, selmon->ww, bh);
 		arrange(selmon);
 		drawbars();
+		/* Sync state file so toggle-bar.sh knows bar state */
+		if (rt) {
+			snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt);
+			if (selmon->showbar)
+				close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644));
+			else
+				unlink(f);
+		}
 	}
 }
 
@@ -2062,9 +2110,10 @@ togglehidemode(const Arg *arg)
 		}
 		arrange(NULL);
 		drawbars();
-		/* sync state file for scripts */
+		/* sync state files for scripts */
 		{ const char *rt = getenv("XDG_RUNTIME_DIR"); char f[256];
-		  if (rt) { snprintf(f, sizeof(f), "%s/hide_mode", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); } }
+		  if (rt) { snprintf(f, sizeof(f), "%s/hide_mode", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); }
+		  if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); unlink(f); } }
 	} else {
 		fprintf(stderr, "[dwm] togglehidemode: OFF — showing bar\n");
 		/* Turning hide mode OFF: show bar permanently */
@@ -2075,9 +2124,10 @@ togglehidemode(const Arg *arg)
 		}
 		arrange(NULL);
 		drawbars();
-		/* sync state file for scripts */
+		/* sync state files for scripts */
 		{ const char *rt = getenv("XDG_RUNTIME_DIR"); char f[256];
-		  if (rt) { snprintf(f, sizeof(f), "%s/hide_mode", rt); unlink(f); } }
+		  if (rt) { snprintf(f, sizeof(f), "%s/hide_mode", rt); unlink(f); }
+		  if (rt) { snprintf(f, sizeof(f), "%s/dwm_bar_shown", rt); close(open(f, O_CREAT|O_WRONLY|O_TRUNC, 0644)); } }
 	}
 }
 
@@ -2085,7 +2135,15 @@ void
 updatebarvisibility(void)
 {
 	Monitor *m;
-	int shouldshow = !hidemode || modkeyheld || (autoshowuntil > 0 && time(NULL) < autoshowuntil);
+	int shouldshow;
+
+	/* updatebarvisibility is the hide-mode auto-show/hide manager.
+	 * When hide mode is OFF, bar visibility is manually controlled via
+	 * togglebar() or config defaults — never override it here. */
+	if (!hidemode)
+		return;
+
+	shouldshow = modkeyheld || (autoshowuntil > 0 && time(NULL) < autoshowuntil);
 	fprintf(stderr, "[dwm] updatebarvisibility: shouldshow=%d (hidemode=%d modkeyheld=%d autoUntil=%ld)\n",
 		shouldshow, hidemode, modkeyheld, (long)autoshowuntil);
 

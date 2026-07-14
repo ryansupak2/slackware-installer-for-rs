@@ -52,6 +52,21 @@ setup_firefox() {
         if ! grep -q 'media.gmp-manager.updateEnabled' "$f" 2>/dev/null; then
             echo 'user_pref("media.gmp-manager.updateEnabled", true);' >> "$f"
         fi
+
+        # Disable session restore — never reopen old tabs on launch
+        for p in browser.sessionstore.resume_from_crash browser.sessionstore.resume_session_once; do
+            if ! grep -q "user_pref(\"$p\", false);" "$f" 2>/dev/null; then
+                echo "user_pref(\"$p\", false);" >> "$f"
+            fi
+        done
+        if ! grep -q 'browser.startup.page' "$f" 2>/dev/null; then
+            echo 'user_pref("browser.startup.page", 0);' >> "$f"
+        fi
+        for p in browser.sessionstore.max_tabs_undo browser.sessionstore.max_windows_undo; do
+            if ! grep -q "user_pref(\"$p\", 0);" "$f" 2>/dev/null; then
+                echo "user_pref(\"$p\", 0);" >> "$f"
+            fi
+        done
     done
 
     chown -R "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.config/gtk-3.0" "$HOME_TARGET/.mozilla" 2>/dev/null || true

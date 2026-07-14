@@ -142,6 +142,31 @@ if $ok; then
                 # Auto-download Widevine (was false — now true so Firefox fetches it)
                 echo 'user_pref("media.gmp-manager.updateEnabled", true);' >> "$profdir/prefs.js"
                 echo 'user_pref("media.gmp-manager.updateEnabled", true);' >> "$profdir/user.js"
+
+                # Disable session restore — never reopen old tabs on launch
+                for p in 'browser.sessionstore.resume_from_crash' 'browser.sessionstore.resume_session_once'; do
+                    if ! grep -q "user_pref(\"$p\", false);" "$profdir/prefs.js" 2>/dev/null; then
+                        echo "user_pref(\"$p\", false);" >> "$profdir/prefs.js"
+                    fi
+                    if ! grep -q "user_pref(\"$p\", false);" "$profdir/user.js" 2>/dev/null; then
+                        echo "user_pref(\"$p\", false);" >> "$profdir/user.js"
+                    fi
+                done
+                # browser.startup.page: 0=blank, 1=homepage, 3=restore (we want 0)
+                for f in "$profdir/prefs.js" "$profdir/user.js"; do
+                    if ! grep -q 'browser.startup.page' "$f" 2>/dev/null; then
+                        echo 'user_pref("browser.startup.page", 0);' >> "$f"
+                    fi
+                done
+                # Zero undo tabs/windows so session restore has nothing to restore
+                for p in 'browser.sessionstore.max_tabs_undo' 'browser.sessionstore.max_windows_undo'; do
+                    if ! grep -q "user_pref(\"$p\", 0);" "$profdir/prefs.js" 2>/dev/null; then
+                        echo "user_pref(\"$p\", 0);" >> "$profdir/prefs.js"
+                    fi
+                    if ! grep -q "user_pref(\"$p\", 0);" "$profdir/user.js" 2>/dev/null; then
+                        echo "user_pref(\"$p\", 0);" >> "$profdir/user.js"
+                    fi
+                done
             fi
         done
     done

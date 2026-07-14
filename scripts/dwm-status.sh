@@ -11,9 +11,30 @@ exec >>"$LOGFILE" 2>&1
 
 echo "dwm-status starting: $(date)"
 
+FIFO="$XDG_RUNTIME_DIR/dwmbar-0"
+HIDE_MODE_FILE="$XDG_RUNTIME_DIR/hide_mode"
+
 # Source shared temp-msg helper
 if [ -f /usr/local/bin/temp-msg.sh ]; then
     . /usr/local/bin/temp-msg.sh
+fi
+
+# Wait for dwm to create the FIFO
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+    sleep 0.1
+    [ -p "$FIFO" ] && break
+done
+if [ ! -p "$FIFO" ]; then
+    echo "$(date): ERROR - dwmbar FIFO not present after 3s wait, hide mode init SKIPPED" >&2
+else
+    echo "$(date): FIFO=$FIFO  hidemode_file=$HIDE_MODE_FILE" >&2
+    # Hide Mode initialization — default ON at session start
+    touch "$HIDE_MODE_FILE"
+    echo "hidemode on" > "$FIFO" 2>/dev/null
+    echo "$(date): hide mode initialized ON, hidemode on -> FIFO" >&2
+    # Briefly show bar with hide mode message
+    set_temp_msg "(Hide Mode On [Mod+H])" 4
+    echo "show all" > "$FIFO" 2>/dev/null
 fi
 
 # ── Helper: signal hide-mode bar reveal ─────────────────────
@@ -64,28 +85,34 @@ vnc_part() {
 prev_capacity=""
 prev_bat_status=""
 bat_part() {
-    local status capacity indicator
+    local status capacity on_ac
     status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown')
     capacity=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo '0')
-    if [ "$status" = "Charging" ]; then
-        indicator="+"
-    else
-        indicator=""
+    on_ac=0
+    if grep -q '^1$' /sys/class/power_supply/*/online 2>/dev/null; then on_ac=1; fi
+    if [ "$on_ac" = 0 ]; then
+        case "$status" in
+            Charging) on_ac=1 ;;
+        esac
     fi
-    local bat_out="BAT: ${capacity}%${indicator}"
+    if [ "$on_ac" = 1 ]; then
+        local bat_out="BAT:+${capacity}%"
+    else
+        local bat_out="BAT: ${capacity}%"
+    fi
     if [ "$capacity" -le 10 ] && [ "$status" = "Discharging" ]; then
         bat_out="(Low Battery!) ${bat_out}"
         # Low Battery forces hide mode off
-        if [ -f "$XDG_RUNTIME_DIR/hide_mode" ]; then
+        if [ -f "$HIDE_MODE_FILE" ]; then
             echo "$(date): LOW-BATTERY: capacity=$capacity% status=$status — forcing hide mode OFF" >&2
-            rm -f "$XDG_RUNTIME_DIR/hide_mode"
-            echo "hidemode off" > "$XDG_RUNTIME_DIR/dwmbar-0" 2>/dev/null
+            rm -f "$HIDE_MODE_FILE"
+            echo "hidemode off" > "$FIFO" 2>/dev/null
         fi
     fi
     # Signal bar only on charging status transitions (not routine capacity changes)
     if [ "$status" != "$prev_bat_status" ]; then
         if [ -n "$prev_bat_status" ]; then
-            echo "$(date): BAT status change: prev='$prev_bat_status' new='$status'" >&2
+            echo "$(date): BAT status change: prev='$prev_bat_status' new='$status' on_ac=$on_ac" >&2
             signal_bar_show
         fi
         prev_bat_status="$status"
@@ -168,7 +195,7 @@ while true; do
     # Build status line
     now=$(date +%s)
     hide_mode_on=0
-    [ -f "$XDG_RUNTIME_DIR/hide_mode" ] && hide_mode_on=1
+    [ -f "$HIDE_MODE_FILE" ] && hide_mode_on=1
 
     # Temp message overrides normal status
     msg_active=0
@@ -216,7 +243,10 @@ while true; do
     if [ "$line" != "$prev_status" ]; then
         xsetroot -name "$line" 2>/dev/null
         prev_status="$line"
-        signal_bar_show
+        # Status text updated — xsetroot handles the bar redraw via dwm's
+        # built-in PropertyNotify handler.  No FIFO signal needed here;
+        # the specific change handlers above (battery, power, temp-msg,
+        # signal) already call signal_bar_show when hide mode is on.
     fi
 
     sleep 0.1
