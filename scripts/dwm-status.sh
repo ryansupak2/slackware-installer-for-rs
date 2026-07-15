@@ -53,7 +53,7 @@ vox_part() {
             loading)         echo -n '[VOX Loading...] ' ;;
             recording)       echo -n '[VOX] ' ;;
             recording+dump)  echo -n '[VOX (recording...)] ' ;;
-            *)               echo -n '[VOX] ' ;;
+            *)               echo -n '' ;;
         esac
     fi
 }

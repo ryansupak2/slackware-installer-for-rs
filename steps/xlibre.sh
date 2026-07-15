@@ -118,7 +118,7 @@ else
         -Dpciaccess=true \
         -Dudev=true \
         -Dudev_kms=true \
-        -Dsystemd_logind=false \
+        -Dsystemd_logind=true \
         -Dsystemd_notify=false \
         -Dseatd_libseat=false \
         -Dipv6=true \

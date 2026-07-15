@@ -108,7 +108,7 @@ while true; do
             loading)         vox_badge="[VOX Loading...] " ;;
             recording)       vox_badge="[VOX] " ;;
             recording+dump)  vox_badge="[VOX (recording...)] " ;;
-            *)               vox_badge="[VOX] " ;;
+            *)               vox_badge="" ;;
         esac
     else
         vox_badge=""

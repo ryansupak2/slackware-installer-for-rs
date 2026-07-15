@@ -30,3 +30,5 @@
 /* $XDG_RUNTIME_DIR/vox_state — "loading" | "recording" | deleted */
 
 #endif
+/* --- Calibration --- */
+#define CALIBRATE_WAV "/usr/local/share/vox/calibrate.wav"

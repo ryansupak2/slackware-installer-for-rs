@@ -329,6 +329,65 @@ static const SherpaOnnxOnlineRecognizer *recognizer_create(void) {
 }
 
 /* ======================================================================
+ * Calibration: feed a known WAV through the LIVE stream to prove both
+ * model and stream are ready. Uses the caller's stream — no temp objects.
+ * Returns 1 when text appears from the WAV (stream + model proven live).
+ * ====================================================================== */
+static int calibrate_stream(const SherpaOnnxOnlineRecognizer *recognizer,
+                             const SherpaOnnxOnlineStream *stream) {
+    log_msg("Calibration: feeding internal WAV through live stream...");
+    const SherpaOnnxWave *wave = SherpaOnnxReadWave(CALIBRATE_WAV);
+    if (!wave) {
+        log_msg("Calibration: WAV not found at %s, falling back to mic prime", CALIBRATE_WAV);
+        return 0;
+    }
+    log_msg("Calibration: WAV loaded — %.2fs, %d samples",
+             (float)wave->num_samples / wave->sample_rate, wave->num_samples);
+
+    int chunk = SAMPLE_RATE * 60 / 1000;
+    int found = 0;
+    for (int k = 0; k < wave->num_samples && !found; k += chunk) {
+        int n = (k + chunk > wave->num_samples) ? (wave->num_samples - k) : chunk;
+        float fbuf[CHUNK_SAMPLES];
+        for (int j = 0; j < n; j++) fbuf[j] = wave->samples[k + j];
+        SherpaOnnxOnlineStreamAcceptWaveform(stream, wave->sample_rate, fbuf, n);
+        while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
+            SherpaOnnxDecodeOnlineStream(recognizer, stream);
+        const SherpaOnnxOnlineRecognizerResult *r =
+            SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+        if (r && strlen(r->text) > 0) {
+            char buf[256];
+            strncpy(buf, r->text, sizeof(buf)-1); buf[sizeof(buf)-1] = '\0';
+            sanitize(buf);
+            log_msg("Calibration: stream produced text → \"%s\" — LIVE", buf);
+            found = 1;
+        }
+        if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
+    }
+
+    if (!found) {
+        float tail[4800] = {0};
+        SherpaOnnxOnlineStreamAcceptWaveform(stream, wave->sample_rate, tail, 4800);
+        SherpaOnnxOnlineStreamInputFinished(stream);
+        while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
+            SherpaOnnxDecodeOnlineStream(recognizer, stream);
+        const SherpaOnnxOnlineRecognizerResult *r =
+            SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+        if (r && strlen(r->text) > 0) {
+            char buf[256];
+            strncpy(buf, r->text, sizeof(buf)-1); buf[sizeof(buf)-1] = '\0';
+            sanitize(buf);
+            log_msg("Calibration (tail): stream produced text → \"%s\" — LIVE", buf);
+            found = 1;
+        }
+        if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
+    }
+
+    SherpaOnnxFreeWave(wave);
+    if (!found) log_msg("Calibration: no text produced, falling back to mic prime");
+    return found;
+}
+/* ======================================================================
  * ALSA
  * ====================================================================== */
 static snd_pcm_t *alsa_open(void) {
@@ -475,28 +534,30 @@ static void run_alsa_mode(void) {
                         if (g_dump_audio) dump_close();
                         return;
                     }
-
-                    /* Feed priming audio into stream to warm up the model.
-                     * Intel SOF DMICs produce near-zero samples for ~1s after
-                     * snd_pcm_prepare. Instead of discarding this audio, we
-                     * feed it to the recognizer so its internal state is
-                     * primed when the user starts speaking. This eliminates
-                     * the 1-2s warmup latency on first utterance. */
+                /* ── Cold-start: calibrate stream with internal WAV ── */
                     snd_pcm_drop(alsa);
                     snd_pcm_prepare(alsa);
-                    {
-                        /* Create stream BEFORE priming so we can feed it */
-                        if (!stream) {
-                            stream = SherpaOnnxCreateOnlineStream(recognizer);
-                            log_msg("Stream created");
-                        } else {
-                            SherpaOnnxOnlineStreamReset(recognizer, stream);
-                            log_msg("Stream reset");
-                        }
 
+                    /* Create the live stream — calibration feeds through it */
+                    stream = SherpaOnnxCreateOnlineStream(recognizer);
+                    log_msg("Stream created");
+
+                    int calibrated = 0;
+                    if (!model_warm) {
+                        calibrated = calibrate_stream(recognizer, stream);
+                        if (calibrated) {
+                            /* Reset stream to clear calibration text from output
+                             * buffer. Model stays warm at recognizer level. */
+                            SherpaOnnxOnlineStreamReset(recognizer, stream);
+                            log_msg("Stream reset after calibration — clean slate");
+                        }
+                    }
+
+                    if (!calibrated) {
+                        log_msg("Mic priming (%d chunks ≈ 3s)...",
+                                 3 * (SAMPLE_RATE / CHUNK_SAMPLES));
                         int16_t prime_buf[CHUNK_SAMPLES];
-                        int prime_chunks = (SAMPLE_RATE / CHUNK_SAMPLES);
-                        log_msg("Priming model (%d chunks ≈ 1s)...", prime_chunks);
+                        int prime_chunks = 3 * (SAMPLE_RATE / CHUNK_SAMPLES);
                         for (int i = 0; i < prime_chunks; i++) {
                             int rc = snd_pcm_readi(alsa, prime_buf, CHUNK_SAMPLES);
                             if (rc < 0) { snd_pcm_recover(alsa, rc, 0); break; }
@@ -509,22 +570,20 @@ static void run_alsa_mode(void) {
                                 SherpaOnnxGetOnlineStreamResult(recognizer, stream);
                             if (pr) SherpaOnnxDestroyOnlineRecognizerResult(pr);
                         }
-                        log_msg("Model primed — capture starting");
-                        primed = 1;
+                        log_msg("Mic priming complete");
                     }
+
                 } else {
-                    /* Warm start: drain stale audio, prepare for capture */
+                    /* ── Warm start: drain, prepare, reset stream ── */
                     snd_pcm_drop(alsa);
                     snd_pcm_prepare(alsa);
-                }
-
-                /* Create or reset stream if not already done during cold-start prime */
-                if (!stream) {
-                    stream = SherpaOnnxCreateOnlineStream(recognizer);
-                    log_msg("Stream created");
-                } else if (!primed) {
-                    SherpaOnnxOnlineStreamReset(recognizer, stream);
-                    log_msg("Stream reset");
+                    if (stream) {
+                        SherpaOnnxOnlineStreamReset(recognizer, stream);
+                        log_msg("Stream reset (warm)");
+                    } else {
+                        stream = SherpaOnnxCreateOnlineStream(recognizer);
+                        log_msg("Stream created (warm)");
+                    }
                 }
 
                 recording = 1;
@@ -544,9 +603,10 @@ static void run_alsa_mode(void) {
                 silent_chunks = 0;
                 first_text_logged = 0;
 
-                /* Pipeline is fully initialized: model loaded, ALSA open,
-                 * stream ready. Mic is hot. Badge ON. */
+                /* Pipeline fully initialized: model loaded, ALSA open,
+                 * recognizer calibrated. Mic is hot. Badge ON. */
                 state_write(g_dump_audio ? "recording+dump" : "recording");
+                log_msg("Badge → recording (pipeline ready, recognizer live)");
 
                 clock_gettime(CLOCK_MONOTONIC, &t_ready);
                 double elapsed = (t_ready.tv_sec - t_start.tv_sec) +

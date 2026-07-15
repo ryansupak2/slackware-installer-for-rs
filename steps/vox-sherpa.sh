@@ -142,6 +142,10 @@ else
     fi
 fi
 
+# ── calibration WAV ──────────────────────────────────────────────
+cp "$REPO_DIR/scripts/voxd/calibrate.wav" /usr/local/share/vox/calibrate.wav 2>/dev/null || true
+echo "  calibrate.wav → /usr/local/share/vox/calibrate.wav"
+
 # ── vox CLI wrapper ──────────────────────────────────────────────
 
 cp "$REPO_DIR/scripts/vox" "$VOX_SCRIPT" 2>/dev/null || true
