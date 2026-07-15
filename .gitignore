@@ -12,3 +12,10 @@ sources/physlock/physlock
 setup.keys.root
 setup.keys.rs
 setup.keys.ryansupak
+
+# Cloned build dependencies (not tracked in this repo)
+sources/libxcvt/
+sources/xf86-input-evdev/
+sources/xf86-input-libinput/
+sources/xorgproto/
+sources/xserver/
