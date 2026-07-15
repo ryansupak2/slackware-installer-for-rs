@@ -431,7 +431,9 @@ static void run_alsa_mode(void) {
     const SherpaOnnxOnlineRecognizer *recognizer = NULL;
     const SherpaOnnxOnlineStream *stream = NULL;
     snd_pcm_t *alsa = NULL;
-    int recording = 0, segment_id = 0, last_partial_len = 0;
+    int recording = 0, segment_id = 0, last_partial_len = 0, primed = 0;
+    int first_chunk_logged = 0, first_ready_logged = 0;
+    int silent_chunks = 0, first_text_logged = 0;
     int model_warm = 0;  /* true after first successful load */
 
     char last_text[4096] = {0};
@@ -473,17 +475,54 @@ static void run_alsa_mode(void) {
                         if (g_dump_audio) dump_close();
                         return;
                     }
+
+                    /* Feed priming audio into stream to warm up the model.
+                     * Intel SOF DMICs produce near-zero samples for ~1s after
+                     * snd_pcm_prepare. Instead of discarding this audio, we
+                     * feed it to the recognizer so its internal state is
+                     * primed when the user starts speaking. This eliminates
+                     * the 1-2s warmup latency on first utterance. */
+                    snd_pcm_drop(alsa);
+                    snd_pcm_prepare(alsa);
+                    {
+                        /* Create stream BEFORE priming so we can feed it */
+                        if (!stream) {
+                            stream = SherpaOnnxCreateOnlineStream(recognizer);
+                            log_msg("Stream created");
+                        } else {
+                            SherpaOnnxOnlineStreamReset(recognizer, stream);
+                            log_msg("Stream reset");
+                        }
+
+                        int16_t prime_buf[CHUNK_SAMPLES];
+                        int prime_chunks = (SAMPLE_RATE / CHUNK_SAMPLES);
+                        log_msg("Priming model (%d chunks ≈ 1s)...", prime_chunks);
+                        for (int i = 0; i < prime_chunks; i++) {
+                            int rc = snd_pcm_readi(alsa, prime_buf, CHUNK_SAMPLES);
+                            if (rc < 0) { snd_pcm_recover(alsa, rc, 0); break; }
+                            float fbuf[CHUNK_SAMPLES];
+                            for (int j = 0; j < rc; j++) fbuf[j] = prime_buf[j] / 32768.0f;
+                            SherpaOnnxOnlineStreamAcceptWaveform(stream, SAMPLE_RATE, fbuf, rc);
+                            while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
+                                SherpaOnnxDecodeOnlineStream(recognizer, stream);
+                            const SherpaOnnxOnlineRecognizerResult *pr =
+                                SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+                            if (pr) SherpaOnnxDestroyOnlineRecognizerResult(pr);
+                        }
+                        log_msg("Model primed — capture starting");
+                        primed = 1;
+                    }
+                } else {
+                    /* Warm start: drain stale audio, prepare for capture */
+                    snd_pcm_drop(alsa);
+                    snd_pcm_prepare(alsa);
                 }
 
-                /* Drain stale audio, prepare for capture */
-                snd_pcm_drop(alsa);
-                snd_pcm_prepare(alsa);
-
-                /* Create or reset stream */
+                /* Create or reset stream if not already done during cold-start prime */
                 if (!stream) {
                     stream = SherpaOnnxCreateOnlineStream(recognizer);
                     log_msg("Stream created");
-                } else {
+                } else if (!primed) {
                     SherpaOnnxOnlineStreamReset(recognizer, stream);
                     log_msg("Stream reset");
                 }
@@ -492,6 +531,18 @@ static void run_alsa_mode(void) {
                 segment_id = 0;
                 last_partial_len = 0;
                 last_text[0] = '\0';
+                first_chunk_logged = 0;
+                first_ready_logged = 0;
+                silent_chunks = 0;
+                first_text_logged = 0;
+                primed = 0;
+                segment_id = 0;
+                last_partial_len = 0;
+                last_text[0] = '\0';
+                first_chunk_logged = 0;
+                first_ready_logged = 0;
+                silent_chunks = 0;
+                first_text_logged = 0;
 
                 /* Pipeline is fully initialized: model loaded, ALSA open,
                  * stream ready. Mic is hot. Badge ON. */
@@ -533,6 +584,7 @@ static void run_alsa_mode(void) {
 
                 state_clear();
                 recording = 0;
+                primed = 0;
                 log_msg("Mic closed — model stays warm for next use");
             }
             continue;
@@ -544,13 +596,33 @@ static void run_alsa_mode(void) {
         int16_t buf[CHUNK_SAMPLES];
         int rc = snd_pcm_readi(alsa, buf, CHUNK_SAMPLES);
         if (rc < 0) { rc = snd_pcm_recover(alsa, rc, 0); if (rc < 0) break; continue; }
+
+        /* Diagnostic: log first audio chunk arrival to identify DMIC lag */
+        if (!first_chunk_logged) {
+            struct timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+            log_msg("First audio chunk arrived: %ld.%09ld", (long)ts.tv_sec, ts.tv_nsec);
+            first_chunk_logged = 1;
+        }
+
         if (g_dump_audio) dump_write(buf, rc);
 
         float samples[CHUNK_SAMPLES];
         for (int i = 0; i < rc; i++) samples[i] = buf[i] / 32768.0f;
         SherpaOnnxOnlineStreamAcceptWaveform(stream, SAMPLE_RATE, samples, rc);
-        while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
+
+        /* Diagnostic: log first time recognizer becomes ready */
+        int was_ready = SherpaOnnxIsOnlineStreamReady(recognizer, stream);
+        if (!first_ready_logged && was_ready) {
+            struct timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+            log_msg("Recognizer first ready: %ld.%09ld", (long)ts.tv_sec, ts.tv_nsec);
+            first_ready_logged = 1;
+        }
+        while (was_ready) {
             SherpaOnnxDecodeOnlineStream(recognizer, stream);
+            was_ready = SherpaOnnxIsOnlineStreamReady(recognizer, stream);
+        }
 
         const SherpaOnnxOnlineRecognizerResult *r =
             SherpaOnnxGetOnlineStreamResult(recognizer, stream);
@@ -561,8 +633,24 @@ static void run_alsa_mode(void) {
         const char *text = text_buf;
         int is_endpoint = SherpaOnnxOnlineStreamIsEndpoint(recognizer, stream);
 
+        /* Diagnostic: count silent chunks to detect recognizer lag */
+        int has_text = strlen(text) > 0;
+        if (!has_text) {
+            silent_chunks++;
+            if (silent_chunks % 50 == 1)  /* every ~5s */
+                log_msg("  (silent for %d chunks ≈ %.1fs)", silent_chunks,
+                         silent_chunks * (CHUNK_MS / 1000.0));
+        } else if (!first_text_logged) {
+            log_msg("  FIRST TEXT after %d silent chunks (%.1fs)", silent_chunks,
+                     silent_chunks * (CHUNK_MS / 1000.0));
+            first_text_logged = 1;
+            silent_chunks = 0;
+        } else {
+            silent_chunks = 0;
+        }
+
         /* Partial update — type immediately, no suppression delay */
-        if (strlen(text) && strcmp(text, last_text) != 0) {
+        if (has_text && strcmp(text, last_text) != 0) {
             if (g_dump_audio)
                 dump_log_text("PARTIAL", last_partial_len, last_text, text);
             type_append(last_text, last_partial_len, text);

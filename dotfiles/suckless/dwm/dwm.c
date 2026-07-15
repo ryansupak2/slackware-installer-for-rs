@@ -572,9 +572,15 @@ clientmessage(XEvent *e)
 	if (cme->message_type == netatom[NetWMState]) {
 		if (cme->data.l[1] == netatom[NetWMFullscreen]
 		|| cme->data.l[2] == netatom[NetWMFullscreen]) {
-			/* Guard against re-entrant fullscreen requests that cause
-			 * a toggle loop (browser sends ADD, dwm resizes client,
-			 * browser sees resize and sends another ADD, etc). */
+			/* Debounce fullscreen client messages to break the
+			 * Firefox toggle loop: Firefox sends TOGGLE, we resize
+			 * and update _NET_WM_STATE, Firefox sees PropertyNotify
+			 * and sends TOGGLE again. Ignoring re-requests within
+			 * 300ms stops the loop while letting real toggles through. */
+			static time_t last_fullscreen_ts = 0;
+			time_t now_ts = time(NULL);
+			if (now_ts - last_fullscreen_ts < 1)
+				return;
 			int action = cme->data.l[0];
 			if (action == 1 /* _NET_WM_STATE_ADD */ && !c->isfullscreen)
 				setfullscreen(c, 1);
@@ -582,7 +588,9 @@ clientmessage(XEvent *e)
 				setfullscreen(c, 0);
 			else if (action == 2 /* _NET_WM_STATE_TOGGLE */)
 				setfullscreen(c, !c->isfullscreen);
+			last_fullscreen_ts = now_ts;
 		}
+	} else if (cme->message_type == netatom[NetActiveWindow]) {
 		if (c != selmon->sel && !c->isurgent)
 			seturgent(c, 1);
 	}

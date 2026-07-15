@@ -19,6 +19,8 @@ echo "========================================"
 
 cleanup() {
     echo "  · cleaning up..."
+    /usr/local/bin/vpn disconnect 2>/dev/null || true
+    pkill -USR1 voxd 2>/dev/null || true   # toggle VOX off if recording
     pkill -x voxd              2>/dev/null || true
     rm -f "$XDG_RUNTIME_DIR/vox_state" 2>/dev/null || true
     pkill -x pipewire-pulse       2>/dev/null || true

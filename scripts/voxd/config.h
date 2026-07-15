@@ -12,13 +12,13 @@
 #define ALSA_DEVICE      "plughw:0,7"  /* DMIC capture device */
 #define SAMPLE_RATE      16000
 #define CHANNELS         1
-#define CHUNK_MS         100            /* 100ms audio chunks */
+#define CHUNK_MS         60             /* 60ms audio chunks (was 100ms) */
 #define CHUNK_SAMPLES    (SAMPLE_RATE * CHUNK_MS / 1000)
 
 /* --- Streaming / endpoint --- */
 #define ENDPOINT_SILENCE 1.2
 #define MAX_UTTERANCE 20.0
-#define NUM_THREADS      2              /* onnxruntime threads */
+#define NUM_THREADS      4              /* onnxruntime threads */
 
 /* --- Keyboard typing --- */
 /* WTYPE_BIN is used when WAYLAND_DISPLAY is set;

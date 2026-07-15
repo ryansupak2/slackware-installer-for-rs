@@ -123,8 +123,17 @@ eval $(dbus-launch --sh-syntax) 2>/dev/null || true
 # First terminal: neofetch runs via bashrc DWL_FIRST_TERMINAL hook
 DWL_FIRST_TERMINAL=1 st &
 
+# Cleanup on X session exit — disconnect VPN, stop VOX recording
+cleanup() {
+    echo "[dwm-start] X session ending — cleaning up..."
+    /usr/local/bin/vpn disconnect 2>/dev/null || true
+    pkill -USR1 voxd 2>/dev/null || true   # toggle VOX off if recording
+    echo "[dwm-start] cleanup complete"
+}
+trap cleanup EXIT
+
 # Start dwm
-exec dwm
+dwm
 XEOF
 chmod +x "$XINITRC"
 

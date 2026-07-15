@@ -160,20 +160,18 @@ cat > "$TOGGLE" << 'TOGGLE_EOF'
 
 PID=$(pgrep -x voxd 2>/dev/null)
 if [ -n "$PID" ]; then
-    # If daemon is in dump mode, restart without it
+    # Regular dictation: ensure voxd is NOT in dump mode
     if grep -q -- '--dump-audio' /proc/$PID/cmdline 2>/dev/null; then
         pkill -x voxd 2>/dev/null
-        # Wait for old process to actually exit
         while pgrep -x voxd >/dev/null 2>&1; do usleep 50000; done
         /usr/local/bin/voxd &
     fi
     kill -USR1 $(pgrep -x voxd) 2>/dev/null
 else
     /usr/local/bin/voxd &
-    # Evidence-based: wait until daemon is actually alive
     for i in $(seq 1 50); do
         pgrep -x voxd >/dev/null 2>&1 && break
-        usleep 20000  # 20ms
+        usleep 20000
     done
     kill -USR1 $(pgrep -x voxd) 2>/dev/null
 fi

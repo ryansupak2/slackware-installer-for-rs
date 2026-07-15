@@ -127,8 +127,10 @@ vpn_part() {
     local now
     now=$(date +%s)
     if [ $((now - last_vpn_check)) -ge 5 ]; then
-        if /usr/local/bin/openvpn-checkconnectionstatus.sh 2>/dev/null | grep -q "1"; then
+        if /usr/sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
             vpn_status="[VPN] "
+        elif [ -f "${XDG_RUNTIME_DIR}/vpn_state" ]; then
+            vpn_status="[VPN Reconnecting...] "
         else
             vpn_status=""
         fi
