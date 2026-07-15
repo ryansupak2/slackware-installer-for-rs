@@ -2356,10 +2356,14 @@ updatebarpos(Monitor *m)
 {
 	m->wy = m->my;
 	m->wh = m->mh;
-	if (m->showbar) {
+	if (m->showbar && !hidemode) {
+		/* Permanent bar: reserve space at top/bottom */
 		m->wh -= bh;
 		m->by = m->topbar ? m->wy : m->wy + m->wh;
 		m->wy = m->topbar ? m->wy + bh : m->wy;
+	} else if (m->showbar && hidemode) {
+		/* Hide-mode temp bar: overlay on top, don't resize windows */
+		m->by = m->topbar ? m->my : m->my + m->mh - bh;
 	} else
 		m->by = -bh;
 }

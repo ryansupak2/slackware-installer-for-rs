@@ -1,12 +1,12 @@
 #!/bin/sh
 #
 # dwl-start — Wayland/dwl session launcher
-# Run from a text console.  Logs to ~/logs/dwl-YYYYMMDD-HHMMSS.log
+# Run from a text console.  Logs to /var/log/<user>-dwl-YYYYMMDD-HHMMSS.log
 # All output mirrored to terminal so the log captures everything.
 
-LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOGFILE="$LOG_DIR/dwl-$(date +%Y%m%d-%H%M%S).log"
+LOGFILE="$LOG_DIR/${USER:-root}-dwl-$(date +%Y%m%d-%H%M%S).log"
 
 # ── Output routing ───────────────────────────────────────────────
 # Quiet: everything → log only (clean terminal)

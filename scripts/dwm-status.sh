@@ -2,11 +2,11 @@
 #
 # dwm-status.sh — status bar content generator for dwm
 # Writes to xsetroot -name so dwm's built-in bar renders it.
-# Logs to ~/logs/dwm-status-YYYYMMDD-HHMMSS.log
+# Logs to /var/log/<user>-dwm-status-YYYYMMDD-HHMMSS.log
 
-LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOGFILE="$LOG_DIR/dwm-status-$(date +%Y%m%d-%H%M%S).log"
+LOGFILE="$LOG_DIR/${USER:-root}-dwm-status-$(date +%Y%m%d-%H%M%S).log"
 exec >>"$LOGFILE" 2>&1
 
 echo "dwm-status starting: $(date)"
@@ -32,9 +32,8 @@ else
     touch "$HIDE_MODE_FILE"
     echo "hidemode on" > "$FIFO" 2>/dev/null
     echo "$(date): hide mode initialized ON, hidemode on -> FIFO" >&2
-    # Briefly show bar with hide mode message
+    # Set temp message — main loop will trigger the initial bar show
     set_temp_msg "(Hide Mode On [Mod+H])" 4
-    echo "show all" > "$FIFO" 2>/dev/null
 fi
 
 # ── Helper: signal hide-mode bar reveal ─────────────────────

@@ -2,7 +2,7 @@
 # toggle-vox-record.sh — VOX toggle with audio recording (Mod+Shift+V)
 #
 # Ensures voxd is running with --dump-audio, then toggles recording.
-# Audio saved to ~/logs/vox-YYYYMMDD-HHMMSS.wav
+# Audio saved to /var/log/<user>-vox-YYYYMMDD-HHMMSS.wav
 
 VOXD=/usr/local/bin/voxd
 

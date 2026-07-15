@@ -2,9 +2,9 @@
 # lid-timer.sh: fires on lid close, waits 10s, then suspends.
 # Screen locking is delegated entirely to lock-screen.sh (slock).
 
-LOG_DIR="/root/logs"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG="$LOG_DIR/slock-sleep-$(date +%Y%m%d-%H%M%S).log"
+LOG="$LOG_DIR/${USER:-root}-slock-sleep-$(date +%Y%m%d-%H%M%S).log"
 
 lid_state() {
     cat /proc/acpi/button/lid/*/state 2>/dev/null | grep -q 'closed'

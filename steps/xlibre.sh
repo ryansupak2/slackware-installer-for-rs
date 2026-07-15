@@ -5,7 +5,7 @@
 # Original Xorg is preserved at /usr/libexec/Xorg.orig.
 
 REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
-LOG_FILE="${LOG_FILE:-/logs/installer.log}"
+LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
 
 if [ -f "$REPO_DIR/lib/common.sh" ]; then
     . "$REPO_DIR/lib/common.sh"

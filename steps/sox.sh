@@ -2,7 +2,7 @@
 # steps/sox.sh - AUDIO/DSP: SoX (Sound eXchange — audio processing Swiss Army knife)
 # Installs sox (format support is built-in on Slackware).
 REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
-LOG_FILE="${LOG_FILE:-/logs/installer.log}"
+LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
 
 if [ -f "$REPO_DIR/lib/common.sh" ]; then
     . "$REPO_DIR/lib/common.sh"

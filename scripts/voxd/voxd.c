@@ -79,9 +79,9 @@ static char g_dump_txt_path[512];
  * ====================================================================== */
 static void log_msg(const char *fmt, ...) {
     if (!g_log) {
-        const char *home = getenv("HOME"); if (!home) home = "/root";
-        char buf[512]; snprintf(buf, sizeof(buf), "%s/logs", home);
-        mkdir(buf, 0755); snprintf(buf, sizeof(buf), "%s/logs/vox.log", home);
+        const char *user = getenv("USER"); if (!user) user = "root";
+        char buf[512]; mkdir("/var/log", 0755);
+        snprintf(buf, sizeof(buf), "/var/log/%s-vox.log", user);
         g_log = fopen(buf, "a"); if (!g_log) g_log = stderr;
     }
     time_t now = time(NULL); struct tm tm; localtime_r(&now, &tm);
@@ -233,10 +233,10 @@ static void dump_log_text(const char *phase, int bs, const char *old_text, const
     fflush(g_dump_txt);
 }
 static void dump_open(void) {
-    const char *home = getenv("HOME"); if (!home) home = "/root";
+    const char *user = getenv("USER"); if (!user) user = "root";
     time_t now = time(NULL); struct tm tm; localtime_r(&now, &tm);
-    snprintf(g_dump_path, sizeof(g_dump_path), "%s/logs/vox-%04d%02d%02d-%02d%02d%02d.wav",
-             home, tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    snprintf(g_dump_path, sizeof(g_dump_path), "/var/log/%s-vox-%04d%02d%02d-%02d%02d%02d.wav",
+             user, tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
     g_dump_fp = fopen(g_dump_path, "wb");
     if (!g_dump_fp) { log_msg("ERROR: cannot open dump %s", g_dump_path); return; }
     char hdr[44] = {0};
@@ -249,8 +249,8 @@ static void dump_open(void) {
     hdr[32]=2; hdr[34]=16;
     memcpy(hdr+36, "data", 4);
     fwrite(hdr,1,44,g_dump_fp); g_dump_data_bytes=0;
-    snprintf(g_dump_txt_path, sizeof(g_dump_txt_path), "%s/logs/vox-%04d%02d%02d-%02d%02d%02d.txt",
-             home, tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    snprintf(g_dump_txt_path, sizeof(g_dump_txt_path), "/var/log/%s-vox-%04d%02d%02d-%02d%02d%02d.txt",
+             user, tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
     g_dump_txt = fopen(g_dump_txt_path, "w");
     if (g_dump_txt) {
         fprintf(g_dump_txt, "# VOX transcription session\n");

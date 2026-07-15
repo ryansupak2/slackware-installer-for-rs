@@ -9,9 +9,9 @@ if [ -f /usr/local/bin/temp-msg.sh ]; then
 fi
 HIDE_MODE_FILE="$XDG_RUNTIME_DIR/hide_mode"
 FIFO="${XDG_RUNTIME_DIR}/somebar-0"
-LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG="$LOG_DIR/dwl-status-$(date +%Y%m%d-%H%M%S).log"
+LOG="$LOG_DIR/${USER:-root}-dwl-status-$(date +%Y%m%d-%H%M%S).log"
 exec >>"$LOG" 2>&1
 
 # Wait for somebar to create its FIFO
@@ -25,9 +25,8 @@ echo "$(date): FIFO=$FIFO" >&2
 # Hide Mode initialization — default ON at session start
 touch "$HIDE_MODE_FILE"
 echo "hidemode on" > "$FIFO" 2>/dev/null
-# Briefly show the bar with the hide mode message, then hide after 3s
+# Set temp message — main loop will trigger the initial bar show
 set_temp_msg "(Hide Mode On [Mod+H])"
-echo "show all" > "$FIFO" 2>/dev/null
 next_log=0
 next_ping=0
 net_status="DOWN"
@@ -137,7 +136,6 @@ while true; do
     [ -f "$HIDE_MODE_FILE" ] && hide_mode_on=1
 
     # Temporary message overrides normal status
-    msg_active=0
     msg_active=0
     msg=""
     if [ -f "$XDG_RUNTIME_DIR/status_msg" ] && [ "$now" -lt $(cat "$XDG_RUNTIME_DIR/status_end" 2>/dev/null || echo 0) ]; then

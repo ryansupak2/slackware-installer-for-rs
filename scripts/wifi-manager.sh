@@ -60,9 +60,9 @@ YELLOW='\033[33m'
 NC='\033[0m'
 
 # Dual logging (everything goes to screen AND the log file)
-LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/wifi-manager-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="$LOG_DIR/${USER:-root}-wifi-manager-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "=================================================="

@@ -54,9 +54,9 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Set up dual logging: everything from this point on goes to the screen
 # AND is appended to a dedicated per-user-installer log file.
-LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/post-install-user-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="$LOG_DIR/${TARGET_USER:-${USER:-root}}-post-install-user-$(date +%Y%m%d-%H%M%S).log"
 export LOG_FILE
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -101,11 +101,8 @@ fi
 # Recompute HOME_TARGET (the user may have been deleted + recreated)
 HOME_TARGET=$(eval echo ~$TARGET_USER)
 
-# Ensure ~/logs exists for target user with correct ownership
-USER_LOG_DIR="$HOME_TARGET/logs"
-mkdir -p "$USER_LOG_DIR" 2>/dev/null || true
-chown "$TARGET_USER:$TARGET_USER" "$USER_LOG_DIR" 2>/dev/null || true
-chmod 700 "$USER_LOG_DIR" 2>/dev/null || true
+# Ensure /var/log exists (target user's session scripts will log here)
+mkdir -p /var/log 2>/dev/null || true
 
 # Counters (exact same style as post-install-global.sh)
 success_count=0

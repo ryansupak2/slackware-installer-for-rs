@@ -16,23 +16,25 @@ make -j$(nproc) >/dev/null 2>&1
 
 ## Logging conventions
 
-All project components log to `$HOME/logs/` (which is `/root/logs/` in this
-environment). Follow these patterns:
+All project components log to `/var/log/` with a consistent
+`<username>-<component>-YYYYMMDD-HHMMSS.log` pattern:
 
-- **dwl**: `$HOME/logs/dwl-YYYYMMDD-HHMMSS.log` (timestamped per-session, all output via `exec >>`)
-- **VOX**: `$HOME/logs/vox.log` (single file, append-only, `$(date): message` format)
-- **dwl-status**: `$HOME/logs/dwl-status-YYYYMMDD-HHMMSS.log`
+- **Session scripts** (dwm, dwl, vpn, wifi-manager, vnc, net-watch): `/var/log/<user>-<component>-YYYYMMDD-HHMMSS.log`
+- **Daemons** (voxd): `/var/log/<user>-vox.log` (single file, append-only, `YYYY-MM-DD HH:MM:SS: message` format)
+- **System/installer** (bootstrap, post-install-*, steps): `/var/log/<user>-<component>-YYYYMMDD-HHMMSS.log`
+- **Toggle scripts** (toggle-bar.sh, toggle-hide-mode.sh): log to stderr (captured by session log) via `log_me()` helper
+- **Hide-mode debug** (dwm.c/dwl.c): fprintf(stderr, ...) with `[dwm]` prefix (captured by session log)
 
-The toggle-vox.sh line 16 is canonical:
+The canonical pattern for shell scripts:
 ```sh
-L="$HOME/logs"; mkdir -p "$L" 2>/dev/null; VL="$L/vox.log"
-log_msg() { echo "$(date): $*" >> "$VL"; }
+LOG_DIR="/var/log"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+LOG_FILE="$LOG_DIR/${USER:-root}-<component>-$(date +%Y%m%d-%H%M%S).log"
+exec >>"$LOG_FILE" 2>&1
 ```
 
-New C code should use `$HOME/logs/vox.log` via `getenv("HOME")`, NOT hardcoded
-`/root/logs/`. Format: `timestamp: message`.
-
-Hide-mode debug logging goes to stderr (captured in the dwl session log).
+New C code should use `/var/log/<user>-vox.log` via `getenv("USER")`, NOT hardcoded
+`/root/logs/`.
 
 ## Installer step discipline
 
@@ -94,5 +96,5 @@ with `--help` or a test path. For daemons: check `pgrep`, check logs.
 bash -n scripts/foo.sh              # shell syntax
 ./voxd --help 2>&1 | head -3         # binary runs
 pgrep -x voxd                         # daemon alive
-tail -3 ~/logs/vox.log               # logging works
+tail -3 /var/log/root-vox.log          # logging works
 ```

@@ -1,12 +1,12 @@
 #!/bin/sh
 #
 # dwm-start — X11/dwm session launcher
-# Run from a text console.  Logs to ~/logs/dwm-YYYYMMDD-HHMMSS.log
+# Run from a text console.  Logs to /var/log/<user>-dwm-YYYYMMDD-HHMMSS.log
 # All output mirrored to terminal so the log captures everything.
 
-LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOGFILE="$LOG_DIR/dwm-$(date +%Y%m%d-%H%M%S).log"
+LOGFILE="$LOG_DIR/${USER:-root}-dwm-$(date +%Y%m%d-%H%M%S).log"
 
 # ── Output routing ───────────────────────────────────────────────
 exec >>"$LOGFILE" 2>&1

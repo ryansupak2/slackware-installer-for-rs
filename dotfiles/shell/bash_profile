@@ -8,8 +8,8 @@ fi
 
 # Optional: any login-only setup can go below (e.g. ssh-agent, keychain already appended to .bashrc by the installer)
 
-LOG="$HOME/logs/shell-init.log"
-mkdir -p "$HOME/logs" 2>/dev/null
+LOG="/var/log/${USER:-root}-shell-init.log"
+mkdir -p /var/log 2>/dev/null
 
 # Login-only: bare TTY console → flush stale VPN + neofetch
 # (DWL_FIRST_TERMINAL and hide_mode newline are handled by .bashrc)

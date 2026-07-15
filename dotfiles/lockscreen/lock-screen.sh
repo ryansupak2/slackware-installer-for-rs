@@ -14,7 +14,7 @@
 # Ensure standard paths (acpid runs with minimal env)
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 # Ensure log directory exists BEFORE redirecting output
-LOG_DIR=/root/logs
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 # ── PID-file mutex (survives suspend/resume) ─────────────────────
@@ -35,7 +35,7 @@ echo $$ > "$LOCKFILE"
 trap 'rm -f "$LOCKFILE" 2>/dev/null' EXIT
 
 # Diagnostic logging (one log per invocation)
-LOG="$LOG_DIR/lock-screen-$(date +%Y%m%d-%H%M%S).log"
+LOG="$LOG_DIR/${USER:-root}-lock-screen-$(date +%Y%m%d-%H%M%S).log"
 exec >> "$LOG" 2>&1
 
 CURRENT_TTY=$(tty 2>/dev/null || echo "none")

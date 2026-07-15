@@ -14,9 +14,9 @@
 #
 # After this, typically run post-install-global.sh (and then post-install-user.sh).
 
-LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/bootstrap-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="$LOG_DIR/${USER:-root}-bootstrap-$(date +%Y%m%d-%H%M%S).log"
 export LOG_FILE
 exec > >(tee -a "$LOG_FILE") 2>&1
 

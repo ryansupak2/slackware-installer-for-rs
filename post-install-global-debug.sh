@@ -40,11 +40,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Set up dual logging: everything from this point on goes to the screen
-LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-# per-user dir, no global group chown
-chmod 700 "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/post-install-global-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="$LOG_DIR/${USER:-root}-post-install-global-$(date +%Y%m%d-%H%M%S).log"
 export LOG_FILE
 exec > >(tee -a "$LOG_FILE") 2>&1
 

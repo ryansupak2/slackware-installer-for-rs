@@ -3,14 +3,32 @@
 # Sourced by individual step scripts and optionally by the main runner.
 
 # ── Unified logging ────────────────────────────────────────────────────
-# All scripts that source this file get a consistent log_msg() and the
-# caller's LOG_FILE is respected.  Every log line gets a timestamp + level.
+# All scripts that source this file get a consistent log_msg() and init_log().
+# Every log line gets a timestamp + level.
+#
+# init_log <component>  — sets up /var/log/<user>-<component>-YYYYMMDD-HHMMSS.log
+#                          with exec redirect and log_msg() available.
+#
+# Usage:
+#   . /path/to/lib/common.sh
+#   init_log "bootstrap"   # creates /var/log/root-bootstrap-20260714-120000.log
+
+init_log() {
+    local component="${1:-unknown}"
+    local user="${USER:-$(whoami 2>/dev/null || echo root)}"
+    local logdir="/var/log"
+    mkdir -p "$logdir" 2>/dev/null || true
+    LOG_FILE="$logdir/${user}-${component}-$(date +%Y%m%d-%H%M%S).log"
+    export LOG_FILE
+    exec >>"$LOG_FILE" 2>&1
+    echo "Log: $LOG_FILE"
+}
 
 log_msg() {
     local level="$1"; shift
     local msg="$*"
     local ts=$(date '+%Y-%m-%d %H:%M:%S')
-    local log_file="${LOG_FILE:-$HOME/logs/installer.log}"
+    local log_file="${LOG_FILE:-/var/log/installer.log}"
     echo "[$ts] [$level] $msg"
     if [ -n "$LOG_FILE" ]; then
         echo "[$ts] [$level] $msg" >> "$LOG_FILE"

@@ -16,7 +16,7 @@ plen_d="$XDG_RT/vox-plen-d"; plen_r="$XDG_RT/vox-plen-r"
 MODEL="/usr/local/share/vox/ggml-tiny.en.bin"
 MODEL_REV="/usr/local/share/vox/ggml-base.en.bin"
 W="/usr/local/bin/whisper-cli"; T="/usr/bin/wtype"
-L="$HOME/logs"; mkdir -p "$L" 2>/dev/null; VL="$L/vox.log"
+L="/var/log"; mkdir -p "$L" 2>/dev/null; VL="$L/${USER:-root}-vox.log"
 log_msg() { echo "$(date): $*" >> "$VL"; }
 [ -f /usr/local/bin/temp-msg.sh ] && . /usr/local/bin/temp-msg.sh
 
