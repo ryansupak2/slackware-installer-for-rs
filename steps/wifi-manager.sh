@@ -7,7 +7,11 @@ if [ -f "$REPO_DIR/lib/common.sh" ]; then
     . "$REPO_DIR/lib/common.sh"
 fi
 
+echo "*****************************************************"
+echo "WIFI MANAGER (interactive tool)"
+echo "*****************************************************"
 
+ok=true
 echo "Installing WiFi Manager tool..."
 
 # The actual manager script lives in scripts/ in the repo
@@ -17,17 +21,30 @@ if [ ! -f "$SOURCE_SCRIPT" ]; then
     echo "ERROR: $SOURCE_SCRIPT not found in the installer repo."
     exit 1
 fi
-
-# Install as a system command (so it is available to all users + root)
-cp "$SOURCE_SCRIPT" /usr/local/bin/wifi-manager || { echo "ERROR: Failed to copy wifi-manager to /usr/local/bin/"; exit 1; }
-chmod +x /usr/local/bin/wifi-manager
+# Install as a system command
+if ! cp "$SOURCE_SCRIPT" /usr/local/bin/wifi-manager; then
+    echo "ERROR: Failed to copy wifi-manager to /usr/local/bin/"
+    ok=false
+fi
+if $ok; then
+    chmod +x /usr/local/bin/wifi-manager
+    echo "  Copied $SOURCE_SCRIPT -> /usr/local/bin/wifi-manager"
+    # Convenience symlink
+    ln -sf /usr/local/bin/wifi-manager /usr/local/bin/wifi-manager.sh 2>/dev/null || true
+fi
 echo "  Copied $SOURCE_SCRIPT -> /usr/local/bin/wifi-manager"
 
 # Convenience symlink (people sometimes type the .sh)
 ln -sf /usr/local/bin/wifi-manager /usr/local/bin/wifi-manager.sh 2>/dev/null || true
 # Aliases are deployed by bootstrap.sh (root bashrc) and post-install-user.sh (user bashrc)
 
-echo ""
-echo "SUCCESS: WiFi Manager installed to /usr/local/bin/wifi-manager"
-echo "  Run it with:  wifi-manager   (or the short alias: wifi )"
-exit 0
+
+if $ok; then
+    echo ""
+    echo "SUCCESS: WiFi Manager installed to /usr/local/bin/wifi-manager"
+    echo "  Run it with:  wifi-manager   (or the short alias: wifi )"
+    exit 0
+else
+    echo "ERROR: WiFi Manager installation failed."
+    exit 1
+fi

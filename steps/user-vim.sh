@@ -9,6 +9,12 @@ if [ -z "$TARGET_USER" ]; then
     exit 1
 fi
 
+LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
+
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
+
 echo "*****************************************************"
 echo "VIM FOR $TARGET_USER"
 echo "*****************************************************"
@@ -27,9 +33,15 @@ setup_vim() {
     echo "Deployed $target"
 }
 
+ok=true
 setup_vim
 
 chown "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.vimrc" 2>/dev/null || true
 
-echo "SUCCESS: Vim configured for $TARGET_USER."
-exit 0
+if [ -f "$HOME_TARGET/.vimrc" ]; then
+    echo "SUCCESS: Vim configured for $TARGET_USER."
+    exit 0
+else
+    echo "ERROR: Vim config deployment failed for $TARGET_USER."
+    exit 1
+fi

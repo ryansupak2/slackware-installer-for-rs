@@ -8,6 +8,11 @@ if [ -z "$TARGET_USER" ]; then
     echo "ERROR: TARGET_USER not set"
     exit 1
 fi
+LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
+
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
 
 echo "*****************************************************"
 echo "GITHUB SSH (PAT + gh) FOR $TARGET_USER"

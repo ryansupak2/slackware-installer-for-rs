@@ -12,8 +12,10 @@ echo "*****************************************************"
 echo "AUDIO/VOLUME"
 echo "*****************************************************"
 
+ok=true
+
 # ALSA is always present on Slackware base
-install_pkg "alsa-utils"
+if ! install_pkg "alsa-utils"; then ok=false; fi
 
 # The SOF firmware IS present on this system (see /lib/firmware/intel/sof/).
 # Do NOT force legacy HDA — the internal DMIC requires the SOF DSP driver.
@@ -86,5 +88,10 @@ mkdir -p /etc/profile.d
 cp "$REPO_DIR/dotfiles/system/xdg.sh" /etc/profile.d/xdg.sh 2>/dev/null || true
 chmod 644 /etc/profile.d/xdg.sh 2>/dev/null || true
 
-echo "SUCCESS: Audio/volume configured (PipeWire)."
-exit 0
+if $ok; then
+    echo "SUCCESS: Audio/volume configured (PipeWire)."
+    exit 0
+else
+    echo "ERROR: Audio/volume setup had issues."
+    exit 1
+fi

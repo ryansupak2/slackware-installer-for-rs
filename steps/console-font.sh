@@ -11,8 +11,8 @@ fi
 echo "*****************************************************"
 echo "CONSOLE FONT"
 echo "*****************************************************"
+ok=true
 echo "Enabling console font and keyboard repeat via /etc/rc.d/rc.font..."
-
 # Slackware's rc.M already calls /etc/rc.d/rc.font if it's executable.
 # Write rc.font: set console font + keyboard repeat rate
 cat > /etc/rc.d/rc.font << 'EOF'
@@ -27,5 +27,10 @@ chmod +x /etc/rc.d/rc.font
 setfont ter-v32b 2>/dev/null || true
 kbdrate -d 250 -r 30 -s 2>/dev/null || true
 
-echo "SUCCESS: Console font configured (ter-v32b, keyboard repeat 250ms/30cps, permanent via rc.font)."
-exit 0
+if $ok; then
+    echo "SUCCESS: Console font configured (ter-v32b, keyboard repeat 250ms/30cps, permanent via rc.font)."
+    exit 0
+else
+    echo "ERROR: Console font setup failed."
+    exit 1
+fi

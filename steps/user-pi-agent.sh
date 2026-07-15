@@ -12,9 +12,13 @@
 # and the readonly-mode extension from dotfiles/pi/ into the user's
 # ~/.pi/ directory, registers it with pi install, then chowns everything.
 
-set -e
-
 REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
+LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
+
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
+
 if [ -z "$TARGET_USER" ]; then
     echo "ERROR: TARGET_USER is not set. Run this via post-install-user.sh." >&2
     exit 1
@@ -30,11 +34,16 @@ fi
 
 # Source the keys file to get XAI_API_KEY and DEEPSEEK_API_KEY
 # shellcheck disable=SC1090
-source "$KEYS_FILE"
+. "$KEYS_FILE"
 
 HOME_TARGET=$(eval echo "~$TARGET_USER")
 PI_DIR="$HOME_TARGET/.pi/agent"
 EXT_DIR="$HOME_TARGET/.pi/extensions"
+
+echo "*****************************************************"
+echo "PI CODING AGENT FOR $TARGET_USER"
+echo "*****************************************************"
+
 
 echo "Setting up pi-coding-agent for $TARGET_USER..."
 echo "  Home: $HOME_TARGET"
@@ -107,9 +116,26 @@ fi
 
 # Chown already done before pi install above
 
-echo ""
-echo "SUCCESS: pi-coding-agent configured for $TARGET_USER."
-echo "  Provider: deepseek  |  Model: deepseek-v4-pro  |  Thinking: high"
-echo "  Keys source: $KEYS_FILE"
-echo "  Config:      $PI_DIR/"
-exit 0
+ok=true
+
+# Check for critical failures
+if [ ! -f "$PI_DIR/settings.json" ]; then
+    ok=false
+fi
+if [ ! -f "$PI_DIR/trust.json" ]; then
+    ok=false
+fi
+if [ ! -f "$PI_DIR/auth.json" ]; then
+    ok=false
+fi
+
+if $ok; then
+    echo "SUCCESS: pi-coding-agent configured for $TARGET_USER."
+    echo "  Provider: deepseek  |  Model: deepseek-v4-pro  |  Thinking: high"
+    echo "  Keys source: $KEYS_FILE"
+    echo "  Config:      $PI_DIR/"
+    exit 0
+else
+    echo "ERROR: pi-coding-agent setup incomplete for $TARGET_USER."
+    exit 1
+fi

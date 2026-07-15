@@ -8,10 +8,22 @@
 #
 # Idempotent and version-resilient. Safe to re-run after pi updates.
 
-set -euo pipefail
+REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
+LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
 
-REPO_DIR="${REPO_DIR:-/root/Development/slackware-installer-for-rs}"
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
+
+echo "*****************************************************"
+echo "PI DOUBLE-INPUT FIX"
+echo "*****************************************************"
 
 echo "pi-double-input-fix: applying Kitty protocol flags fix (7 → 5)..."
-bash "$REPO_DIR/lib/patch-pi-kitty-flags.sh"
-echo "pi-double-input-fix: done"
+if bash "$REPO_DIR/lib/patch-pi-kitty-flags.sh"; then
+    echo "SUCCESS: pi double-input fix applied."
+    exit 0
+else
+    echo "ERROR: pi double-input fix failed."
+    exit 1
+fi

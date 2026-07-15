@@ -6,13 +6,15 @@
 # All scripts that source this file get a consistent log_msg() and init_log().
 # Every log line gets a timestamp + level.
 #
-# init_log <component>  — sets up /var/log/<user>-<component>-YYYYMMDD-HHMMSS.log
-#                          with exec redirect and log_msg() available.
+# NOTE: init_log() is DEPRECATED. Step scripts should NOT call it — the parent
+# installer (post-install-global.sh / post-install-user.sh) already captures all
+# output via `exec > >(tee -a "$LOG_FILE")`. Calling init_log() from a step
+# would replace the tee redirect and hide output from the terminal.
+#
+# Step scripts should simply echo to stdout and exit 0/1; the parent handles
+# logging and tallying.
 #
 # Usage:
-#   . /path/to/lib/common.sh
-#   init_log "bootstrap"   # creates /var/log/root-bootstrap-20260714-120000.log
-
 init_log() {
     local component="${1:-unknown}"
     local user="${USER:-$(whoami 2>/dev/null || echo root)}"

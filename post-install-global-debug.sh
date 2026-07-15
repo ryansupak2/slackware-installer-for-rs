@@ -1,6 +1,16 @@
 #!/bin/bash
 
-# post-install-global.sh - Global system setup for Slackware Linux installer
+# post-install-global-debug.sh - DEBUG/NO-X11 VARIANT of post-install-global.sh
+#
+# This is a stripped-down fork of post-install-global.sh for debugging.
+# Differences from the main script:
+#   - No root-dotfiles in core_prereqs
+#   - No sof-firmware or whisper-cpp-vox in audio_dsp (sox only)
+#   - All step results include TRACE SUCCESS/ERROR for debugging
+#
+# When updating post-install-global.sh, apply the same structural
+# changes here unless they belong to the omitted step groups.
+#
 # Run once as root after Slackware base install.
 # Interactive menu by default; use --non-interactive for full run.
 #
@@ -86,12 +96,12 @@ fi
 #
 # Source the common helpers (already done above for the main script itself).
 # Category definitions (for Slackware: removed glibc-compat, renamed apk step)
-core_prereqs=("slackpkg-setup" "console-font" "ca-certificates" "wayland-base")
-networking=("wifi" "openvpn" "vnc" "remote-desktop")
-hardware_config=("input-hardware" "screen-locking" "acpi-wakeup" "audio-volume" "brightness" "clipboard-wayland")
+core_prereqs=("slackpkg-setup" "console-font" "ca-certificates" "xlibre")
+networking=("wifi" "openvpn" "vnc")
+hardware_config=("input-hardware" "screen-locking" "acpi-wakeup" "audio-volume" "brightness")
 security_access=("root-ssh-key" "keychain" "github-ssh")
-dev_tools=("suckless-foot" "vim" "git-lfs")
-ui_appearance=("neofetch" "additional-fonts" "suckless-dwl")
+dev_tools=("vim" "git-lfs")
+ui_appearance=("neofetch" "additional-fonts" "suckless-dwm")
 applications=("firefox" "inkscape" "yad" "root-shortcuts" "slskd")
 utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux")
 audio_dsp=("sox")
@@ -225,8 +235,8 @@ for section in "${selected[@]}"; do
                 echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
-        "wayland-base")
-            if ./steps/wayland-base.sh; then
+        "xlibre")
+            if ./steps/xlibre.sh; then
                 echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
                 echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
@@ -253,13 +263,7 @@ for section in "${selected[@]}"; do
                 echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
-        "remote-desktop")
-            if ./steps/remote-desktop.sh; then
-                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
-            else
-                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
-            fi
-            ;;
+
         "input-hardware")
             if ./steps/input-hardware.sh; then
                 echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
@@ -288,13 +292,7 @@ for section in "${selected[@]}"; do
                 echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
-        "clipboard-wayland")
-            if ./steps/clipboard-wayland.sh; then
-                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
-            else
-                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
-            fi
-            ;;
+
         "acpi-wakeup")
             if ./steps/acpi-wakeup.sh; then
                 echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
@@ -436,20 +434,14 @@ for section in "${selected[@]}"; do
                 echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
-        "suckless-dwl")
-            if ./steps/suckless-dwl.sh; then
+        "suckless-dwm")
+            if ./steps/suckless-dwm.sh; then
                 echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
             else
                 echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
             fi
             ;;
-        "suckless-foot")
-            if ./steps/suckless-foot.sh; then
-                echo "TRACE SUCCESS: $section"; success_count=$((success_count + 1))
-            else
-                echo "TRACE ERROR: $section"; error_count=$((error_count + 1))
-            fi
-            ;;
+
     esac
 done
 

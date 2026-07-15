@@ -11,15 +11,18 @@ fi
 echo "*****************************************************"
 echo "AUDIO/DSP: SoX (Sound eXchange)"
 echo "*****************************************************"
+ok=true
 
 # Already installed? (idempotent check)
 if command -v sox >/dev/null 2>&1; then
     echo "SoX is already installed ($(sox --version 2>&1 | head -1))."
-    echo "SUCCESS: SoX (already present)."
-    exit 0
+else
+    if ! install_pkg "sox"; then
+        ok=false
+    fi
 fi
 
-if install_pkg "sox"; then
+if $ok; then
     echo "SUCCESS: SoX installed."
     echo ""
     echo "  Usage examples:"

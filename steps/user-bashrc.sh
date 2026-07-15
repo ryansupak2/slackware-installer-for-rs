@@ -9,6 +9,12 @@ if [ -z "$TARGET_USER" ]; then
     exit 1
 fi
 
+LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
+
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
+
 echo "*****************************************************"
 echo "BASHRC FOR $TARGET_USER"
 echo "*****************************************************"
@@ -75,9 +81,15 @@ setup_bashrc() {
     chmod 600 "$bl_target" 2>/dev/null || true
 }
 
+ok=true
 setup_bashrc
 
 chown "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.bashrc" "$HOME_TARGET/.bash_profile" "$HOME_TARGET/.bash_logout" 2>/dev/null || true
 
-echo "SUCCESS: Bashrc configured for $TARGET_USER."
-exit 0
+if $ok; then
+    echo "SUCCESS: Bashrc configured for $TARGET_USER."
+    exit 0
+else
+    echo "ERROR: Bashrc setup had problems for $TARGET_USER."
+    exit 1
+fi

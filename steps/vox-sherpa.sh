@@ -11,7 +11,7 @@
 #   /usr/local/bin/voxd                        — VOX daemon
 #   /usr/local/bin/vox                         — CLI wrapper (symlink to script)
 
-REPO_DIR="${REPO_DIR:-/root/Development/slackware-installer-for-rs}"
+REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
 LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
 
 if [ -f "$REPO_DIR/lib/common.sh" ]; then
@@ -22,7 +22,7 @@ echo "*****************************************************"
 echo "VOX SHERPA (streaming Zipformer voice dictation)"
 echo "*****************************************************"
 
-OK=true
+ok=true
 
 SRC=/usr/local/src/sherpa-onnx
 LIB=/usr/local/lib/libsherpa-onnx-c-api.so
@@ -38,10 +38,10 @@ if [ -f "$LIB" ] && [ -f "$HEADER" ]; then
 else
     echo "Building sherpa-onnx C API library..."
 
-    install_pkg "git make gcc cmake" || OK=false
-    install_pkg "alsa-lib" || OK=false
+    install_pkg "git make gcc cmake" || ok=false
+    install_pkg "alsa-lib" || ok=false
 
-    if $OK; then
+    if $ok; then
         mkdir -p /usr/local/src
         cd /usr/local/src
 
@@ -49,9 +49,9 @@ else
             cd sherpa-onnx && git pull --ff-only 2>/dev/null || true
         else
             git clone --depth 1 https://github.com/k2-fsa/sherpa-onnx
-        fi || { echo "ERROR: clone/update failed"; OK=false; }
+        fi || { echo "ERROR: clone/update failed"; ok=false; }
 
-        if $OK; then
+        if $ok; then
             cd /usr/local/src/sherpa-onnx
             mkdir -p build && cd build
 
@@ -62,18 +62,18 @@ else
                       -DSHERPA_ONNX_ENABLE_TESTS=OFF \
                       -DSHERPA_ONNX_ENABLE_CHECK=OFF \
                       -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
-                      .. || { echo "ERROR: cmake failed"; OK=false; }
+                      .. || { echo "ERROR: cmake failed"; ok=false; }
             fi
 
-            if $OK && [ ! -f "$LIB" ]; then
+            if $ok && [ ! -f "$LIB" ]; then
                 make -j"$(nproc)" sherpa-onnx-c-api \
-                    || { echo "ERROR: build failed"; OK=false; }
+                    || { echo "ERROR: build failed"; ok=false; }
             fi
 
-            if $OK; then
-                cp lib/libsherpa-onnx-c-api.so /usr/local/lib/ || OK=false
+            if $ok; then
+                cp lib/libsherpa-onnx-c-api.so /usr/local/lib/ || ok=false
                 mkdir -p /usr/local/include/sherpa-onnx/c-api
-                cp ../sherpa-onnx/c-api/c-api.h /usr/local/include/sherpa-onnx/c-api/ || OK=false
+                cp ../sherpa-onnx/c-api/c-api.h /usr/local/include/sherpa-onnx/c-api/ || ok=false
                 # Install bundled onnxruntime too
                 if [ -f "$SRC/build/_deps/onnxruntime-src/lib/libonnxruntime.so" ]; then
                     cp "$SRC/build/_deps/onnxruntime-src/lib/libonnxruntime.so" /usr/local/lib/libonnxruntime.so.1.27.0 || true
@@ -104,10 +104,10 @@ else
     cd /usr/local/share/vox
 
     curl -L --progress-bar -o zipformer-en-20M.tar.bz2 \
-        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2" || OK=false
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2" || ok=false
 
-    if $OK; then
-        tar xf zipformer-en-20M.tar.bz2 || OK=false
+    if $ok; then
+        tar xf zipformer-en-20M.tar.bz2 || ok=false
         rm -f zipformer-en-20M.tar.bz2
         echo "  Model extracted to $MODEL_DIR"
     fi
@@ -130,10 +130,10 @@ else
     echo "Building voxd..."
     cd "$REPO_DIR/scripts/voxd"
     make clean 2>/dev/null || true
-    make || { echo "ERROR: voxd build failed"; OK=false; }
+    make || { echo "ERROR: voxd build failed"; ok=false; }
 
-    if $OK; then
-        make install || OK=false
+    if $ok; then
+        make install || ok=false
         mkdir -p "$VOXD_STAMP"
         cp "$VOXD_SRC" "$VOXD_STAMP/voxd.c"
         cp "$VOXD_CFG" "$VOXD_STAMP/config.h"
@@ -174,7 +174,7 @@ echo "  toggle-vox.sh → $TOGGLE"
 
 # ── Result ───────────────────────────────────────────────────────
 
-if $OK; then
+if $ok; then
     echo "SUCCESS: VOX sherpa-onnx dictation installed."
     echo ""
     echo "Usage:"
