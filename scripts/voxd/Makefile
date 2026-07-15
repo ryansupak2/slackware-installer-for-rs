@@ -4,7 +4,7 @@
 
 CC      = gcc
 CFLAGS  = -O2 -Wall -Wextra -std=c11
-LDFLAGS = -L/usr/local/lib -lsherpa-onnx-c-api -lasound -lpthread
+LDFLAGS = -L/usr/local/lib -lsherpa-onnx-c-api -lasound -lX11 -lXtst -lpthread
 INCLUDES = -I/usr/local/include -I.
 
 TARGET  = voxd

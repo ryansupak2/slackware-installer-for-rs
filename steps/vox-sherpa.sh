@@ -117,12 +117,14 @@ fi
 
 VOXD_SRC="$REPO_DIR/scripts/voxd/voxd.c"
 VOXD_CFG="$REPO_DIR/scripts/voxd/config.h"
+VOXD_MKF="$REPO_DIR/scripts/voxd/Makefile"
 VOXD_STAMP=/usr/local/src/suckless/voxd-stamp
 
 if [ -x "$VOXD_BIN" ] && \
    [ -f "$VOXD_STAMP/voxd.c" ] && \
    cmp -s "$VOXD_SRC" "$VOXD_STAMP/voxd.c" 2>/dev/null && \
-   cmp -s "$VOXD_CFG" "$VOXD_STAMP/config.h" 2>/dev/null; then
+   cmp -s "$VOXD_CFG" "$VOXD_STAMP/config.h" 2>/dev/null && \
+   cmp -s "$VOXD_MKF" "$VOXD_STAMP/Makefile" 2>/dev/null; then
     echo "voxd already installed (source unchanged)."
 else
     echo "Building voxd..."
@@ -135,6 +137,7 @@ else
         mkdir -p "$VOXD_STAMP"
         cp "$VOXD_SRC" "$VOXD_STAMP/voxd.c"
         cp "$VOXD_CFG" "$VOXD_STAMP/config.h"
+        cp "$VOXD_MKF" "$VOXD_STAMP/Makefile"
         echo "  voxd → $VOXD_BIN"
     fi
 fi

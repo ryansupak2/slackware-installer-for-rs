@@ -1,15 +1,16 @@
 /*
  * voxd.c — VOX voice dictation daemon (sherpa-onnx / streaming Zipformer)
  *
- * Sim mode:  voxd --sim foo.wav   — same code path as live, no wtype
+ * Sim mode:  voxd --sim foo.wav   — same code path as live, no typing
  * File mode: voxd --file foo.wav  — decode WAV, no typing
- * Daemon:    voxd                 — ALSA mic → wtype
+ * Daemon:    voxd                 — ALSA mic → keyboard typing
  *
  * Architecture:
  *   type_append(old, len, new) → computes suffix → type_replace(0, suffix)
- *   type_replace(bs, text)     → sim appends to buffer, real forks wtype
+ *   type_replace(bs, text)     → sim appends to buffer, real types at cursor
  *
  * One code path. Sim mode only changes the bottom of type_replace.
+ * Auto-detects X11 (XTest) vs Wayland (wtype) at startup.
  */
 
 #define _GNU_SOURCE
@@ -26,30 +27,20 @@
 #include <ctype.h>
 #include <stdarg.h>
 
+#include <X11/Xlib.h>
+#include <X11/keysym.h>
+#include <X11/extensions/XTest.h>
+
 #include <alsa/asoundlib.h>
 #include <sherpa-onnx/c-api/c-api.h>
 
-/* ======================================================================
- * Config
- * ====================================================================== */
+#include "config.h"
 
-#define MODEL_DIR  "/usr/local/share/vox/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17"
-#define TOKENS     MODEL_DIR "/tokens.txt"
-#define ENCODER    MODEL_DIR "/encoder-epoch-99-avg-1.onnx"
-#define DECODER    MODEL_DIR "/decoder-epoch-99-avg-1.onnx"
-#define JOINER     MODEL_DIR "/joiner-epoch-99-avg-1.onnx"
-
-#define ALSA_DEVICE      "plughw:0,7"
-#define SAMPLE_RATE      16000
-#define CHANNELS         1
-#define CHUNK_MS         100
-#define CHUNK_SAMPLES    (SAMPLE_RATE * CHUNK_MS / 1000)
-
-#define ENDPOINT_SILENCE 0.6
-#define MAX_UTTERANCE 20.0
-#define NUM_THREADS      2
-
-#define WTYPE_BIN "/usr/bin/wtype"
+/* X11 keycode cache — populated once at startup */
+static Display *g_x11_dpy = NULL;
+static int      g_use_wayland = 0;
+static KeyCode  g_keycodes[128];  /* ASCII → keycode */
+static int      g_need_shift[128]; /* ASCII → needs Shift? */
 
 /* ======================================================================
  * Global state
@@ -110,6 +101,35 @@ static void state_clear(void) {
 
 
 /* ======================================================================
+ * X11 keyboard typing via XTest (fallback when no WAYLAND_DISPLAY)
+ * ====================================================================== */
+static void x11_type(const char *buf, int len) {
+    if (!g_x11_dpy || len <= 0) return;
+    for (int i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)buf[i];
+        if (c == '\b' || c == 0x7f) {
+            /* Backspace */
+            KeyCode kc = XKeysymToKeycode(g_x11_dpy, XK_BackSpace);
+            if (kc) {
+                XTestFakeKeyEvent(g_x11_dpy, kc, True, 0);
+                XTestFakeKeyEvent(g_x11_dpy, kc, False, 0);
+            }
+            continue;
+        }
+        if (c >= 128) continue; /* skip non-ASCII */
+        KeyCode kc = g_keycodes[c];
+        if (!kc) continue;
+        if (g_need_shift[c])
+            XTestFakeKeyEvent(g_x11_dpy, XKeysymToKeycode(g_x11_dpy, XK_Shift_L), True, 0);
+        XTestFakeKeyEvent(g_x11_dpy, kc, True, 0);
+        XTestFakeKeyEvent(g_x11_dpy, kc, False, 0);
+        if (g_need_shift[c])
+            XTestFakeKeyEvent(g_x11_dpy, XKeysymToKeycode(g_x11_dpy, XK_Shift_L), False, 0);
+    }
+    XFlush(g_x11_dpy);
+}
+
+/* ======================================================================
  * Sim helpers
  * ====================================================================== */
 static void sim_verify(const char *label) {
@@ -124,7 +144,7 @@ static void sim_verify(const char *label) {
 }
 
 /* ======================================================================
- * Core: type_replace — sim appends to buffer, real forks wtype
+ * Core: type_replace — sim appends to buffer, real types at cursor
  * ====================================================================== */
 static void type_replace(int bs, const char *text) {
     if (bs == 0 && (!text || !*text)) return;
@@ -155,30 +175,38 @@ static void type_replace(int bs, const char *text) {
     if (bs > 0) memset(buf, '\b', bs);
     if (tlen > 0) memcpy(buf + bs, text, tlen);
 
-    log_msg("[WTYPE] replace bs=%d + %d chars", bs, tlen);
+    log_msg("[TYPE] replace bs=%d + %d chars (%s)", bs, tlen,
+             g_use_wayland ? "wtype" : "XTest");
 
-    pid_t pid = fork();
-    if (pid == 0) {
-        int pipefd[2];
-        if (pipe(pipefd) != 0) _exit(1);
-        pid_t writer = fork();
-        if (writer == 0) {
-            close(pipefd[0]);
-            write(pipefd[1], buf, bufsz);
+    if (g_use_wayland) {
+        /* Wayland: pipe buffer to wtype */
+        pid_t pid = fork();
+        if (pid == 0) {
+            int pipefd[2];
+            if (pipe(pipefd) != 0) _exit(1);
+            pid_t writer = fork();
+            if (writer == 0) {
+                close(pipefd[0]);
+                write(pipefd[1], buf, bufsz);
+                close(pipefd[1]);
+                _exit(0);
+            }
             close(pipefd[1]);
-            _exit(0);
+            dup2(pipefd[0], STDIN_FILENO);
+            close(pipefd[0]);
+            execl(WTYPE_BIN, "wtype", "-", (char *)NULL);
+            _exit(1);
         }
-        close(pipefd[1]);
-        dup2(pipefd[0], STDIN_FILENO);
-        close(pipefd[0]);
-        execl(WTYPE_BIN, "wtype", "-", (char *)NULL);
-        _exit(1);
-    }
-    free(buf);
-    if (pid > 0) {
-        int status; waitpid(pid, &status, 0);
-        if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
-            log_msg("[WTYPE ERROR] exit=%d", WEXITSTATUS(status));
+        free(buf);
+        if (pid > 0) {
+            int status; waitpid(pid, &status, 0);
+            if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+                log_msg("[TYPE ERROR] wtype exit=%d", WEXITSTATUS(status));
+        }
+    } else {
+        /* X11: type directly via XTest */
+        x11_type(buf, bufsz);
+        free(buf);
     }
 }
 
@@ -516,6 +544,69 @@ static void run_alsa_mode(void) {
 }
 
 /* ======================================================================
+ * Display auto-detection + X11 keycode cache
+ * ====================================================================== */
+static void x11_init(void) {
+    const char *wayland_display = getenv("WAYLAND_DISPLAY");
+    if (wayland_display && *wayland_display) {
+        g_use_wayland = 1;
+        log_msg("Display: Wayland (%s) — using wtype", wayland_display);
+        return;
+    }
+
+    const char *display = getenv("DISPLAY");
+    if (!display || !*display) {
+        log_msg("WARNING: no DISPLAY or WAYLAND_DISPLAY — typing disabled");
+        return;
+    }
+
+    g_x11_dpy = XOpenDisplay(NULL);
+    if (!g_x11_dpy) {
+        log_msg("WARNING: cannot open X11 display %s — typing disabled", display);
+        return;
+    }
+
+    /* Verify XTest extension is available */
+    int ev, er, ma, mi;
+    if (!XTestQueryExtension(g_x11_dpy, &ev, &er, &ma, &mi)) {
+        log_msg("WARNING: XTest extension not available — typing disabled");
+        XCloseDisplay(g_x11_dpy);
+        g_x11_dpy = NULL;
+        return;
+    }
+
+    /* Build ASCII keycode cache */
+    memset(g_keycodes, 0, sizeof(g_keycodes));
+    memset(g_need_shift, 0, sizeof(g_need_shift));
+
+    for (int c = 32; c < 127; c++) {
+        char str[2] = { (char)c, 0 };
+        KeySym ks = XStringToKeysym(str);
+        if (ks == NoSymbol) continue;
+        KeyCode kc = XKeysymToKeycode(g_x11_dpy, ks);
+        if (!kc) continue;
+        g_keycodes[c] = kc;
+
+        /* Determine if shift is needed: compare with lowercase version */
+        char lower[2] = { (char)tolower(c), 0 };
+        KeySym lower_ks = XStringToKeysym(lower);
+        g_need_shift[c] = (lower_ks != ks);
+    }
+
+    /* Ensure space and backspace work */
+    if (!g_keycodes[' ']) {
+        KeyCode kc = XKeysymToKeycode(g_x11_dpy, XK_space);
+        if (kc) g_keycodes[' '] = kc;
+    }
+
+    log_msg("Display: X11 (%s) — using XTest", display);
+}
+
+static void x11_cleanup(void) {
+    if (g_x11_dpy) { XCloseDisplay(g_x11_dpy); g_x11_dpy = NULL; }
+}
+
+/* ======================================================================
  * Signals
  * ====================================================================== */
 static void sig_handler(int sig) { if (sig == SIGUSR1) g_toggle = 1; if (sig == SIGTERM || sig == SIGINT) g_running = 0; }
@@ -527,7 +618,7 @@ int main(int argc, char *argv[]) {
     if (argc > 1) {
         if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
             fprintf(stderr, "voxd — VOX voice dictation daemon (sherpa-onnx / Zipformer)\n"
-                    "  voxd                   Daemon (ALSA mic → wtype)\n"
+                    "  voxd                   Daemon (ALSA mic → keyboard typing, auto-detects X11/Wayland)\n"
                     "  voxd --dump-audio       Also save recorded audio\n"
                     "  voxd --sim foo.wav     Simulate typing (verify no garbling)\n"
                     "  voxd --file foo.wav    Decode WAV file\n");
@@ -549,6 +640,7 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; i++) if (strcmp(argv[i], "--dump-audio") == 0) g_dump_audio = 1;
 
     log_open();
+    x11_init();
     log_msg("voxd starting (daemon mode)%s", g_dump_audio?" [audio dump enabled]":"");
     signal(SIGUSR1, sig_handler); signal(SIGTERM, sig_handler); signal(SIGINT, sig_handler);
     signal(SIGPIPE, SIG_IGN);
@@ -558,6 +650,7 @@ int main(int argc, char *argv[]) {
     if (pid > 0) { log_msg("Daemonized, PID %d", pid); return 0; }
     setsid();
     run_alsa_mode();
+    x11_cleanup();
     log_msg("voxd exiting");
     if (g_log && g_log != stderr) fclose(g_log);
     return 0;

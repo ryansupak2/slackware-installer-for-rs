@@ -20,7 +20,9 @@
 #define MAX_UTTERANCE 20.0
 #define NUM_THREADS      2              /* onnxruntime threads */
 
-/* --- wtype --- */
+/* --- Keyboard typing --- */
+/* WTYPE_BIN is used when WAYLAND_DISPLAY is set;
+   otherwise X11 XTest is used directly (no external tool needed). */
 #define WTYPE_BIN "/usr/bin/wtype"
 
 /* --- state files (built at runtime from $HOME) --- */

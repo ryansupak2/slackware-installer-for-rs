@@ -872,6 +872,19 @@ focusin(XEvent *e)
 
 	if (selmon->sel && ev->window != selmon->sel->win)
 		setfocus(selmon->sel);
+
+	/* Hide mode: if focus changed while modkey was held, we likely lost
+	 * the Mod release event (e.g. Firefox stole focus on launch).
+	 * Reconcile by resetting modkeyheld and starting auto-hide timer. */
+	if (modkeyheld && ev->window != root) {
+		fprintf(stderr, "[dwm] focusin: lost Mod release (focus changed to 0x%lx) — reconciling\n",
+			(unsigned long)ev->window);
+		modkeyheld = 0;
+		if (hidemode) {
+			autoshowuntil = time(NULL) + 3;
+			updatebarvisibility();
+		}
+	}
 }
 
 void
@@ -1271,6 +1284,18 @@ manage(Window w, XWindowAttributes *wa)
 	arrange(c->mon);
 	XMapWindow(dpy, c->win);
 	focus(NULL);
+
+	/* Hide mode: briefly show bar when a new window opens so the
+	 * user can see what launched and access the bar. */
+	if (hidemode && autoshowuntil <= time(NULL) + 3) {
+		fprintf(stderr, "[dwm] manage: new window 0x%lx — extending auto-show to %ld\n",
+			(unsigned long)w, (long)(time(NULL) + 3));
+		autoshowuntil = time(NULL) + 3;
+		updatebarvisibility();
+	} else if (hidemode) {
+		fprintf(stderr, "[dwm] manage: new window 0x%lx — NOT extending (autoshowuntil=%ld now+3=%ld)\n",
+			(unsigned long)w, (long)autoshowuntil, (long)(time(NULL) + 3));
+	}
 }
 
 void

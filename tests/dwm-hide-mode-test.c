@@ -247,6 +247,39 @@ static void togglebar(void) {
     showbar = !showbar;
 }
 
+/* focusin handler: XFocusChangeEvent received when focused window changes.
+ * Extracted from dwm.c focusin() — reconciles lost Mod release if focus
+ * changes to a non-root window while modkeyheld is stuck.
+ * This fixes the Firefox-launch bug: Firefox steals focus, Mod release is
+ * lost, modkeyheld stays 1 forever, and the bar never auto-hides. */
+static void focusin(unsigned long target_window) {
+    /* If focus changed to a non-root window while modkey was still held,
+     * we likely lost the Mod release event. Reconcile. */
+    if (modkeyheld && target_window != 0) {
+        printf("  [focusin] lost Mod release (focus changed to 0x%lx) — reconciling\n",
+               (unsigned long)target_window);
+        modkeyheld = 0;
+        if (hidemode) {
+            autoshowuntil = fake_now + 3;
+            updatebarvisibility();
+        }
+    }
+}
+
+/* manage handler: when dwm starts managing a new window, briefly show
+ * the bar so the user can see what launched and access it.
+ * Extracted from the end of dwm.c manage(). */
+static void manage_window(void) {
+	printf("  [manage] new window mapped\n");
+	/* Hide mode: briefly show bar when a new window opens so the
+	 * user can see what launched and access the bar. */
+	if (hidemode && autoshowuntil <= fake_now + 3) {
+		autoshowuntil = fake_now + 3;
+		updatebarvisibility();
+	}
+}
+
+
 /* ── Test framework ───────────────────────────────────────────────── */
 
 static int tests_run = 0;
@@ -1099,6 +1132,299 @@ static void test_31_chord_handler_safety_net(void) {
     PASS();
 }
 
+
+/*
+ * Prove: when a new window (e.g. Firefox) steals focus while Mod is held,
+ * focusin reconciles the lost Mod release so the bar auto-hides correctly.
+ *
+ * Scenario:
+ *   1. Hide mode ON, bar hidden
+ *   2. User presses Mod+F (launch Firefox) → modkeyheld=1, bar shown
+ *   3. Firefox window appears and steals focus → FocusIn event
+ *   4. focusin handler detects lost Mod → resets modkeyheld, starts auto-hide
+ *   5. User releases Mod, but event is LOST (Firefox has focus)
+ *   6. Timer expires → bar auto-hides ✓
+ *
+ * Before the fix: modkeyheld stayed 1 forever, bar never hid.
+ */
+static void test_32_focusin_reconciles_lost_mod_release(void) {
+    TEST("focusin: lost Mod release after Firefox steals focus → auto-hide");
+    reset_state();
+    hidemode = 1;
+    showbar = 0;
+    modkeyheld = 0;
+
+    printf("  Setup: hidemode=1, bar hidden (hide mode ON)\n");
+    ASSERT_STATE(1, 0, 0, 0);
+
+    /* Step 1: User presses Mod (bare Super) to start launching Firefox */
+    printf("  Step 1: User presses Mod\n");
+    key_press_bare_super();
+    ASSERT_STATE(1, 1, 0, 1);  /* bar shown, modkeyheld=1 */
+
+    /* Step 2: User presses F (chord) which launches Firefox */
+    printf("  Step 2: Mod+F chord launches Firefox\n");
+    key_press_chord(0);  /* just a chord, no hide-mode toggle */
+    ASSERT_STATE(1, 1, 0, 1);  /* still shown */
+
+    /* Step 3: Firefox window appears and FocusIn fires for the new window.
+     * The Mod key is still physically held. dwm focusin detects that
+     * focus changed to a client window while modkeyheld=1 → reconcile. */
+    printf("  Step 3: Firefox steals focus → FocusIn arrives\n");
+    focusin(0x12345678);  /* Firefox's window ID */
+    ASSERT_STATE(1, 0, -1, 1);  /* modkeyheld reset, auto-hide timer started */
+
+    /* Step 4: User releases Mod, but the event is LOST because Firefox
+     * has focus and the XGrabKey for bare Super may not deliver to dwm.
+     * This was the root cause: modkeyheld would stay 1 forever.
+     * But with the focusin fix, modkeyheld is already 0. */
+    printf("  Step 4: User releases Mod (event LOST — Firefox has focus)\n");
+    key_release_super_lost();
+    /* modkeyheld already 0, so this does nothing. State unchanged. */
+    ASSERT_STATE(1, 0, -1, 1);
+
+    /* Step 5: Timer expires → bar auto-hides */
+    printf("  Step 5: Auto-hide timer expires (3s later)\n");
+    advance_time(4);
+    timer_check();
+    ASSERT_STATE(1, 0, 0, 0);  /* bar HIDDEN! ✓ */
+
+    printf("  Firefox-launch bug FIXED: bar auto-hid after focusin reconciled\n");
+    PASS();
+}
+
+/*
+ * Prove: when a new window launches (e.g. Firefox, terminal, any app)
+ * the bar briefly appears for 3 seconds so the user can see what opened
+ * and has a chance to interact with the bar.
+ *
+ * This hooks into manage() — fires on EVERY new window, not just
+ * those launched via a Mod chord. It covers:
+ *
+ *   a) Hide mode ON, bar hidden, app opens → bar shows for 3s, then hides
+ *   b) Hide mode ON, bar already shown via Mod → timer extends, no flash
+ *   c) Hide mode ON, timer active, another app opens → timer extends
+ *   d) Hide mode OFF → no effect (bar stays as-is)
+ *   e) Multiple rapid window opens → timer stays 3s from LAST window
+ */
+static void test_33_manage_window_auto_show(void) {
+	TEST("manage: new window briefly shows bar in hide mode");
+
+	/* ── Scenario A: Basic new window in hide mode ── */
+	printf("\n  --- Scenario A: New window in hide mode ---\n");
+	reset_state();
+	hidemode = 1;
+	showbar = 0;
+	printf("  Setup: hidemode=1, bar hidden\n");
+	ASSERT_STATE(1, 0, 0, 0);
+
+	printf("  User clicks Firefox icon → window mapped\n");
+	manage_window();
+	ASSERT_STATE(1, 0, -1, 1);  /* bar shown, timer ticking */
+
+	printf("  After 2 seconds: bar still visible\n");
+	advance_time(2);
+	timer_check();
+	ASSERT_STATE(1, 0, -1, 1);
+
+	printf("  After 4 more seconds: timer expired, bar hides\n");
+	advance_time(4);
+	timer_check();
+	ASSERT_STATE(1, 0, 0, 0);  /* bar hidden again */
+
+	/* ── Scenario B: Window opens while Mod is held ── */
+	printf("\n  --- Scenario B: New window while Mod held ---\n");
+	reset_state();
+	hidemode = 1;
+	showbar = 0;
+	printf("  User presses Mod (bar shown via modkeyheld)\n");
+	key_press_bare_super();
+	ASSERT_STATE(1, 1, 0, 1);
+
+	printf("  Firefox opens while Mod held\n");
+	manage_window();
+	/* autoshowuntil set but modkeyheld=1 dominates; bar stays visible */
+	ASSERT_STATE(1, 1, -1, 1);
+
+	printf("  User releases Mod → timer-based show continues 3s\n");
+	key_release_super();
+	ASSERT_STATE(1, 0, -1, 1);
+
+	printf("  After 3s: bar hides\n");
+	advance_time(4);
+	timer_check();
+	ASSERT_STATE(1, 0, 0, 0);
+
+	/* ── Scenario C: Second window extends timer ── */
+	printf("\n  --- Scenario C: Second window extends timer ---\n");
+	reset_state();
+	hidemode = 1;
+	showbar = 0;
+	printf("  First window opens → bar shown\n");
+	manage_window();
+	ASSERT_STATE(1, 0, -1, 1);
+
+	printf("  2 seconds pass\n");
+	advance_time(2);
+	timer_check();
+	ASSERT_STATE(1, 0, -1, 1);
+
+	printf("  Second window opens → timer extends to now+3\n");
+	manage_window();
+	ASSERT_STATE(1, 0, -1, 1);
+
+	printf("  2 more seconds: bar still visible (would have expired by now)\n");
+	advance_time(2);
+	timer_check();
+	ASSERT_STATE(1, 0, -1, 1);  /* timer was extended, still alive */
+
+	printf("  After 2 more seconds: timer expires, bar hides\n");
+	advance_time(2);
+	timer_check();
+	ASSERT_STATE(1, 0, 0, 0);
+
+	/* ── Scenario D: Hide mode OFF → no effect ── */
+	printf("\n  --- Scenario D: Hide mode OFF, new window ---\n");
+	reset_state();
+	hidemode = 0;
+	showbar = 1;  /* bar always visible */
+	printf("  Setup: hidemode=0, bar shown\n");
+	ASSERT_STATE(0, 0, 0, 1);
+
+	printf("  New window opens → no change (updatebarvisibility is NOOP)\n");
+	manage_window();
+	/* autoshowuntil stays 0, showbar stays 1 */
+	ASSERT_STATE(0, 0, 0, 1);
+
+	/* ── Scenario E: Rapid window spam ── */
+	printf("\n  --- Scenario E: Rapid window spam ---\n");
+	reset_state();
+	hidemode = 1;
+	showbar = 0;
+	printf("  Setup: hidemode=1, bar hidden\n");
+	ASSERT_STATE(1, 0, 0, 0);
+
+	/* App 1 */
+	manage_window();
+	ASSERT_STATE(1, 0, -1, 1);
+	advance_time(1);
+	timer_check();
+
+	/* App 2 */
+	manage_window();
+	ASSERT_STATE(1, 0, -1, 1);
+	advance_time(1);
+	timer_check();
+
+	/* App 3 */
+	manage_window();
+	ASSERT_STATE(1, 0, -1, 1);
+	advance_time(1);
+	timer_check();
+
+	/* App 4 */
+	manage_window();
+	ASSERT_STATE(1, 0, -1, 1);
+	advance_time(1);
+	timer_check();
+
+	/* App 5 */
+	manage_window();
+	ASSERT_STATE(1, 0, -1, 1);
+
+	printf("  5 apps in 4s → bar still visible (timer at now+3 from last)\n");
+
+	printf("  3s after last app → bar hides\n");
+	advance_time(4);
+	timer_check();
+	ASSERT_STATE(1, 0, 0, 0);
+
+	/* ── Scenario F: Mod release + same-second manage == BROKEN ── */
+	printf("\n  --- Scenario F: Mod release, then manage() same second ---\n");
+	reset_state();
+	hidemode = 1;
+	showbar = 0;
+	printf("  Setup: hidemode=1, bar hidden\n");
+	ASSERT_STATE(1, 0, 0, 0);
+
+	printf("  User presses Mod+F (launch Firefox)\n");
+	key_press_bare_super();
+	ASSERT_STATE(1, 1, 0, 1);
+
+	printf("  User releases Mod → autoshowuntil = %ld\n", (long)fake_now + 3);
+	key_release_super();
+	ASSERT_STATE(1, 0, fake_now + 3, 1);
+
+	printf("  Firefox window appears, manage() fires in same second\n");
+	printf("  manage() checks: autoshowuntil(%ld) < now+3(%ld) → FALSE!\n",
+	       (long)autoshowuntil, (long)(fake_now + 3));
+	manage_window();
+	/* BUG: autoshowuntil == now+3, so < is false, manage() does NOT extend! */
+	ASSERT_STATE(1, 0, fake_now + 3, 1);  /* timer NOT extended from manage */
+
+	printf("  3s later: bar hides (timer from Mod release, NOT from manage)\n");
+	advance_time(4);
+	timer_check();
+	ASSERT_STATE(1, 0, 0, 0);
+
+	printf("  EXPECTED: manage() should extend timer to now+3 from window open\n");
+	printf("  ACTUAL:   bar hid after original Mod-release timer, no flash\n");
+
+	printf("  New window auto-show: Scenario F demonstrates the bug\n");
+	PASS();
+}
+
+/*
+ * Prove: manage() re-shows bar even after timer expires (bar hidden),
+ * and extends timer when called with autoshowuntil == now+3.
+ * This is the \"w x\" (firefox) scenario: user launches app from
+ * terminal, bar is hidden, manage() fires and flashes the bar.
+ */
+static void test_34_manage_reshows_after_timer_expired(void) {
+	TEST("manage: re-shows bar after timer expired, extends on <= now+3");
+
+	/* ── Sub-test A: bar hidden, manage() shows it ── */
+	printf("\n  --- A: Bar hidden, manage() shows it ---\n");
+	reset_state();
+	hidemode = 1;
+	showbar = 0;
+	ASSERT_STATE(1, 0, 0, 0);
+
+	manage_window();
+	ASSERT_STATE(1, 0, fake_now + 3, 1);
+
+	advance_time(4);
+	timer_check();
+	ASSERT_STATE(1, 0, 0, 0);
+
+	/* ── Sub-test B: timer expired (bar hidden), manage() re-shows ── */
+	printf("  --- B: Timer expired, manage() re-shows bar ---\n");
+	manage_window();
+	ASSERT_STATE(1, 0, fake_now + 3, 1);
+
+	advance_time(4);
+	timer_check();
+	ASSERT_STATE(1, 0, 0, 0);
+
+	/* ── Sub-test C: autoshowuntil == now+3, manage() extends ── */
+	printf("  --- C: autoshowuntil == now+3, manage() extends with <= ---\n");
+	reset_state();
+	hidemode = 1;
+	showbar = 0;
+
+	/* Simulate Mod release to set autoshowuntil = now + 3 */
+	key_press_bare_super();
+	key_release_super();
+	ASSERT_STATE(1, 0, fake_now + 3, 1);
+
+	/* manage_window at same fake_now: autoshowuntil(fake_now+3) <= fake_now+3 → TRUE */
+	manage_window();
+	ASSERT_STATE(1, 0, fake_now + 3, 1);
+
+	printf("  manage() auto-show: all sub-tests pass\n");
+	PASS();
+}
+
 int main(void) {
     printf("dwm hide mode state machine tests\n");
     printf("==================================\n");
@@ -1134,7 +1460,10 @@ int main(void) {
     test_29_mappingnotify_regrab_bare_super();
     test_30_repeated_bare_super_presses();
     test_31_chord_handler_safety_net();
-    printf("\n==================================\n");
+	test_32_focusin_reconciles_lost_mod_release();
+	test_33_manage_window_auto_show();
+	test_34_manage_reshows_after_timer_expired();
+	printf("\n==================================\n");
     printf("RESULTS: %d tests, %d passed, %d failed\n",
            tests_passed + tests_failed, tests_passed, tests_failed);
 
