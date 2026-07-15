@@ -95,7 +95,7 @@ struct Client {
 	int basew, baseh, incw, inch, maxw, maxh, minw, minh, hintsvalid;
 	int bw, oldbw;
 	unsigned int tags;
-	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
+	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen, infullscreenchange;
 	Client *next;
 	Client *snext;
 	Monitor *mon;
@@ -572,15 +572,14 @@ clientmessage(XEvent *e)
 	if (cme->message_type == netatom[NetWMState]) {
 		if (cme->data.l[1] == netatom[NetWMFullscreen]
 		|| cme->data.l[2] == netatom[NetWMFullscreen]) {
-			/* Debounce fullscreen client messages to break the
-			 * Firefox toggle loop: Firefox sends TOGGLE, we resize
-			 * and update _NET_WM_STATE, Firefox sees PropertyNotify
-			 * and sends TOGGLE again. Ignoring re-requests within
-			 * 300ms stops the loop while letting real toggles through. */
-			static time_t last_fullscreen_ts = 0;
-			time_t now_ts = time(NULL);
-			if (now_ts - last_fullscreen_ts < 1)
+			/* Re-entrancy guard: when setfullscreen() calls
+			 * XChangeProperty + resizeclient, Firefox receives
+			 * PropertyNotify + ConfigureNotify and sends another
+			 * ClientMessage before we return. This flag breaks the
+			 * loop by ignoring requests while we're still processing. */
+			if (c->infullscreenchange)
 				return;
+			c->infullscreenchange = 1;
 			int action = cme->data.l[0];
 			if (action == 1 /* _NET_WM_STATE_ADD */ && !c->isfullscreen)
 				setfullscreen(c, 1);
@@ -588,7 +587,7 @@ clientmessage(XEvent *e)
 				setfullscreen(c, 0);
 			else if (action == 2 /* _NET_WM_STATE_TOGGLE */)
 				setfullscreen(c, !c->isfullscreen);
-			last_fullscreen_ts = now_ts;
+			c->infullscreenchange = 0;
 		}
 	} else if (cme->message_type == netatom[NetActiveWindow]) {
 		if (c != selmon->sel && !c->isurgent)
