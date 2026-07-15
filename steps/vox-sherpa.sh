@@ -154,23 +154,71 @@ TOGGLE=/usr/local/bin/toggle-vox.sh
 cat > "$TOGGLE" << 'TOGGLE_EOF'
 #!/bin/sh
 # toggle-vox.sh — VOX toggle (Mod+V) — regular dictation, NO audio dump
+#
+# Evidence-based startup: polls for voxd process instead of arbitrary sleep.
+# Model loads lazily on first use inside voxd, not at daemon startup.
+
 PID=$(pgrep -x voxd 2>/dev/null)
 if [ -n "$PID" ]; then
     # If daemon is in dump mode, restart without it
     if grep -q -- '--dump-audio' /proc/$PID/cmdline 2>/dev/null; then
-        pkill -x voxd 2>/dev/null; sleep 0.3
+        pkill -x voxd 2>/dev/null
+        # Wait for old process to actually exit
+        while pgrep -x voxd >/dev/null 2>&1; do usleep 50000; done
         /usr/local/bin/voxd &
-        sleep 1.0
     fi
     kill -USR1 $(pgrep -x voxd) 2>/dev/null
 else
     /usr/local/bin/voxd &
-    sleep 1.0
+    # Evidence-based: wait until daemon is actually alive
+    for i in $(seq 1 50); do
+        pgrep -x voxd >/dev/null 2>&1 && break
+        usleep 20000  # 20ms
+    done
     kill -USR1 $(pgrep -x voxd) 2>/dev/null
 fi
 TOGGLE_EOF
 chmod +x "$TOGGLE"
 echo "  toggle-vox.sh → $TOGGLE"
+
+# ── toggle-vox-record.sh (Mod+Shift+V) ───────────────────────────
+
+TOGGLE_REC=/usr/local/bin/toggle-vox-record.sh
+cat > "$TOGGLE_REC" << 'TOGGLE_REC_EOF'
+#!/bin/sh
+# toggle-vox-record.sh — VOX toggle with audio recording (Mod+Shift+V)
+#
+# Ensures voxd is running with --dump-audio, then toggles recording.
+# Audio saved to /var/log/<user>-vox-YYYYMMDD-HHMMSS.wav
+#
+# Evidence-based: no arbitrary sleeps, polls for process state.
+
+VOXD=/usr/local/bin/voxd
+
+if pgrep -x voxd >/dev/null 2>&1; then
+    if ! grep -q -- '--dump-audio' /proc/$(pgrep -x voxd)/cmdline 2>/dev/null; then
+        # voxd running but WITHOUT --dump-audio — restart it
+        pkill -x voxd 2>/dev/null
+        while pgrep -x voxd >/dev/null 2>&1; do usleep 50000; done
+        $VOXD --dump-audio &
+        # Evidence-based: wait for daemon to be alive
+        for i in $(seq 1 50); do
+            pgrep -x voxd >/dev/null 2>&1 && break
+            usleep 20000
+        done
+    fi
+else
+    $VOXD --dump-audio &
+    for i in $(seq 1 50); do
+        pgrep -x voxd >/dev/null 2>&1 && break
+        usleep 20000
+    done
+fi
+
+kill -USR1 $(pgrep -x voxd) 2>/dev/null
+TOGGLE_REC_EOF
+chmod +x "$TOGGLE_REC"
+echo "  toggle-vox-record.sh → $TOGGLE_REC"
 
 # ── Result ───────────────────────────────────────────────────────
 

@@ -424,16 +424,15 @@ static void run_file_mode(const char *wav_path) {
  * ALSA mode
  * ====================================================================== */
 static void run_alsa_mode(void) {
-    const SherpaOnnxOnlineRecognizer *recognizer = recognizer_create();
-    if (!recognizer) { log_msg("FATAL: no recognizer"); return; }
-
+    /* Lazy init: model and ALSA are created on first toggle ON,
+     * kept alive between toggles, and destroyed on daemon exit.
+     * Zero memory footprint until first use.
+     */
+    const SherpaOnnxOnlineRecognizer *recognizer = NULL;
     const SherpaOnnxOnlineStream *stream = NULL;
+    snd_pcm_t *alsa = NULL;
     int recording = 0, segment_id = 0, last_partial_len = 0;
-
-    /* Open ALSA once at startup — keep open between toggles for zero-latency ON */
-    log_msg("Opening ALSA...");
-    snd_pcm_t *alsa = alsa_open();
-    if (!alsa) { log_msg("FATAL: cannot open ALSA"); return; }
+    int model_warm = 0;  /* true after first successful load */
 
     char last_text[4096] = {0};
     while (g_running) {
@@ -441,42 +440,100 @@ static void run_alsa_mode(void) {
             g_toggle = 0;
             if (!recording) {
                 /* --- TOGGLE ON --- */
-                log_msg("ON");
+                struct timespec t_start, t_ready;
+                clock_gettime(CLOCK_MONOTONIC, &t_start);
+                log_msg("TOGGLE ON — user pressed Mod+V");
                 state_write("loading");
 
                 if (g_dump_audio) dump_open();
 
-                /* ALSA already open — drain buffered audio, reset stream, go */
+                /* Lazy model load on first use only */
+                if (!recognizer) {
+                    log_msg("Cold start — loading sherpa-onnx model (this may take a moment)...");
+                    recognizer = recognizer_create();
+                    if (!recognizer) {
+                        log_msg("FATAL: recognizer_create() returned NULL");
+                        state_clear();
+                        if (g_dump_audio) dump_close();
+                        return;
+                    }
+                    clock_gettime(CLOCK_MONOTONIC, &t_ready);
+                    double elapsed = (t_ready.tv_sec - t_start.tv_sec) +
+                                     (t_ready.tv_nsec - t_start.tv_nsec) / 1e9;
+                    log_msg("Model loaded in %.2fs", elapsed);
+                }
+
+                /* Lazy ALSA open on first use */
+                if (!alsa) {
+                    log_msg("Opening ALSA device %s...", ALSA_DEVICE);
+                    alsa = alsa_open();
+                    if (!alsa) {
+                        log_msg("FATAL: cannot open ALSA device %s", ALSA_DEVICE);
+                        state_clear();
+                        if (g_dump_audio) dump_close();
+                        return;
+                    }
+                }
+
+                /* Drain stale audio, prepare for capture */
                 snd_pcm_drop(alsa);
                 snd_pcm_prepare(alsa);
-                if (!stream) stream = SherpaOnnxCreateOnlineStream(recognizer);
-                else SherpaOnnxOnlineStreamReset(recognizer, stream);
 
-                log_msg("capture active");
+                /* Create or reset stream */
+                if (!stream) {
+                    stream = SherpaOnnxCreateOnlineStream(recognizer);
+                    log_msg("Stream created");
+                } else {
+                    SherpaOnnxOnlineStreamReset(recognizer, stream);
+                    log_msg("Stream reset");
+                }
+
                 recording = 1;
                 segment_id = 0;
                 last_partial_len = 0;
                 last_text[0] = '\0';
+
+                /* Pipeline is fully initialized: model loaded, ALSA open,
+                 * stream ready. Mic is hot. Badge ON. */
                 state_write(g_dump_audio ? "recording+dump" : "recording");
+
+                clock_gettime(CLOCK_MONOTONIC, &t_ready);
+                double elapsed = (t_ready.tv_sec - t_start.tv_sec) +
+                                 (t_ready.tv_nsec - t_start.tv_nsec) / 1e9;
+                log_msg("%s start — ready in %.3fs",
+                         model_warm ? "Warm" : "Cold", elapsed);
 
             } else {
                 /* --- TOGGLE OFF --- */
-                log_msg("OFF");
+                log_msg("TOGGLE OFF — user pressed Mod+V");
+
+                /* Model is now warm — keep it loaded for next use */
+                model_warm = 1;
+
                 if (stream) {
                     SherpaOnnxOnlineStreamInputFinished(stream);
-                    while (SherpaOnnxIsOnlineStreamReady(recognizer, stream)) SherpaOnnxDecodeOnlineStream(recognizer, stream);
-                    const SherpaOnnxOnlineRecognizerResult *r = SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+                    while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
+                        SherpaOnnxDecodeOnlineStream(recognizer, stream);
+                    const SherpaOnnxOnlineRecognizerResult *r =
+                        SherpaOnnxGetOnlineStreamResult(recognizer, stream);
                     if (r && strlen(r->text)) {
-                        char final_buf[4096]; strncpy(final_buf, r->text, sizeof(final_buf)-1); final_buf[sizeof(final_buf)-1]='\0';
+                        char final_buf[4096];
+                        strncpy(final_buf, r->text, sizeof(final_buf)-1);
+                        final_buf[sizeof(final_buf)-1] = '\0';
                         sanitize(final_buf);
                         type_append(last_text, last_partial_len, final_buf);
+                        log_msg("Final text at OFF: %s", final_buf);
                     }
                     if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
-                    /* Keep stream alive between sessions */
                 }
-                if (alsa) { snd_pcm_drop(alsa); /* drain, keep open */ }
+
+                /* Stop audio capture but keep ALSA and model loaded */
+                if (alsa) snd_pcm_drop(alsa);
                 if (g_dump_audio) dump_close();
-                state_clear(); recording = 0;
+
+                state_clear();
+                recording = 0;
+                log_msg("Mic closed — model stays warm for next use");
             }
             continue;
         }
@@ -492,40 +549,36 @@ static void run_alsa_mode(void) {
         float samples[CHUNK_SAMPLES];
         for (int i = 0; i < rc; i++) samples[i] = buf[i] / 32768.0f;
         SherpaOnnxOnlineStreamAcceptWaveform(stream, SAMPLE_RATE, samples, rc);
-        while (SherpaOnnxIsOnlineStreamReady(recognizer, stream)) SherpaOnnxDecodeOnlineStream(recognizer, stream);
+        while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
+            SherpaOnnxDecodeOnlineStream(recognizer, stream);
 
-        const SherpaOnnxOnlineRecognizerResult *r = SherpaOnnxGetOnlineStreamResult(recognizer, stream);
-        char text_buf[4096]; strncpy(text_buf, r?r->text:"", sizeof(text_buf)-1); text_buf[sizeof(text_buf)-1]='\0';
+        const SherpaOnnxOnlineRecognizerResult *r =
+            SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+        char text_buf[4096];
+        strncpy(text_buf, r ? r->text : "", sizeof(text_buf)-1);
+        text_buf[sizeof(text_buf)-1] = '\0';
         sanitize(text_buf);
         const char *text = text_buf;
         int is_endpoint = SherpaOnnxOnlineStreamIsEndpoint(recognizer, stream);
 
         /* Partial update — type immediately, no suppression delay */
         if (strlen(text) && strcmp(text, last_text) != 0) {
-            /* First real partial — mark as recording (in case still "loading") */
-            if (g_state_path) {
-                FILE *sf = fopen(g_state_path, "r");
-                if (sf) {
-                    char state_buf[64];
-                    if (fgets(state_buf, sizeof(state_buf), sf) && strstr(state_buf, "loading")) {
-                        state_write(g_dump_audio ? "recording+dump" : "recording");
-                        log_msg("Ready for dictation");
-                    }
-                    fclose(sf);
-                }
-            }
-            if (g_dump_audio) dump_log_text("PARTIAL", last_partial_len, last_text, text);
+            if (g_dump_audio)
+                dump_log_text("PARTIAL", last_partial_len, last_text, text);
             type_append(last_text, last_partial_len, text);
             last_partial_len = strlen(text);
             strncpy(last_text, text, sizeof(last_text)-1);
             log_msg("  partial: %s", text);
         }
 
+
         /* Endpoint — type immediately */
         if (is_endpoint) {
             if (strlen(text)) {
-                char spaced[4096]; snprintf(spaced, sizeof(spaced), "%s ", text);
-                if (g_dump_audio) dump_log_text("ENDPOINT", last_partial_len, last_text, spaced);
+                char spaced[4096];
+                snprintf(spaced, sizeof(spaced), "%s ", text);
+                if (g_dump_audio)
+                    dump_log_text("ENDPOINT", last_partial_len, last_text, spaced);
                 type_append(last_text, last_partial_len, spaced);
                 last_partial_len = 0;
                 last_text[0] = '\0';
@@ -537,10 +590,12 @@ static void run_alsa_mode(void) {
         if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
     }
 
+    /* Cleanup on daemon exit */
     if (stream) SherpaOnnxDestroyOnlineStream(stream);
     if (alsa) snd_pcm_close(alsa);
-    SherpaOnnxDestroyOnlineRecognizer(recognizer);
+    if (recognizer) SherpaOnnxDestroyOnlineRecognizer(recognizer);
     state_clear();
+    log_msg("voxd daemon exiting — all resources freed");
 }
 
 /* ======================================================================
