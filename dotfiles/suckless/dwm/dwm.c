@@ -571,10 +571,18 @@ clientmessage(XEvent *e)
 		return;
 	if (cme->message_type == netatom[NetWMState]) {
 		if (cme->data.l[1] == netatom[NetWMFullscreen]
-		|| cme->data.l[2] == netatom[NetWMFullscreen])
-			setfullscreen(c, (cme->data.l[0] == 1 /* _NET_WM_STATE_ADD    */
-				|| (cme->data.l[0] == 2 /* _NET_WM_STATE_TOGGLE */ && !c->isfullscreen)));
-	} else if (cme->message_type == netatom[NetActiveWindow]) {
+		|| cme->data.l[2] == netatom[NetWMFullscreen]) {
+			/* Guard against re-entrant fullscreen requests that cause
+			 * a toggle loop (browser sends ADD, dwm resizes client,
+			 * browser sees resize and sends another ADD, etc). */
+			int action = cme->data.l[0];
+			if (action == 1 /* _NET_WM_STATE_ADD */ && !c->isfullscreen)
+				setfullscreen(c, 1);
+			else if (action == 0 /* _NET_WM_STATE_REMOVE */ && c->isfullscreen)
+				setfullscreen(c, 0);
+			else if (action == 2 /* _NET_WM_STATE_TOGGLE */)
+				setfullscreen(c, !c->isfullscreen);
+		}
 		if (c != selmon->sel && !c->isurgent)
 			seturgent(c, 1);
 	}
