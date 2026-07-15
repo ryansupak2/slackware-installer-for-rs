@@ -54,9 +54,12 @@ export GDK_DPI_SCALE=1.5
 export PATH=/usr/local/node-v22.19.0-linux-x64/bin:$PATH
 # screen locking: 'lock' works in dwl (wlock) and on TTY (physlock)
 alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (wlock in dwl, physlock on TTY)
-LOG="/var/log/${USER:-root}-shell-init.log"
-mkdir -p /var/log 2>/dev/null
-
+LOG_DIR="/var/log"
+if [ ! -w "$LOG_DIR" ]; then
+    LOG_DIR="$HOME/logs"
+fi
+LOG="$LOG_DIR/${USER:-root}-shell-init.log"
+mkdir -p "$LOG_DIR" 2>/dev/null
 # First X terminal: neofetch + audio device log (once per session)
 if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
     echo "[$(date '+%H:%M:%S')] first-terminal: running neofetch" >> "$LOG"
@@ -64,7 +67,7 @@ if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
     neofetch
     # "Need Help?" message is appended by the neofetch alias (line 9)
     # Log audio capture devices for post-boot diagnosis
-    AUDIO_LOG="/var/log/${USER:-root}-audio-boot-$(date +%Y%m%d-%H%M%S).log"
+    AUDIO_LOG="$LOG_DIR/${USER:-root}-audio-boot-$(date +%Y%m%d-%H%M%S).log"
     echo "=== $(date) ===" >> "$AUDIO_LOG"
     dmesg | grep -i "snd\|sof\|audio\|dmic\|microphone" >> "$AUDIO_LOG" 2>/dev/null
     echo "arecord -l:" >> "$AUDIO_LOG"

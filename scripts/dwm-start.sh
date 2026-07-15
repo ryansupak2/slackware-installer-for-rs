@@ -4,7 +4,11 @@
 # Run from a text console.  Logs to /var/log/<user>-dwm-YYYYMMDD-HHMMSS.log
 # All output mirrored to terminal so the log captures everything.
 
+# Logging: try /var/log first; fall back to $HOME/logs if not writable
 LOG_DIR="/var/log"
+if [ ! -w "$LOG_DIR" ]; then
+    LOG_DIR="$HOME/logs"
+fi
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOGFILE="$LOG_DIR/${USER:-root}-dwm-$(date +%Y%m%d-%H%M%S).log"
 

@@ -208,6 +208,18 @@ fi
 # ── ldconfig ────────────────────────────────────────────────
 ldconfig
 
+# ── Fix nvidia config (remove invalid Module directives from OutputClass) ──
+for nv_conf in \
+    "$PREFIX/share/X11/xorg.conf.d/10-nvidia-modules.conf" \
+    /usr/share/X11/xorg.conf.d/10-nvidia-modules.conf \
+    "$XLIBRE_SRC/build/hw/xfree86/compat/10-nvidia-modules.conf"; do
+    if [ -f "$nv_conf" ] && grep -q '^[[:space:]]*Module[[:space:]]' "$nv_conf" 2>/dev/null; then
+        echo "Fixing nvidia config: $nv_conf"
+        sed -i '/^[[:space:]]*Module[[:space:]]"glx/d' "$nv_conf"
+        sed -i '/^[[:space:]]*Module[[:space:]]"glxserver_nvidia/d' "$nv_conf"
+    fi
+done
+
 echo ""
 echo "SUCCESS: XLibre installed."
 echo "  X server:      $PREFIX/bin/Xorg"
