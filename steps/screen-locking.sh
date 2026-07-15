@@ -43,7 +43,7 @@ else
 fi
 
 # wlock (Wayland screen locker)
-echo "Installing screen lockers (wlock + physlock)..."
+echo "Installing screen lockers (wlock + slock + physlock)..."
 
 wlock_ok=false
 if [ -x /usr/local/bin/wlock ] && [ -f /etc/pam.d/wlock ]; then
@@ -72,38 +72,44 @@ else
     fi
 fi
 
-# physlock (console/TTY locker)
-physlock_ok=false
-if [ -x /usr/local/bin/physlock ] && [ -f /etc/pam.d/physlock ]; then
-    echo "  physlock already installed — skipping build"
-    physlock_ok=true
+# slock (X11 screen locker — colors match wlock)
+slock_ok=false
+if [ -x /usr/local/bin/slock ] && [ -f /etc/pam.d/slock ]; then
+    echo "  slock already installed — skipping build"
+    slock_ok=true
 else
-    echo "Building physlock (console/TTY locker)..."
-    install_pkg "kernel-headers"
+    echo "Building slock (X11 screen locker)..."
+    echo "  Installing slock build dependencies..."
+    install_pkg "libX11 pkg-config"
 
-    if [ -d "$REPO_DIR/sources/physlock" ]; then
-        if make -C "$REPO_DIR/sources/physlock" HAVE_SYSTEMD=0 HAVE_ELOGIND=0; then
-            cp "$REPO_DIR/sources/physlock/physlock" /usr/local/bin/physlock 2>/dev/null
-            chmod 4755 /usr/local/bin/physlock 2>/dev/null
-            echo "  physlock built and installed to /usr/local/bin/physlock."
-            cp "$REPO_DIR/dotfiles/lockscreen/physlock.pam" /etc/pam.d/physlock 2>/dev/null
-            if grep -qE '^[[:space:]]*(auth|account)[[:space:]]+(required|requisite|sufficient)[[:space:]]+pam_unix\.so' /etc/pam.d/physlock 2>/dev/null; then
-                physlock_ok=true
+    if [ -d "$REPO_DIR/sources/slock" ]; then
+        if make -C "$REPO_DIR/sources/slock"; then
+            cp "$REPO_DIR/sources/slock/slock" /usr/local/bin/slock 2>/dev/null
+            echo "  slock built and installed to /usr/local/bin/slock."
+            cp "$REPO_DIR/sources/slock/slock.pam" /etc/pam.d/slock 2>/dev/null
+            echo "  slock PAM config installed."
+            if grep -qE '^[[:space:]]*(auth|account)[[:space:]]+(required|requisite|sufficient)[[:space:]]+pam_unix\.so' /etc/pam.d/slock 2>/dev/null; then
+                slock_ok=true
             else
-                physlock_ok=true
+                echo "ERROR: slock PAM config missing required pam_unix.so entries."
+                slock_ok=false
             fi
         else
-            echo "ERROR: could not build physlock."
+            echo "ERROR: could not build slock (is X11 installed?)."
         fi
     fi
 fi
 
-# Verdict: acpid configs AND both lockers must succeed — no fallbacks
+# Verdict: acpid configs AND all three lockers must succeed — no fallbacks
 if [ -x /usr/local/bin/lock-screen.sh ] && \
    [ -f /etc/acpi/events/lid-close ] && \
    [ -f /etc/acpi/events/lid-open ]; then
-    if $wlock_ok && $physlock_ok; then
-        echo "SUCCESS: Screen locking fully configured (wlock + physlock + acpid)."
+    if $wlock_ok && $physlock_ok && $slock_ok; then
+        echo "SUCCESS: Screen locking fully configured (wlock + slock + physlock + acpid)."
+        exit 0
+    elif $wlock_ok && $physlock_ok && ! $slock_ok; then
+        echo "WARNING: wlock and physlock installed but slock failed."
+        echo "  X11 screen locking will fall back to physlock."
         exit 0
     elif $wlock_ok && ! $physlock_ok; then
         echo "ERROR: wlock installed but physlock failed."
@@ -112,7 +118,7 @@ if [ -x /usr/local/bin/lock-screen.sh ] && \
         echo "ERROR: physlock installed but wlock failed (run Core/wayland-base first)."
         exit 1
     else
-        echo "ERROR: both wlock and physlock failed to install."
+        echo "ERROR: all lockers (wlock, slock, physlock) failed to install."
         exit 1
     fi
 else

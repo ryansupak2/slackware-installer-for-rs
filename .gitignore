@@ -4,6 +4,10 @@ ovpn.zip
 sources/wlock/*.o
 sources/wlock/wlock
 
+# slock build artifacts
+sources/slock/*.o
+sources/slock/slock
+
 # physlock build artifacts
 sources/physlock/*.o
 sources/physlock/physlock

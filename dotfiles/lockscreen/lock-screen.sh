@@ -1,11 +1,11 @@
 #!/bin/bash
-# lock-screen.sh — screen locker for dwl (wlock) + dwm (xlock) + TTY (physlock)
+# lock-screen.sh — screen locker for dwl (wlock) + dwm (slock) + TTY (physlock)
 # Called from keybinds and from ACPI/elogind hooks (system context, no env).
 #
 # Strategy:
 #   - In-session (Mod+Esc): lock the graphical session:
 #       · Wayland (dwl) → wlock
-#       · X11 (dwm)     → xlock
+#       · X11 (dwm)     → slock
 #   - System (lid close/sleep): if a graphical session is running, lock it;
 #     otherwise, lock TTY consoles with physlock.
 #   - physlock's VT acquisition conflicts with the compositor's DRM master,
@@ -75,14 +75,14 @@ if [ -n "$WAYLAND_DISPLAY" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
 fi
 
 # ── In-session call (Mod+Esc from dwm) ─────────────────────────
-# Lock the current X11 session with xlock and block until it exits.
+# Lock the current X11 session with slock and block until it exits.
 if [ -n "$DISPLAY" ] && pgrep dwm >/dev/null 2>&1; then
-    if command -v xlock >/dev/null 2>&1; then
-        echo "$(date) branch: X11 in-session, using xlock"
-        xlock -mode blank -bg black -fg white
+    if command -v slock >/dev/null 2>&1; then
+        echo "$(date) branch: X11 in-session, using slock"
+        slock
         exit 0
     else
-        echo "$(date) xlock not found, falling back to physlock"
+        echo "$(date) slock not found, falling back to physlock"
         try_physlock
         exit 0
     fi
@@ -135,17 +135,17 @@ if pgrep dwl >/dev/null 2>&1; then
     wait 2>/dev/null
     echo "$(date) wlock finished"
 elif pgrep dwm >/dev/null 2>&1; then
-    echo "$(date) branch: dwm detected, trying xlock"
-    if command -v xlock >/dev/null 2>&1; then
+    echo "$(date) branch: dwm detected, trying slock"
+    if command -v slock >/dev/null 2>&1; then
         # When called from system context, DISPLAY may not be set.
         # Try :0 as default for the running X session.
         export DISPLAY="${DISPLAY:-:0}"
-        xlock -mode blank -bg black -fg white &
+        slock &
         wait $! 2>/dev/null
-        echo "$(date) xlock finished"
+        echo "$(date) slock finished"
         exit 0
     else
-        echo "$(date) xlock not found, falling back to physlock"
+        echo "$(date) slock not found, falling back to physlock"
         try_physlock
         exit 0
     fi
