@@ -125,6 +125,8 @@ struct Monitor {
 	unsigned int seltags;
 	unsigned int sellt;
 	unsigned int tagset[2];
+	int curtagidx;        /* currently focused tag index (0-8) */
+	unsigned int bartags;   /* tags drawn in the bar (occupied + revealed + anchor) */
 	int showbar;
 	int topbar;
 	Client *clients;
@@ -219,6 +221,8 @@ static void tile(Monitor *m);
 static void togglebar(const Arg *arg);
 static void togglehidemode(const Arg *arg);
 static void updatebarvisibility(void);
+static int tagisoccupied(Monitor *m, int tagidx);
+static void ensurebartagsvalid(Monitor *m);
 static void togglefloating(const Arg *arg);
 static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
@@ -470,9 +474,10 @@ buttonpress(XEvent *e)
 	}
 	if (ev->window == selmon->barwin) {
 		i = x = 0;
-		do
-			x += TEXTW(tags[i]);
-		while (ev->x >= x && ++i < LENGTH(tags));
+		do {
+			if (selmon->bartags & (1 << i))
+				x += TEXTW(tags[i]);
+		} while (ev->x >= x && ++i < LENGTH(tags));
 		if (i < LENGTH(tags)) {
 			click = ClkTagBar;
 			arg.ui = 1 << i;
@@ -701,6 +706,8 @@ createmon(void)
 
 	m = ecalloc(1, sizeof(Monitor));
 	m->tagset[0] = m->tagset[1] = 1;
+	m->curtagidx = 0;
+	m->bartags = 1;
 	m->mfact = mfact;
 	m->nmaster = nmaster;
 	m->showbar = showbar;
@@ -787,10 +794,12 @@ drawbar(Monitor *m)
 	}
 	x = 0;
 	for (i = 0; i < LENGTH(tags); i++) {
+		if (!(m->bartags & (1 << i)))
+			continue;  /* dynamic tags: only draw tags in the bar */
 		w = bh;  /* square tags: width = bar height */
-		drw_setscheme(drw, scheme[m->tagset[m->seltags] & 1 << i ? SchemeSel : SchemeNorm]);
+		drw_setscheme(drw, scheme[i == m->curtagidx ? SchemeSel : SchemeNorm]);
 		drw_text(drw, x, 0, w, bh, lrpad / 2, tags[i], urg & 1 << i);
-		if (m->tagset[m->seltags] & 1 << i)
+		if (i == m->curtagidx)
 			drw_rect(drw, x, 0, w, bh - 1, 0, 0);
 		if (occ & 1 << i)
 			drw_rect(drw, x + boxs, boxs, boxw, boxw,
@@ -1265,6 +1274,9 @@ manage(Window w, XWindowAttributes *wa)
 		c->mon = selmon;
 		applyrules(c);
 	}
+
+	/* Dynamic tags: ensure the client's tag appears in the bar */
+	c->mon->bartags |= c->tags;
 
 	if (c->x + WIDTH(c) > c->mon->wx + c->mon->ww)
 		c->x = c->mon->wx + c->mon->ww - WIDTH(c);
@@ -2094,7 +2106,8 @@ spawn(const Arg *arg)
 void
 tag(const Arg *arg)
 {
-	if (selmon->sel && arg->ui & TAGMASK) {
+	/* Rule 5: only tag onto tags that are in the bar */
+	if (selmon->sel && (arg->ui & TAGMASK) && (selmon->bartags & arg->ui)) {
 		selmon->sel->tags = arg->ui & TAGMASK;
 		focus(NULL);
 		arrange(selmon);
@@ -2297,6 +2310,8 @@ toggletag(const Arg *arg)
 
 	if (!selmon->sel)
 		return;
+	if (!(selmon->bartags & (arg->ui & TAGMASK)))
+		return;
 	newtags = selmon->sel->tags ^ (arg->ui & TAGMASK);
 	if (newtags) {
 		selmon->sel->tags = newtags;
@@ -2308,12 +2323,17 @@ toggletag(const Arg *arg)
 void
 toggleview(const Arg *arg)
 {
-	unsigned int newtagset = selmon->tagset[selmon->seltags] ^ (arg->ui & TAGMASK);
+	unsigned int mask = arg->ui & TAGMASK;
+	if (!(selmon->bartags & mask))
+		return;
 
-	if (newtagset) {
-		selmon->tagset[selmon->seltags] = newtagset;
+	unsigned int newbartags = selmon->bartags ^ mask;
+	if (newbartags) {
+		selmon->bartags = newbartags;
+		ensurebartagsvalid(selmon);
 		focus(NULL);
 		arrange(selmon);
+		drawbars();
 	}
 }
 
@@ -2351,6 +2371,18 @@ unmanage(Client *c, int destroyed)
 		XUngrabServer(dpy);
 	}
 	free(c);
+
+	/* Dynamic tags: recalculate bar visibility after client removal */
+	{
+		unsigned int newset = 1;  /* tag 1 always in bar */
+		Client *cl;
+		for (cl = m->clients; cl; cl = cl->next)
+			newset |= cl->tags;
+		/* Don't hide the tag the user is currently on */
+		newset |= (1 << m->curtagidx);
+		m->bartags = newset & TAGMASK;
+		ensurebartagsvalid(m);
+	}
 	focus(NULL);
 	updateclientlist();
 	arrange(m);
@@ -2609,53 +2641,182 @@ updatewmhints(Client *c)
 	}
 }
 
+/* Dynamic tags: check if a tag index has any windows on this monitor */
+int
+tagisoccupied(Monitor *m, int tagidx)
+{
+	Client *c;
+	for (c = m->clients; c; c = c->next)
+		if (c->tags & (1 << tagidx))
+			return 1;
+	return 0;
+}
+
+/* Dynamic tags: ensure tag 1 is always in the bar and curtagidx is valid,
+ * and keep tagset pinned to the current tag so only its windows show. */
+void
+ensurebartagsvalid(Monitor *m)
+{
+	m->bartags |= 1;  /* tag 1 (anchor) is always in the bar */
+	if (!(m->bartags & (1 << m->curtagidx))) {
+		m->curtagidx = __builtin_ffs(m->bartags) - 1;
+		if (m->curtagidx < 0)
+			m->curtagidx = 0;
+	}
+	m->tagset[0] = m->tagset[1] = 1 << m->curtagidx;
+}
+
 void
 view(const Arg *arg)
 {
-	if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
+	Monitor *m = selmon;
+	unsigned int mask = arg->ui & TAGMASK;
+
+	/* Mod+0: show all tags in the bar */
+	if (mask == TAGMASK) {
+		m->bartags = TAGMASK;
+		m->curtagidx = 0;
+		m->tagset[0] = m->tagset[1] = 1;
+		focus(NULL);
+		arrange(m);
+		drawbars();
 		return;
-	selmon->seltags ^= 1; /* toggle sel tagset */
-	if (arg->ui & TAGMASK)
-		selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
+	}
+
+	/* Rule 5: only switch to tags that are in the bar */
+	if (!(m->bartags & mask))
+		return;
+
+	int idx = __builtin_ffs(mask) - 1;
+	if (idx < 0 || idx == m->curtagidx)
+		return;
+
+	m->curtagidx = idx;
+	m->tagset[0] = m->tagset[1] = 1 << idx;
 	focus(NULL);
-	arrange(selmon);
+	arrange(m);
 	drawbars();
 }
 
 void
 viewnext(const Arg *arg)
 {
-	unsigned int curtag = selmon->tagset[selmon->seltags];
-	int curidx = __builtin_ffs(curtag) - 1;  /* Get index of lowest set bit (0-based) */
-	if (curidx >= 0 && curidx < LENGTH(tags) - 1)
-		view(&((Arg){ .ui = 1 << (curidx + 1) }));
+	Monitor *m = selmon;
+
+	/* Rule 3b: current tag must have windows to advance */
+	if (!tagisoccupied(m, m->curtagidx))
+		return;
+	if (m->curtagidx >= LENGTH(tags) - 1)
+		return;
+
+	int next = m->curtagidx + 1;
+	m->bartags |= (1 << next);          /* reveal in bar */
+	m->curtagidx = next;
+	m->tagset[0] = m->tagset[1] = 1 << next;  /* only new tag's windows */
+	focus(NULL);
+	arrange(m);
+	drawbars();
 }
 
 void
 viewprev(const Arg *arg)
 {
-	unsigned int curtag = selmon->tagset[selmon->seltags];
-	int curidx = __builtin_ffs(curtag) - 1;  /* Get index of lowest set bit (0-based) */
-	if (curidx > 0)
-		view(&((Arg){ .ui = 1 << (curidx - 1) }));
+	Monitor *m = selmon;
+	int oldidx = m->curtagidx;
+
+	/* Rule 3c/6: leaving an empty non-anchor tag */
+	if (oldidx > 0 && !tagisoccupied(m, oldidx)) {
+		/* Check if there are any higher-numbered occupied tags */
+		int has_higher = 0, i;
+		for (i = oldidx + 1; i < LENGTH(tags); i++) {
+			if (tagisoccupied(m, i)) {
+				has_higher = 1;
+				break;
+			}
+		}
+
+		if (has_higher) {
+			/* Rule 6a: collapse — shift all higher tags down by one,
+			 * reassigning every window to fill the gap. */
+			for (i = oldidx; i < LENGTH(tags) - 1; i++) {
+				Client *c;
+				unsigned int from = 1 << (i + 1);
+				unsigned int to   = 1 << i;
+				for (c = m->clients; c; c = c->next) {
+					if (c->tags & from) {
+						c->tags &= ~from;
+						c->tags |= to;
+					}
+				}
+				/* Shift bartags: if i+1 was in bar, move to i */
+				if (m->bartags & from) {
+					m->bartags |= to;
+					m->bartags &= ~from;
+				} else {
+					m->bartags &= ~to;
+				}
+			}
+		} else {
+			/* Rule 6b: no higher populated tags — just hide this one */
+			m->bartags &= ~(1 << oldidx);
+		}
+	}
+
+	/* Find previous tag in the bar */
+	int prev;
+	for (prev = oldidx - 1; prev >= 0; prev--)
+		if (m->bartags & (1 << prev))
+			break;
+	if (prev < 0) {
+		ensurebartagsvalid(m);
+		return;
+	}
+
+	m->curtagidx = prev;
+	m->tagset[0] = m->tagset[1] = 1 << prev;
+	focus(NULL);
+	arrange(m);
+	drawbars();
 }
 
 void
 tagnext(const Arg *arg)
 {
-	unsigned int curtag = selmon->tagset[selmon->seltags];
-	int curidx = __builtin_ffs(curtag) - 1;  /* Get index of lowest set bit (0-based) */
-	if (curidx >= 0 && curidx < LENGTH(tags) - 1)
-		tag(&((Arg){ .ui = 1 << (curidx + 1) }));
+	Monitor *m = selmon;
+	if (!m->sel || m->curtagidx >= LENGTH(tags) - 1)
+		return;
+
+	int next = m->curtagidx + 1;
+	unsigned int nextmask = 1 << next;
+
+	m->sel->tags = nextmask;
+	m->bartags |= nextmask;  /* reveal destination in bar */
+	m->curtagidx = next;
+	m->tagset[0] = m->tagset[1] = nextmask;
+	focus(NULL);
+	arrange(m);
+	drawbars();
 }
 
 void
 tagprev(const Arg *arg)
 {
-	unsigned int curtag = selmon->tagset[selmon->seltags];
-	int curidx = __builtin_ffs(curtag) - 1;  /* Get index of lowest set bit (0-based) */
-	if (curidx > 0)
-		tag(&((Arg){ .ui = 1 << (curidx - 1) }));
+	Monitor *m = selmon;
+	if (!m->sel || m->curtagidx <= 0)
+		return;
+
+	unsigned int bt = m->bartags;
+	int prev;
+	for (prev = m->curtagidx - 1; prev >= 0; prev--)
+		if (bt & (1 << prev))
+			break;
+	if (prev < 0)
+		return;
+
+	m->sel->tags = 1 << prev;
+	focus(NULL);
+	arrange(m);
+	drawbars();
 }
 
 Client *
