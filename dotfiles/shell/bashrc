@@ -69,7 +69,7 @@ if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
     # Log audio capture devices for post-boot diagnosis
     AUDIO_LOG="$LOG_DIR/${USER:-root}-audio-boot-$(date +%Y%m%d-%H%M%S).log"
     echo "=== $(date) ===" >> "$AUDIO_LOG"
-    dmesg | grep -i "snd\|sof\|audio\|dmic\|microphone" >> "$AUDIO_LOG" 2>/dev/null
+    dmesg 2>/dev/null | grep -i "snd\|sof\|audio\|dmic\|microphone" >> "$AUDIO_LOG" 2>/dev/null
     echo "arecord -l:" >> "$AUDIO_LOG"
     arecord -l >> "$AUDIO_LOG" 2>/dev/null
     unset DWL_FIRST_TERMINAL
