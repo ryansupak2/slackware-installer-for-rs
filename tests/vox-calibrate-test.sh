@@ -4,11 +4,12 @@
 # Verifies that on cold start:
 #   1. VOX starts from zero (no model loaded, no state file)
 #   2. Toggle ON triggers "loading" badge
-#   3. Internal calibration WAV is fed to recognizer
-#   4. Recognizer produces text from calibration WAV → pipeline is LIVE
-#   5. Internal playback STOPS, microphone input takes over
-#   6. Badge transitions from "loading" → "recording"
-#   7. Audio capture starts from real microphone
+#   3. Warmup[1/3]: calibration WAV fed to recognizer
+#   4. Recognizer produces text from calibration WAV → pipeline LIVE
+#   5. Warmup[2/3]: mic priming skipped (already live from WAV)
+#   6. Warmup[3/3]: stream drained + reset → clean slate for user audio
+#   7. Badge transitions from "loading" → "recording"
+#   8. Microphone capture starts — no warmup text leaks
 #
 # Run:  bash tests/vox-calibrate-test.sh
 # Requires: voxd installed at /usr/local/bin/voxd
@@ -106,7 +107,7 @@ while [ $WAITED -lt 15 ]; do
     # Check log for key events
     NEW_LOG=$(tail -n +$((LOG_START+1)) "$LOG" 2>/dev/null || echo "")
     
-    if echo "$NEW_LOG" | grep -q "Calibration: stream produced text"; then
+    if echo "$NEW_LOG" | grep -q "Warmup\[1/3\] WAV produced text"; then
         if [ $CAL_OK -eq 0 ]; then
             pass "Calibration WAV produced text — stream is LIVE"
             CAL_OK=1
@@ -140,8 +141,8 @@ echo "── Phase 3: Verify calibration sequence order"
 NEW_LOG=$(tail -n +$((LOG_START+1)) "$LOG" 2>/dev/null || echo "")
 
 # Extract timestamps for ordering check
-CAL_LOAD=$(echo "$NEW_LOG" | grep "Calibration: WAV loaded" | head -1)
-CAL_TEXT=$(echo "$NEW_LOG" | grep "Calibration: stream produced text" | head -1)
+CAL_LOAD=$(echo "$NEW_LOG" | grep "Warmup\[1/3\] WAV loaded:" | head -1)
+CAL_TEXT=$(echo "$NEW_LOG" | grep "Warmup\[1/3\] WAV produced text" | head -1)
 BADGE_LINE=$(echo "$NEW_LOG" | grep "Badge → recording" | head -1)
 MIC_LINE=$(echo "$NEW_LOG" | grep "First audio chunk arrived" | head -1)
 
@@ -176,6 +177,35 @@ else
     pass "4. Microphone input active"
 fi
 
+# Verify warmup drain phase completed
+DRAIN_LINE=$(echo "$NEW_LOG" | grep "Warmup\[3/3\] Drain complete:" | head -1)
+SUMMARY_LINE=$(echo "$NEW_LOG" | grep "Warmup SUMMARY:" | head -1)
+CLEAN_LINE=$(echo "$NEW_LOG" | grep "Warmup complete — stream is clean" | head -1)
+PRIME_SKIP=$(echo "$NEW_LOG" | grep "Warmup\[2/3\] Mic priming skipped" | head -1)
+
+if [ -z "$DRAIN_LINE" ]; then
+    fail "Drain phase (Warmup[3/3]) missing"
+else
+    pass "5. Drain phase completed (InputFinished + drain + reset)"
+fi
+
+if [ -z "$SUMMARY_LINE" ]; then
+    fail "Warmup SUMMARY line missing"
+else
+    pass "6. Warmup SUMMARY logged (chunks, decodes, liveness)"
+fi
+
+if [ -z "$CLEAN_LINE" ]; then
+    fail "'Warmup complete — stream is clean' message missing"
+else
+    pass "7. Clean slate confirmed"
+fi
+
+if [ -z "$PRIME_SKIP" ]; then
+    fail "Mic priming NOT skipped (expected skip — pipeline live from WAV)"
+else
+    pass "8. Mic priming correctly skipped (pipeline already live)"
+fi
 # Verify "loading" appeared before "recording"
 LOADING_LINE=$(echo "$NEW_LOG" | grep "TOGGLE ON" | head -1)
 echo ""
@@ -215,8 +245,8 @@ sleep 2
 
 NEW_LOG=$(tail -n +$((LOG_START+1)) "$LOG" 2>/dev/null || echo "")
 
-if echo "$NEW_LOG" | grep -q "Calibration:"; then
-    fail "Calibration ran on warm start (should skip)"
+if echo "$NEW_LOG" | grep -q "Warmup\[1/3\]"; then
+    fail "Warmup ran on warm start (should skip)"
 else
     pass "No calibration on warm start (model already warm)"
 fi
@@ -244,14 +274,15 @@ if [ $FAIL -gt 0 ]; then
     echo ""
     echo "FAILED — Full calibration log:"
     echo "---"
-    grep -E "TOGGLE|Calib|Badge|First audio|Model|Warm|Cold|ready" "$LOG" | tail -20
+    grep -E "TOGGLE|Warmup|Badge|First audio|Model|Cold|ready|Stream|Drain|SUMMARY" "$LOG" | tail -30
     exit 1
 fi
 
 echo ""
-echo "SUCCESS: Calibration pipeline works correctly."
-echo "  1. Internal WAV plays → recognizer proves it's alive"
-echo "  2. Internal playback stops → microphone takes over"
-echo "  3. Badge transitions: loading → recording"
-echo "  4. Warm starts skip calibration"
+echo "SUCCESS: Calibration + drain pipeline works correctly."
+echo "  1. Warmup[1/3] WAV playback → recognizer proves pipeline live"
+echo "  2. Warmup[2/3] Mic priming skipped (pipeline already live)"
+echo "  3. Warmup[3/3] Drain + reset → clean slate for user audio"
+echo "  4. Badge transitions: loading → recording"
+echo "  5. Warm starts skip calibration"
 exit 0

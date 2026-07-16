@@ -19,6 +19,7 @@
 #define ENDPOINT_SILENCE 1.2
 #define MAX_UTTERANCE 20.0
 #define NUM_THREADS      4              /* onnxruntime threads */
+#define SILENCE_FLUSH_S  1.0             /* silence to flush decoder context after warmup */
 
 /* --- Keyboard typing --- */
 /* WTYPE_BIN is used when WAYLAND_DISPLAY is set;

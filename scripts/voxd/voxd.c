@@ -329,64 +329,9 @@ static const SherpaOnnxOnlineRecognizer *recognizer_create(void) {
 }
 
 /* ======================================================================
- * Calibration: feed a known WAV through the LIVE stream to prove both
- * model and stream are ready. Uses the caller's stream — no temp objects.
- * Returns 1 when text appears from the WAV (stream + model proven live).
+ * Calibration logic has been inlined into run_alsa_mode() as
+ * Warmup[1/3] to give full control over the drain synchronisation.
  * ====================================================================== */
-static int calibrate_stream(const SherpaOnnxOnlineRecognizer *recognizer,
-                             const SherpaOnnxOnlineStream *stream) {
-    log_msg("Calibration: feeding internal WAV through live stream...");
-    const SherpaOnnxWave *wave = SherpaOnnxReadWave(CALIBRATE_WAV);
-    if (!wave) {
-        log_msg("Calibration: WAV not found at %s, falling back to mic prime", CALIBRATE_WAV);
-        return 0;
-    }
-    log_msg("Calibration: WAV loaded — %.2fs, %d samples",
-             (float)wave->num_samples / wave->sample_rate, wave->num_samples);
-
-    int chunk = SAMPLE_RATE * 60 / 1000;
-    int found = 0;
-    for (int k = 0; k < wave->num_samples && !found; k += chunk) {
-        int n = (k + chunk > wave->num_samples) ? (wave->num_samples - k) : chunk;
-        float fbuf[CHUNK_SAMPLES];
-        for (int j = 0; j < n; j++) fbuf[j] = wave->samples[k + j];
-        SherpaOnnxOnlineStreamAcceptWaveform(stream, wave->sample_rate, fbuf, n);
-        while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
-            SherpaOnnxDecodeOnlineStream(recognizer, stream);
-        const SherpaOnnxOnlineRecognizerResult *r =
-            SherpaOnnxGetOnlineStreamResult(recognizer, stream);
-        if (r && strlen(r->text) > 0) {
-            char buf[256];
-            strncpy(buf, r->text, sizeof(buf)-1); buf[sizeof(buf)-1] = '\0';
-            sanitize(buf);
-            log_msg("Calibration: stream produced text → \"%s\" — LIVE", buf);
-            found = 1;
-        }
-        if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
-    }
-
-    if (!found) {
-        float tail[4800] = {0};
-        SherpaOnnxOnlineStreamAcceptWaveform(stream, wave->sample_rate, tail, 4800);
-        SherpaOnnxOnlineStreamInputFinished(stream);
-        while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
-            SherpaOnnxDecodeOnlineStream(recognizer, stream);
-        const SherpaOnnxOnlineRecognizerResult *r =
-            SherpaOnnxGetOnlineStreamResult(recognizer, stream);
-        if (r && strlen(r->text) > 0) {
-            char buf[256];
-            strncpy(buf, r->text, sizeof(buf)-1); buf[sizeof(buf)-1] = '\0';
-            sanitize(buf);
-            log_msg("Calibration (tail): stream produced text → \"%s\" — LIVE", buf);
-            found = 1;
-        }
-        if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
-    }
-
-    SherpaOnnxFreeWave(wave);
-    if (!found) log_msg("Calibration: no text produced, falling back to mic prime");
-    return found;
-}
 /* ======================================================================
  * ALSA
  * ====================================================================== */
@@ -490,7 +435,7 @@ static void run_alsa_mode(void) {
     const SherpaOnnxOnlineRecognizer *recognizer = NULL;
     const SherpaOnnxOnlineStream *stream = NULL;
     snd_pcm_t *alsa = NULL;
-    int recording = 0, segment_id = 0, last_partial_len = 0, primed = 0;
+    int recording = 0, segment_id = 0, last_partial_len = 0;
     int first_chunk_logged = 0, first_ready_logged = 0;
     int silent_chunks = 0, first_text_logged = 0;
     int model_warm = 0;  /* true after first successful load */
@@ -534,44 +479,171 @@ static void run_alsa_mode(void) {
                         if (g_dump_audio) dump_close();
                         return;
                     }
-                /* ── Cold-start: calibrate stream with internal WAV ── */
+                /* ── Cold-start: warm up pipeline, then drain to clean slate ── */
+                    struct timespec t_phase;
                     snd_pcm_drop(alsa);
                     snd_pcm_prepare(alsa);
 
-                    /* Create the live stream — calibration feeds through it */
                     stream = SherpaOnnxCreateOnlineStream(recognizer);
-                    log_msg("Stream created");
+                    log_msg("Warmup: stream created");
 
-                    int calibrated = 0;
+                    int pipeline_live = 0;
+                    int warmup_chunks_fed = 0;
+                    int warmup_decode_iters = 0;
+
+                    /* Phase 1: feed calibration WAV to prove model+stream work */
                     if (!model_warm) {
-                        calibrated = calibrate_stream(recognizer, stream);
-                        if (calibrated) {
-                            /* Reset stream to clear calibration text from output
-                             * buffer. Model stays warm at recognizer level. */
-                            SherpaOnnxOnlineStreamReset(recognizer, stream);
-                            log_msg("Stream reset after calibration — clean slate");
+                        clock_gettime(CLOCK_MONOTONIC, &t_phase);
+                        const SherpaOnnxWave *wave = SherpaOnnxReadWave(CALIBRATE_WAV);
+                        if (wave) {
+                            log_msg("Warmup[1/3] WAV loaded: %.2fs, %d samples, %dHz",
+                                     (float)wave->num_samples / wave->sample_rate,
+                                     wave->num_samples, wave->sample_rate);
+                            int chunk = SAMPLE_RATE * 60 / 1000;
+                            int wav_chunks = 0, wav_decodes = 0;
+                            for (int k = 0; k < wave->num_samples; k += chunk) {
+                                int n = (k + chunk > wave->num_samples) ? (wave->num_samples - k) : chunk;
+                                float fbuf[CHUNK_SAMPLES];
+                                for (int j = 0; j < n; j++) fbuf[j] = wave->samples[k + j];
+                                SherpaOnnxOnlineStreamAcceptWaveform(stream, wave->sample_rate, fbuf, n);
+                                wav_chunks++;
+                                while (SherpaOnnxIsOnlineStreamReady(recognizer, stream)) {
+                                    SherpaOnnxDecodeOnlineStream(recognizer, stream);
+                                    wav_decodes++;
+                                }
+                                const SherpaOnnxOnlineRecognizerResult *r =
+                                    SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+                                if (r && strlen(r->text) > 0 && !pipeline_live) {
+                                    char buf[256];
+                                    strncpy(buf, r->text, sizeof(buf)-1); buf[sizeof(buf)-1] = '\0';
+                                    sanitize(buf);
+                                    log_msg("Warmup[1/3] WAV produced text → \"%s\" — PIPELINE LIVE", buf);
+                                    pipeline_live = 1;
+                                }
+                                if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
+                            }
+                            SherpaOnnxFreeWave(wave);
+                            warmup_chunks_fed += wav_chunks;
+                            warmup_decode_iters += wav_decodes;
+                            double t1 = (t_phase.tv_sec == 0) ? 0.0 : 0.0;
+                            { struct timespec tn; clock_gettime(CLOCK_MONOTONIC, &tn);
+                              t1 = (tn.tv_sec - t_phase.tv_sec) + (tn.tv_nsec - t_phase.tv_nsec)/1e9; }
+                            log_msg("Warmup[1/3] WAV done: %d chunks, %d decodes in %.3fs, live=%d",
+                                     wav_chunks, wav_decodes, t1, pipeline_live);
+                        } else {
+                            log_msg("Warmup[1/3] WAV not found at %s — skipping", CALIBRATE_WAV);
                         }
+                    } else {
+                        log_msg("Warmup[1/3] WAV skipped (model already warm)");
                     }
 
-                    if (!calibrated) {
-                        log_msg("Mic priming (%d chunks ≈ 3s)...",
-                                 3 * (SAMPLE_RATE / CHUNK_SAMPLES));
-                        int16_t prime_buf[CHUNK_SAMPLES];
+                    /* Phase 2: if WAV didn't prove liveness, prime with mic audio */
+                    if (!pipeline_live) {
+                        clock_gettime(CLOCK_MONOTONIC, &t_phase);
                         int prime_chunks = 3 * (SAMPLE_RATE / CHUNK_SAMPLES);
+                        log_msg("Warmup[2/3] Mic priming: %d chunks ≈ 3s (WAV did not prove liveness)",
+                                 prime_chunks);
+                        int16_t prime_buf[CHUNK_SAMPLES];
+                        int mic_chunks = 0, mic_decodes = 0, mic_errors = 0;
                         for (int i = 0; i < prime_chunks; i++) {
                             int rc = snd_pcm_readi(alsa, prime_buf, CHUNK_SAMPLES);
-                            if (rc < 0) { snd_pcm_recover(alsa, rc, 0); break; }
+                            if (rc < 0) { snd_pcm_recover(alsa, rc, 0); mic_errors++; break; }
                             float fbuf[CHUNK_SAMPLES];
                             for (int j = 0; j < rc; j++) fbuf[j] = prime_buf[j] / 32768.0f;
                             SherpaOnnxOnlineStreamAcceptWaveform(stream, SAMPLE_RATE, fbuf, rc);
-                            while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
+                            mic_chunks++;
+                            while (SherpaOnnxIsOnlineStreamReady(recognizer, stream)) {
                                 SherpaOnnxDecodeOnlineStream(recognizer, stream);
+                                mic_decodes++;
+                            }
                             const SherpaOnnxOnlineRecognizerResult *pr =
                                 SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+                            if (pr && strlen(pr->text) > 0 && !pipeline_live) {
+                                char buf[256];
+                                strncpy(buf, pr->text, sizeof(buf)-1); buf[sizeof(buf)-1] = '\0';
+                                sanitize(buf);
+                                log_msg("Warmup[2/3] Mic produced text → \"%s\" — PIPELINE LIVE", buf);
+                                pipeline_live = 1;
+                            }
                             if (pr) SherpaOnnxDestroyOnlineRecognizerResult(pr);
                         }
-                        log_msg("Mic priming complete");
+                        warmup_chunks_fed += mic_chunks;
+                        warmup_decode_iters += mic_decodes;
+                        double t2 = 0.0;
+                        { struct timespec tn; clock_gettime(CLOCK_MONOTONIC, &tn);
+                          t2 = (tn.tv_sec - t_phase.tv_sec) + (tn.tv_nsec - t_phase.tv_nsec)/1e9; }
+                        log_msg("Warmup[2/3] Mic priming done: %d chunks, %d decodes, %d ALSA errs in %.3fs, live=%d",
+                                 mic_chunks, mic_decodes, mic_errors, t2, pipeline_live);
+                    } else {
+                        log_msg("Warmup[2/3] Mic priming skipped (pipeline already live from WAV)");
                     }
+
+                    /* Phase 3: synchronisation point — flush decoder context,
+                     * then drain EVERY last frame through the decoder, then reset.
+                     *
+                     * The streaming Zipformer decoder retains internal context
+                     * across SherpaOnnxOnlineStreamReset.  We must push silence
+                     * through the stream first to displace the WAV content from
+                     * the decoder's lookback window.  Only then does
+                     * InputFinished + drain + reset produce a truly clean slate. */
+                    {
+                        clock_gettime(CLOCK_MONOTONIC, &t_phase);
+                        log_msg("Warmup[3/3] Flush: feeding %.1fs silence to displace WAV context...",
+                                 SILENCE_FLUSH_S);
+                        int silence_frames = (int)(SAMPLE_RATE * SILENCE_FLUSH_S);
+                        int pos = 0;
+                        while (pos < silence_frames) {
+                            int n = (silence_frames - pos > CHUNK_SAMPLES) ? CHUNK_SAMPLES : (silence_frames - pos);
+                            float silence[CHUNK_SAMPLES];
+                            memset(silence, 0, sizeof(float) * n);
+                            SherpaOnnxOnlineStreamAcceptWaveform(stream, SAMPLE_RATE, silence, n);
+                            while (SherpaOnnxIsOnlineStreamReady(recognizer, stream))
+                                SherpaOnnxDecodeOnlineStream(recognizer, stream);
+                            /* discard intermediate results — still warmup */
+                            const SherpaOnnxOnlineRecognizerResult *sr =
+                                SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+                            if (sr) SherpaOnnxDestroyOnlineRecognizerResult(sr);
+                            pos += n;
+                        }
+
+                        log_msg("Warmup[3/3] Drain: calling InputFinished + blocking drain...");
+                        SherpaOnnxOnlineStreamInputFinished(stream);
+                        int drain_iters = 0;
+                        while (SherpaOnnxIsOnlineStreamReady(recognizer, stream)) {
+                            SherpaOnnxDecodeOnlineStream(recognizer, stream);
+                            drain_iters++;
+                        }
+                        const SherpaOnnxOnlineRecognizerResult *drain_r =
+                            SherpaOnnxGetOnlineStreamResult(recognizer, stream);
+                        int drain_text_len = 0;
+                        if (drain_r) {
+                            drain_text_len = (int)strlen(drain_r->text);
+                            if (drain_text_len > 0) {
+                                char dbg[256];
+                                strncpy(dbg, drain_r->text, sizeof(dbg)-1); dbg[sizeof(dbg)-1] = '\0';
+                                sanitize(dbg);
+                                log_msg("Warmup[3/3] Drain: discarded text (len=%d) → \"%s\"",
+                                         drain_text_len, dbg);
+                            }
+                            SherpaOnnxDestroyOnlineRecognizerResult(drain_r);
+                        }
+                        SherpaOnnxOnlineStreamReset(recognizer, stream);
+                        double t3 = 0.0;
+                        { struct timespec tn; clock_gettime(CLOCK_MONOTONIC, &tn);
+                          t3 = (tn.tv_sec - t_phase.tv_sec) + (tn.tv_nsec - t_phase.tv_nsec)/1e9; }
+                        log_msg("Warmup[3/3] Flush+drain complete: %d silence frames, %d drain iters, "
+                                 "final_text_len=%d in %.3fs",
+                                 silence_frames, drain_iters, drain_text_len, t3);
+                    }
+
+                    /* Summary: one log line with everything needed to debug warmup */
+                    log_msg("Warmup SUMMARY: live=%d, total_chunks=%d, total_decodes=%d, "
+                             "cal_wav=%s, mic_prime=%s, model_was_warm=%d",
+                             pipeline_live, warmup_chunks_fed, warmup_decode_iters,
+                             model_warm ? "skipped" : "used",
+                             pipeline_live ? "skipped" : "used",
+                             model_warm);
+                    log_msg("Warmup complete — stream is clean, ready for user audio");
 
                 } else {
                     /* ── Warm start: drain, prepare, reset stream ── */
@@ -594,7 +666,7 @@ static void run_alsa_mode(void) {
                 first_ready_logged = 0;
                 silent_chunks = 0;
                 first_text_logged = 0;
-                primed = 0;
+                /* primed removed — drain handles this */
                 segment_id = 0;
                 last_partial_len = 0;
                 last_text[0] = '\0';
@@ -644,7 +716,7 @@ static void run_alsa_mode(void) {
 
                 state_clear();
                 recording = 0;
-                primed = 0;
+                /* primed removed — drain handles this */
                 log_msg("Mic closed — model stays warm for next use");
             }
             continue;
