@@ -4,10 +4,7 @@
 # Run from a text console.  Logs to /var/log/<user>-dwl-YYYYMMDD-HHMMSS.log
 # All output mirrored to terminal so the log captures everything.
 
-LOG_DIR="/var/log"
-if [ ! -w "$LOG_DIR" ]; then
-    LOG_DIR="$HOME/logs"
-fi
+LOG_DIR="/var/log/sessions"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOGFILE="$LOG_DIR/${USER:-root}-dwl-$(date +%Y%m%d-%H%M%S).log"
 

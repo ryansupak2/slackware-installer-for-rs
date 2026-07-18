@@ -13,10 +13,7 @@
 # Installed as /usr/local/bin/vnc
 
 # ── Configuration ──────────────────────────────────────────────────────
-LOG_DIR="/var/log"
-if [ ! -w "$LOG_DIR" ]; then
-    LOG_DIR="$HOME/logs"
-fi
+LOG_DIR="/var/log/sessions"
 LOG_FILE="$LOG_DIR/${USER:-root}-vnc-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 
