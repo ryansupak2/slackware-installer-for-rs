@@ -35,6 +35,8 @@ prev_signal=""
 prev_msg_active=0
 prev_msg=""
 prev_online=""
+last_loop=0
+prev_bat_status=""
 
 while true; do
     status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown')
@@ -64,6 +66,14 @@ while true; do
     fi
 
     now=$(date +%s)
+    # ── Resume detection: if loop gap > 5s, system woke from sleep ──
+    if [ "$last_loop" -ne 0 ] && [ $((now - last_loop)) -gt 5 ]; then
+        echo "$(date): RESUME detected (gap=$((now - last_loop))s) — forcing full refresh" >&2
+        prev_bat_status=""  # force battery re-evaluation
+        prev_online=""      # force AC state re-evaluation
+        prev_signal=""       # force bar update
+        echo "show all" > "$FIFO" 2>/dev/null
+    fi
 
     # Keyboard brightness temporary message
     current_kbd=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || echo 0)
@@ -203,6 +213,7 @@ while true; do
         break
     fi
 
+    last_loop=$now
     next_log=$((next_log - 1))
     sleep 0.1
 done

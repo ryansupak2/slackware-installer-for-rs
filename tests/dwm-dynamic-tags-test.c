@@ -60,6 +60,27 @@ static void ensurebartagsvalid(void) {
 	tagset0 = tagset1 = 1 << curtagidx;
 }
 
+static void collapse(int from) {
+	int i;
+	for (i = from; i < TAGS_COUNT - 1; i++) {
+		unsigned int fr = 1 << (i + 1);
+		unsigned int to = 1 << i;
+		int ci;
+		for (ci = 0; ci < client_count; ci++) {
+			if (clients[ci] & fr) {
+				clients[ci] &= ~fr;
+				clients[ci] |= to;
+			}
+		}
+		if (bartags & fr) {
+			bartags |= to;
+			bartags &= ~fr;
+		} else {
+			bartags &= ~to;
+		}
+	}
+}
+
 static void view(unsigned int mask) {
 	mask &= TAGMASK;
 	if (mask == TAGMASK) {
@@ -73,6 +94,19 @@ static void view(unsigned int mask) {
 	int idx = __builtin_ffs(mask) - 1;
 	if (idx < 0 || idx == curtagidx)
 		return;
+
+	/* If leaving an empty non-anchor tag, clean it up (same as viewprev) */
+	int oldidx = curtagidx;
+	if (oldidx > 0 && !tagisoccupied(oldidx)) {
+		if (has_higher_occupied(oldidx)) {
+			collapse(oldidx);
+			if (idx > oldidx)
+				idx--;  /* target shifted down in collapse */
+		} else {
+			bartags &= ~(1 << oldidx);
+		}
+	}
+
 	curtagidx = idx;
 	tagset0 = tagset1 = 1 << idx;
 }
@@ -93,30 +127,10 @@ static void viewprev(void) {
 
 	/* Rule 3c/6: leaving an empty non-anchor tag */
 	if (oldidx > 0 && !tagisoccupied(oldidx)) {
-		if (has_higher_occupied(oldidx)) {
-			/* Rule 6a: collapse — shift all higher windows + bartags down */
-			int i;
-			for (i = oldidx; i < TAGS_COUNT - 1; i++) {
-				unsigned int from = 1 << (i + 1);
-				unsigned int to   = 1 << i;
-				int ci;
-				for (ci = 0; ci < client_count; ci++) {
-					if (clients[ci] & from) {
-						clients[ci] &= ~from;
-						clients[ci] |= to;
-					}
-				}
-				if (bartags & from) {
-					bartags |= to;
-					bartags &= ~from;
-				} else {
-					bartags &= ~to;
-				}
-			}
-		} else {
-			/* Rule 6b: no higher populated — just hide */
-			bartags &= ~(1 << oldidx);
-		}
+		if (has_higher_occupied(oldidx))
+			collapse(oldidx);  /* Rule 6a: renumber down */
+		else
+			bartags &= ~(1 << oldidx);  /* Rule 6b: just hide */
 	}
 
 	/* Find previous tag in the bar */
@@ -684,6 +698,58 @@ static void test_30_collapse_multi_level(void) {
 	ASSERT_CLIENT_TAGS(win3, 1 << 1);  /* was tag 3, now tag 2 */
 	ASSERT_CLIENT_TAGS(win4, 1 << 2);  /* was tag 4, now tag 3 */
 	PASS();
+	PASS();
+}
+
+/* ── Mod+Number cleanup: same as viewprev when leaving empty tag ──── */
+static void test_31_view_number_cleans_up_empty(void) {
+	TEST("Mod+Number off empty tag hides it (no higher occupied)");
+	reset_state();
+
+	/* Tags 1 and 3 visible, both with windows, on tag 3 */
+	manage_client(1 << 0);
+	int c3 = manage_client(1 << 2);
+	(void)c3;
+	bartags = 1 | (1 << 2);
+	curtagidx = 2;
+	tagset0 = tagset1 = 1 << 2;
+
+	/* Delete window on tag 3 — tag 3 now empty but user still on it */
+	unmanage_client(1);  /* c3 removed, tag 3 empty */
+	ASSERT_INT(0, tagisoccupied(2), "tag 3 empty");
+	ASSERT_BARTAGS(1 | (1 << 2));  /* still in bar (current) */
+
+	/* Now press Mod+1 — navigate to tag 1, tag 3 should be hidden */
+	view(1 << 0);
+	ASSERT_CURTAG(0);
+	ASSERT_BARTAGS(1);  /* tag 3 gone */
+	PASS();
+}
+
+static void test_32_view_number_collapses_with_higher(void) {
+	TEST("Mod+Number off empty tag collapses + target adjusts");
+	reset_state();
+
+	/* Tags 1,2,3,4 visible. Windows on tag 1 and tag 4. On tag 3 (empty). */
+	manage_client(1 << 0);
+	int w4 = manage_client(1 << 3);
+	bartags = 1 | (1<<1) | (1<<2) | (1<<3);
+	curtagidx = 2;  /* on tag 3 (empty) */
+	tagset0 = tagset1 = 1 << 2;
+
+	/* Press Mod+2 — navigate to tag 2, tag 3 collapses, tag 4→3 */
+	view(1 << 1);
+	ASSERT_CURTAG(1);  /* on tag 2 */
+	ASSERT_BARTAGS(1 | (1<<1) | (1<<2));  /* tags 1,2,3 */
+	ASSERT_CLIENT_TAGS(w4, 1 << 2);  /* was tag 4, now tag 3 (idx 2) */
+
+	/* Press Mod+3 — tag 3 has the window. But tag 2 (current) is
+	 * empty → collapse fires: window 3→2, target 3→2. */
+	view(1 << 2);
+	ASSERT_CURTAG(1);  /* target adjusted: old tag 3 collapsed to tag 2 */
+	ASSERT_CLIENT_TAGS(w4, 1 << 1);  /* window now on tag 2 */
+	ASSERT_BARTAGS(1 | (1 << 1));  /* only tags 1 and 2 */
+	PASS();
 }
 
 
@@ -722,6 +788,8 @@ int main(void) {
 	test_28_multi_client_tag_stays();
 	test_29_full_workflow();
 	test_30_collapse_multi_level();
+	test_31_view_number_cleans_up_empty();
+	test_32_view_number_collapses_with_higher();
 
 	printf("\n========================================================\n");
 	printf("RESULTS: %d tests, %d passed, %d failed\n",

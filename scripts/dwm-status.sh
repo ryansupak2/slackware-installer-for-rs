@@ -108,7 +108,7 @@ bat_part() {
             echo "hidemode off" > "$FIFO" 2>/dev/null
         fi
     fi
-    # Signal bar only on charging status transitions (not routine capacity changes)
+    # Signal bar on charging status transitions and on AC plug/unplug
     if [ "$status" != "$prev_bat_status" ]; then
         if [ -n "$prev_bat_status" ]; then
             echo "$(date): BAT status change: prev='$prev_bat_status' new='$status' on_ac=$on_ac" >&2
@@ -116,6 +116,12 @@ bat_part() {
         fi
         prev_bat_status="$status"
     fi
+    # Detect AC plug/unplug (separate from charging status transitions)
+    if [ "$on_ac" != "$prev_online" ] && [ -n "$prev_online" ]; then
+        echo "$(date): POWER online change: prev='$prev_online' new='$on_ac' status=$status cap=$capacity%" >&2
+        signal_bar_show
+    fi
+    prev_online="$on_ac"
     prev_capacity="$capacity"
     echo -n "${bat_out} "
 }
@@ -167,6 +173,8 @@ prev_kbd_brightness=$(cat /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/de
 prev_signal=""
 prev_msg_active_val=0
 prev_msg_val=""
+last_loop=0
+prev_online=""
 while true; do
     # VOX badge
     vox_badge="$(vox_part)"
@@ -194,6 +202,14 @@ while true; do
 
     # Build status line
     now=$(date +%s)
+    # ── Resume detection: if loop gap > 5s, system woke from sleep ──
+    if [ "$last_loop" -ne 0 ] && [ $((now - last_loop)) -gt 5 ]; then
+        echo "$(date): RESUME detected (gap=$((now - last_loop))s) — forcing full refresh" >&2
+        prev_bat_status=""  # force battery re-evaluation
+        prev_online=""      # force AC state re-evaluation
+        prev_signal=""       # force bar update
+        signal_bar_show
+    fi
     hide_mode_on=0
     [ -f "$HIDE_MODE_FILE" ] && hide_mode_on=1
 
@@ -241,5 +257,6 @@ while true; do
         # signal) already call signal_bar_show when hide mode is on.
     fi
 
+    last_loop=$now
     sleep 0.1
 done

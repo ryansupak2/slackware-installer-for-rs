@@ -61,23 +61,29 @@ AUTH
         echo "ERROR: Could not download config bundle"
         ok=false
     fi
+else
+    echo "NORD_USER/NORD_PASS not set — skipping NordVPN auth + config download"
+    echo "Set NORD_USER and NORD_PASS env vars to enable automatic config deployment"
+fi
 
-    # Copy DNS-by-country reference file
-    cp "$REPO_DIR/dotfiles/vpn/nordvpn-dns-by-country.txt" /etc/openvpn/ 2>/dev/null || true
+# ── Always deploy: scripts, sudoers, elogind hook, DNS reference ──
 
-    # Deploy OpenVPN management script
-    echo "Deploying VPN management script..."
-    cp "$REPO_DIR/scripts/vpn.sh" /usr/local/bin/vpn || { echo "ERROR: Failed to copy vpn script"; ok=false; }
-    chmod +x /usr/local/bin/vpn 2>/dev/null || true
+# Copy DNS-by-country reference file (used by vpn script, no credentials needed)
+cp "$REPO_DIR/dotfiles/vpn/nordvpn-dns-by-country.txt" /etc/openvpn/ 2>/dev/null || true
 
-    # Deploy VPN suspend/resume handler (disconnect on sleep, reconnect on wake)
-    echo "Deploying VPN suspend/resume handler..."
-    cp "$REPO_DIR/scripts/vpn-resume.sh" /usr/local/bin/vpn-suspend 2>/dev/null || true
-    chmod +x /usr/local/bin/vpn-suspend 2>/dev/null || true
+# Deploy OpenVPN management script
+echo "Deploying VPN management script..."
+cp "$REPO_DIR/scripts/vpn.sh" /usr/local/bin/vpn || { echo "ERROR: Failed to copy vpn script"; ok=false; }
+chmod +x /usr/local/bin/vpn 2>/dev/null || true
 
-    # Install elogind system-sleep hook (handles both pre-suspend and post-resume)
-    if [ -d "/lib64/elogind/system-sleep" ]; then
-        cat > /lib64/elogind/system-sleep/vpn-suspend.sh << 'SLEEPHOOK'
+# Deploy VPN suspend/resume handler (disconnect on sleep, reconnect on wake)
+echo "Deploying VPN suspend/resume handler..."
+cp "$REPO_DIR/scripts/vpn-resume.sh" /usr/local/bin/vpn-suspend 2>/dev/null || true
+chmod +x /usr/local/bin/vpn-suspend 2>/dev/null || true
+
+# Install elogind system-sleep hook (handles both pre-suspend and post-resume)
+if [ -d "/lib64/elogind/system-sleep" ]; then
+    cat > /lib64/elogind/system-sleep/vpn-suspend.sh << 'SLEEPHOOK'
 #!/bin/bash
 case "$1" in
   pre)
@@ -88,20 +94,17 @@ case "$1" in
     ;;
 esac
 SLEEPHOOK
-        chmod +x /lib64/elogind/system-sleep/vpn-suspend.sh
-        echo "  VPN suspend hook installed: /lib64/elogind/system-sleep/vpn-suspend.sh"
-    fi
-
-    # Deploy sudoers so wheel users can manage OpenVPN without a password prompt
-    echo "Deploying sudoers for OpenVPN access..."
-    mkdir -p /etc/sudoers.d
-    cp "$REPO_DIR/dotfiles/sudoers/nordvpn" /etc/sudoers.d/nordvpn-wg 2>/dev/null || true
-    chmod 440 /etc/sudoers.d/nordvpn-wg 2>/dev/null || true
-
-    echo "OpenVPN setup complete."
-else
-    ok=false
+    chmod +x /lib64/elogind/system-sleep/vpn-suspend.sh
+    echo "  VPN suspend hook installed: /lib64/elogind/system-sleep/vpn-suspend.sh"
 fi
+
+# Deploy sudoers so wheel users can manage OpenVPN without a password prompt
+echo "Deploying sudoers for OpenVPN access..."
+mkdir -p /etc/sudoers.d
+cp "$REPO_DIR/dotfiles/sudoers/nordvpn" /etc/sudoers.d/nordvpn-wg 2>/dev/null || true
+chmod 440 /etc/sudoers.d/nordvpn-wg 2>/dev/null || true
+
+echo "OpenVPN scripts + sudoers deployed."
 
 if $ok; then
     echo "SUCCESS: OpenVPN configured."

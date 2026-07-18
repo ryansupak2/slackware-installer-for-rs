@@ -110,34 +110,34 @@ if $ok; then
     fi
 fi
 
+# ── Always deploy: session launcher + status scripts (independent of build) ──
+echo "Installing dwm-start session launcher + status script..."
+cp "$REPO_DIR/scripts/dwm-start.sh" /usr/local/bin/dwm-start
+chmod +x /usr/local/bin/dwm-start
+cp "$REPO_DIR/scripts/dwm-status.sh" /usr/local/bin/dwm-status
+chmod +x /usr/local/bin/dwm-status
+cp "$REPO_DIR/scripts/toggle-bar.sh" /usr/local/bin/toggle-bar.sh
+chmod +x /usr/local/bin/toggle-bar.sh
+cp "$REPO_DIR/scripts/toggle-hide-mode.sh" /usr/local/bin/toggle-hide-mode.sh
+chmod +x /usr/local/bin/toggle-hide-mode.sh
+cp "$REPO_DIR/scripts/temp-msg.sh" /usr/local/bin/temp-msg.sh
+chmod +x /usr/local/bin/temp-msg.sh
+
+echo "  dwm-start deployed to /usr/local/bin/dwm-start"
+echo "  dwm-status deployed to /usr/local/bin/dwm-status"
+echo "  toggle-bar deployed to /usr/local/bin/toggle-bar.sh"
+echo "  toggle-hide-mode deployed to /usr/local/bin/toggle-hide-mode.sh"
+echo "  temp-msg deployed to /usr/local/bin/temp-msg.sh"
+
+echo "Installing shell shortcuts..."
+cp "$REPO_DIR/scripts/x" /usr/local/bin/x
+chmod +x /usr/local/bin/x
+echo "  x deployed to /usr/local/bin/x"
+
 if $ok; then
-    echo "Installing dwm-start session launcher + status script..."
-    cp "$REPO_DIR/scripts/dwm-start.sh" /usr/local/bin/dwm-start
-    chmod +x /usr/local/bin/dwm-start
-    cp "$REPO_DIR/scripts/dwm-status.sh" /usr/local/bin/dwm-status
-    chmod +x /usr/local/bin/dwm-status
-    cp "$REPO_DIR/scripts/toggle-bar.sh" /usr/local/bin/toggle-bar.sh
-    chmod +x /usr/local/bin/toggle-bar.sh
-    cp "$REPO_DIR/scripts/toggle-hide-mode.sh" /usr/local/bin/toggle-hide-mode.sh
-    chmod +x /usr/local/bin/toggle-hide-mode.sh
-    cp "$REPO_DIR/scripts/temp-msg.sh" /usr/local/bin/temp-msg.sh
-    chmod +x /usr/local/bin/temp-msg.sh
-
-    echo "  dwm-start deployed to /usr/local/bin/dwm-start"
-    echo "  dwm-status deployed to /usr/local/bin/dwm-status"
-    echo "  toggle-bar deployed to /usr/local/bin/toggle-bar.sh"
-    echo "  toggle-hide-mode deployed to /usr/local/bin/toggle-hide-mode.sh"
-    echo "  temp-msg deployed to /usr/local/bin/temp-msg.sh"
-
-    echo "Installing shell shortcuts..."
-    cp "$REPO_DIR/scripts/x" /usr/local/bin/x
-    chmod +x /usr/local/bin/x
-
-    echo "  x deployed to /usr/local/bin/x"
-
     echo "SUCCESS: Suckless dwm + st installed and configured."
     exit 0
 else
-    echo "ERROR: dwm setup encountered errors."
+    echo "ERROR: dwm setup encountered errors (scripts deployed anyway)."
     exit 1
 fi

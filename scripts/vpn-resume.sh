@@ -4,7 +4,7 @@
 # post: reconnect VPN from saved state, notify user.
 # Called from elogind system-sleep hook with "pre" or "post" as $1.
 
-export PATH="/usr/sbin:/sbin:/usr/local/bin:$PATH"
+export PATH="/usr/sbin:/sbin:/usr/bin:/bin:/usr/local/bin:$PATH"
 
 LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
@@ -51,7 +51,7 @@ notify_user() {
 if [ "$1" = "pre" ]; then
     log_msg INFO "pre-suspend: checking for active VPN"
 
-    if ! ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
+    if ! /sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
         log_msg INFO "tun0 not UP — no VPN to disconnect"
         exit 0
     fi
@@ -59,19 +59,19 @@ if [ "$1" = "pre" ]; then
     log_msg INFO "tun0 is UP — disconnecting VPN before suspend"
 
     # Restore IPv6 on non-tun interfaces
-    for iface in $(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
-        sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=0" >/dev/null 2>&1
+    for iface in $(/sbin/ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | grep -vE '^lo$|^tun'); do
+        /sbin/sysctl -w "net.ipv6.conf.${iface}.disable_ipv6=0" >/dev/null 2>&1
     done
 
     # Kill openvpn
-    pkill openvpn 2>/dev/null || true
+    /usr/bin/pkill openvpn 2>/dev/null || true
     sleep 1
-    pkill -9 openvpn 2>/dev/null || true
+    /usr/bin/pkill -9 openvpn 2>/dev/null || true
     sleep 0.5
 
     # Bring down tun0 if it survived
-    if ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
-        ip link set tun0 down 2>/dev/null || true
+    if /sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
+        /sbin/ip link set tun0 down 2>/dev/null || true
     fi
 
     log_msg INFO "VPN disconnected for suspend"
@@ -105,7 +105,7 @@ if [ "$1" = "post" ]; then
     fi
 
     # vpn-suspend-fix: already-connected guard — skip restore if user reconnected manually
-    if ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
+    if /sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
         log_msg INFO "tun0 already UP — user already reconnected manually; skipping restore"
         exit 0
     fi

@@ -2666,6 +2666,31 @@ ensurebartagsvalid(Monitor *m)
 	m->tagset[0] = m->tagset[1] = 1 << m->curtagidx;
 }
 
+/* Collapse: when removing empty tag 'from', shift all windows + bartags
+ * from higher-numbered tags down by one to fill the gap. */
+void
+collapse(Monitor *m, int from)
+{
+	int i;
+	for (i = from; i < LENGTH(tags) - 1; i++) {
+		Client *c;
+		unsigned int fr = 1 << (i + 1);
+		unsigned int to = 1 << i;
+		for (c = m->clients; c; c = c->next) {
+			if (c->tags & fr) {
+				c->tags &= ~fr;
+				c->tags |= to;
+			}
+		}
+		if (m->bartags & fr) {
+			m->bartags |= to;
+			m->bartags &= ~fr;
+		} else {
+			m->bartags &= ~to;
+		}
+	}
+}
+
 void
 view(const Arg *arg)
 {
@@ -2690,6 +2715,27 @@ view(const Arg *arg)
 	int idx = __builtin_ffs(mask) - 1;
 	if (idx < 0 || idx == m->curtagidx)
 		return;
+
+	/* If leaving an empty non-anchor tag, clean it up (same as viewprev) */
+	int oldidx = m->curtagidx;
+	if (oldidx > 0 && !tagisoccupied(m, oldidx)) {
+		int has_higher = 0, i;
+		for (i = oldidx + 1; i < LENGTH(tags); i++) {
+			if (tagisoccupied(m, i)) {
+				has_higher = 1;
+				break;
+			}
+		}
+
+		if (has_higher) {
+			collapse(m, oldidx);
+			/* Collapse shifted everything — adjust target if it was above */
+			if (idx > oldidx)
+				idx--;
+		} else {
+			m->bartags &= ~(1 << oldidx);
+		}
+	}
 
 	m->curtagidx = idx;
 	m->tagset[0] = m->tagset[1] = 1 << idx;
@@ -2735,31 +2781,10 @@ viewprev(const Arg *arg)
 			}
 		}
 
-		if (has_higher) {
-			/* Rule 6a: collapse — shift all higher tags down by one,
-			 * reassigning every window to fill the gap. */
-			for (i = oldidx; i < LENGTH(tags) - 1; i++) {
-				Client *c;
-				unsigned int from = 1 << (i + 1);
-				unsigned int to   = 1 << i;
-				for (c = m->clients; c; c = c->next) {
-					if (c->tags & from) {
-						c->tags &= ~from;
-						c->tags |= to;
-					}
-				}
-				/* Shift bartags: if i+1 was in bar, move to i */
-				if (m->bartags & from) {
-					m->bartags |= to;
-					m->bartags &= ~from;
-				} else {
-					m->bartags &= ~to;
-				}
-			}
-		} else {
-			/* Rule 6b: no higher populated tags — just hide this one */
-			m->bartags &= ~(1 << oldidx);
-		}
+		if (has_higher)
+			collapse(m, oldidx);  /* Rule 6a: renumber down */
+		else
+			m->bartags &= ~(1 << oldidx);  /* Rule 6b: just hide */
 	}
 
 	/* Find previous tag in the bar */
