@@ -2153,6 +2153,7 @@ powermgrsetmode(struct wl_listener *listener, void *data)
 void
 quit(const Arg *arg)
 {
+	system("wall \"closing dwl\"");
 	wl_display_terminate(dpy);
 }
 

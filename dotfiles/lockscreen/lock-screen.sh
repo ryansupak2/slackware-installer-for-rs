@@ -136,19 +136,47 @@ if pgrep dwl >/dev/null 2>&1; then
     echo "$(date) wlock finished"
 elif pgrep dwm >/dev/null 2>&1; then
     echo "$(date) branch: dwm detected, trying slock"
-    if command -v slock >/dev/null 2>&1; then
-        # When called from system context, DISPLAY may not be set.
-        # Try :0 as default for the running X session.
-        export DISPLAY="${DISPLAY:-:0}"
-        slock &
-        wait $! 2>/dev/null
-        echo "$(date) slock finished"
-        exit 0
-    else
+
+    if ! command -v slock >/dev/null 2>&1; then
         echo "$(date) slock not found, falling back to physlock"
         try_physlock
         exit 0
     fi
+
+    # Lock every active dwm session as its owner
+    slock_started=0
+    for dwm_pid in $(pgrep dwm 2>/dev/null); do
+        [ "$(cat /proc/$dwm_pid/comm 2>/dev/null)" = "dwm" ] || continue
+        dwm_uid=$(awk '/^Uid:/{print $2}' /proc/$dwm_pid/status 2>/dev/null)
+        [ -z "$dwm_uid" ] && continue
+        dwm_user=$(getent passwd "$dwm_uid" 2>/dev/null | cut -d: -f1)
+        [ -z "$dwm_user" ] && continue
+
+        # Extract DISPLAY and XAUTHORITY from the dwm process environment
+        dwm_display=$(tr '\0' '\n' < /proc/$dwm_pid/environ 2>/dev/null | grep '^DISPLAY=' | cut -d= -f2-)
+        [ -n "$dwm_display" ] || dwm_display=":0"
+        dwm_xauth=$(tr '\0' '\n' < /proc/$dwm_pid/environ 2>/dev/null | grep '^XAUTHORITY=' | cut -d= -f2-)
+        if [ -z "$dwm_xauth" ]; then
+            dwm_home=$(getent passwd "$dwm_uid" 2>/dev/null | cut -d: -f6)
+            dwm_xauth="${dwm_home:-/home/$dwm_user}/.Xauthority"
+        fi
+
+        echo "$(date) starting slock for $dwm_user on $dwm_display"
+        su "$dwm_user" -c "env DISPLAY=$dwm_display XAUTHORITY=$dwm_xauth slock" &
+        slock_started=1
+    done
+
+    if [ "$slock_started" -eq 0 ]; then
+        echo "$(date) no slock started (dwm zombie?), falling back to physlock"
+        try_physlock
+        exit 0
+    fi
+
+    # Wait for slock to finish
+    echo "$(date) waiting for slock..."
+    wait 2>/dev/null
+    echo "$(date) slock finished"
+    exit 0
 else
     echo "$(date) branch: no dwl, using physlock"
     # No graphical session — lock TTY consoles with physlock

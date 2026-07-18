@@ -7,6 +7,9 @@
 # Launched from .xinitrc (or manually). Idempotent (won't start duplicates).
 
 LOG_DIR="/var/log"
+if [ ! -w "$LOG_DIR" ]; then
+    LOG_DIR="$HOME/logs"
+fi
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG_FILE="$LOG_DIR/${USER:-root}-net-watch-$(date +%Y%m%d-%H%M%S).log"
 

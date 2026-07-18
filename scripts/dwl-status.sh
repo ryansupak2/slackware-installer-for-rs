@@ -10,6 +10,9 @@ fi
 HIDE_MODE_FILE="$XDG_RUNTIME_DIR/hide_mode"
 FIFO="${XDG_RUNTIME_DIR}/somebar-0"
 LOG_DIR="/var/log"
+if [ ! -w "$LOG_DIR" ]; then
+    LOG_DIR="$HOME/logs"
+fi
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG="$LOG_DIR/${USER:-root}-dwl-status-$(date +%Y%m%d-%H%M%S).log"
 exec >>"$LOG" 2>&1

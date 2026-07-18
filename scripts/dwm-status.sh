@@ -5,6 +5,9 @@
 # Logs to /var/log/<user>-dwm-status-YYYYMMDD-HHMMSS.log
 
 LOG_DIR="/var/log"
+if [ ! -w "$LOG_DIR" ]; then
+    LOG_DIR="$HOME/logs"
+fi
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOGFILE="$LOG_DIR/${USER:-root}-dwm-status-$(date +%Y%m%d-%H%M%S).log"
 exec >>"$LOGFILE" 2>&1

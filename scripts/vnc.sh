@@ -14,8 +14,11 @@
 
 # ── Configuration ──────────────────────────────────────────────────────
 LOG_DIR="/var/log"
+if [ ! -w "$LOG_DIR" ]; then
+    LOG_DIR="$HOME/logs"
+fi
 LOG_FILE="$LOG_DIR/${USER:-root}-vnc-$(date +%Y%m%d-%H%M%S).log"
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 exec > >(tee -a "$LOG_FILE") 2>&1
 

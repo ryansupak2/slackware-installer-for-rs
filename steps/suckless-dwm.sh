@@ -122,6 +122,8 @@ cp "$REPO_DIR/scripts/toggle-hide-mode.sh" /usr/local/bin/toggle-hide-mode.sh
 chmod +x /usr/local/bin/toggle-hide-mode.sh
 cp "$REPO_DIR/scripts/temp-msg.sh" /usr/local/bin/temp-msg.sh
 chmod +x /usr/local/bin/temp-msg.sh
+cp "$REPO_DIR/scripts/broadcast.sh" /usr/local/bin/broadcast
+chmod +x /usr/local/bin/broadcast
 
 echo "  dwm-start deployed to /usr/local/bin/dwm-start"
 echo "  dwm-status deployed to /usr/local/bin/dwm-status"

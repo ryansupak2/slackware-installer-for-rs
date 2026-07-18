@@ -7,6 +7,9 @@
 export PATH="/usr/sbin:/sbin:/usr/bin:/bin:/usr/local/bin:$PATH"
 
 LOG_DIR="/var/log"
+if [ ! -w "$LOG_DIR" ]; then
+    LOG_DIR="$HOME/logs"
+fi
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG="$LOG_DIR/${USER:-root}-vpn-suspend-$(date +%Y%m%d-%H%M%S).log"
 exec >>"$LOG" 2>&1

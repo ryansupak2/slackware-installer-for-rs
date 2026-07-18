@@ -17,8 +17,11 @@ STATE_FILE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/vpn_state"
 MAX_TRIES=5
 CONNECT_TIMEOUT=15
 LOG_DIR="/var/log"
+if [ ! -w "$LOG_DIR" ]; then
+    LOG_DIR="$HOME/logs"
+fi
 LOG_FILE="$LOG_DIR/${USER:-root}-vpn-$(date +%Y%m%d-%H%M%S).log"
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
 # Redirect all output to both screen and log (matching wifi-manager / dwl-start pattern)
 exec > >(tee -a "$LOG_FILE") 2>&1
 

@@ -1506,6 +1506,7 @@ propertynotify(XEvent *e)
 void
 quit(const Arg *arg)
 {
+	system("broadcast Exiting Window Manager Now...");
 	running = 0;
 }
 
