@@ -65,7 +65,7 @@ if [ -f /etc/rc.d/rc.local ]; then
     if ! grep -q "acpi-wakeup" /etc/rc.d/rc.local 2>/dev/null; then
         cat >> /etc/rc.d/rc.local << 'EOF'
 
-# Disable ACPI wakeup devices (added by post-install-global.sh)
+# acpi-wakeup: disable wakeup devices (added by post-install-global.sh)
 for dev in LID XHC RP01 RP02 RP03 RP04 RP05 RP06 RP07 RP08; do
     [ -f "/proc/acpi/wakeup" ] && grep -q "^$dev" /proc/acpi/wakeup && echo "$dev" > /proc/acpi/wakeup 2>/dev/null || true
 done

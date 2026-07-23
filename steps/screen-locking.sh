@@ -71,6 +71,36 @@ else
     fi
 fi
 
+# physlock (TTY/console screen locker — used when no X session is active)
+if [ -x /usr/local/bin/physlock ] && [ -f /etc/pam.d/physlock ]; then
+    echo "  physlock already installed — skipping build"
+    physlock_ok=true
+else
+    echo "Building physlock (TTY/console screen locker)..."
+
+    if [ -d "$REPO_DIR/sources/physlock" ]; then
+        if make -C "$REPO_DIR/sources/physlock" HAVE_SYSTEMD=0 HAVE_ELOGIND=1; then
+            install -m 4755 -o root -g root \
+                "$REPO_DIR/sources/physlock/physlock" /usr/local/bin/physlock 2>/dev/null
+            echo "  physlock built and installed to /usr/local/bin/physlock."
+            cp "$REPO_DIR/dotfiles/lockscreen/physlock.pam" /etc/pam.d/physlock 2>/dev/null
+            echo "  physlock PAM config installed."
+            if grep -qE '^[[:space:]]*(auth|account)[[:space:]]+(required|requisite|sufficient)[[:space:]]+pam_unix\.so' /etc/pam.d/physlock 2>/dev/null; then
+                physlock_ok=true
+            else
+                echo "ERROR: physlock PAM config missing required pam_unix.so entries."
+                physlock_ok=false
+            fi
+        else
+            echo "ERROR: could not build physlock."
+            physlock_ok=false
+        fi
+    else
+        echo "ERROR: physlock source not found at $REPO_DIR/sources/physlock."
+        physlock_ok=false
+    fi
+fi
+
 # Verdict: acpid configs AND both lockers must succeed
 if [ -x /usr/local/bin/lock-screen.sh ] && \
    [ -f /etc/acpi/events/lid-close ] && \
