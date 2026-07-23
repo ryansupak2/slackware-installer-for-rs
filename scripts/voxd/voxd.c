@@ -618,8 +618,22 @@ static void run_alsa_mode(void) {
 
                 } else {
                     /* ── Warm start: drain, prepare, reset stream ── */
-                    snd_pcm_drop(alsa);
-                    snd_pcm_prepare(alsa);
+                    int alsa_err = 0;
+                    if (snd_pcm_drop(alsa) < 0) alsa_err = 1;
+                    if (!alsa_err && snd_pcm_prepare(alsa) < 0) alsa_err = 1;
+                    if (alsa_err) {
+                        /* ALSA handle stale (likely after suspend/resume) — re-open */
+                        log_msg("Warm start: ALSA drop/prepare failed — re-opening device");
+                        snd_pcm_close(alsa);
+                        alsa = alsa_open();
+                        if (!alsa) {
+                            log_msg("FATAL: ALSA re-open failed on warm start");
+                            state_clear();
+                            if (g_dump_audio) dump_close();
+                            return;
+                        }
+                        log_msg("Warm start: ALSA re-opened successfully");
+                    }
                     if (stream) {
                         SherpaOnnxOnlineStreamReset(recognizer, stream);
                         log_msg("Stream reset (warm)");
@@ -698,7 +712,24 @@ static void run_alsa_mode(void) {
         /* --- Audio capture --- */
         int16_t buf[CHUNK_SAMPLES];
         int rc = snd_pcm_readi(alsa, buf, CHUNK_SAMPLES);
-        if (rc < 0) { rc = snd_pcm_recover(alsa, rc, 0); if (rc < 0) break; continue; }
+        if (rc < 0) {
+            int recovered = snd_pcm_recover(alsa, rc, 0);
+            if (recovered < 0) {
+                /* ALSA device is dead (likely after suspend/resume) —
+                 * try to close and re-open instead of exiting the daemon */
+                log_msg("ALSA: unrecoverable error (%s) — attempting re-open",
+                         snd_strerror(rc));
+                snd_pcm_close(alsa);
+                alsa = alsa_open();
+                if (!alsa) {
+                    log_msg("FATAL: ALSA re-open failed — daemon cannot continue");
+                    break;
+                }
+                log_msg("ALSA: re-opened successfully after error");
+                continue;
+            }
+            continue;
+        }
 
         /* Diagnostic: log first audio chunk arrival to identify DMIC lag */
         if (!first_chunk_logged) {
