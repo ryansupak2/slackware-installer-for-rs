@@ -49,16 +49,14 @@ if [ -z "$TARGET_USER" ]; then
     echo "Specify --user. Use --help for usage."; exit 1
 fi
 
-# Set REPO_DIR to the directory where this script (and the installer) lives.
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Set up dual logging: everything from this point on goes to the screen
-# AND is appended to a dedicated per-user-installer log file.
-LOG_DIR="/var/log"
-mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/${TARGET_USER:-${USER:-root}}-post-install-user-$(date +%Y%m%d-%H%M%S).log"
-export LOG_FILE
-exec > >(tee -a "$LOG_FILE") 2>&1
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
+
+# Set up dual logging: tee to screen + /var/log (uses TARGET_USER as log prefix)
+init_installer_log "post-install-user" "$TARGET_USER"
 
 echo "=================================================="
 echo "Per-user setup log for $TARGET_USER started: $(date)"
@@ -69,8 +67,6 @@ echo "=================================================="
 # User account creation (and the new "user already exists?" + destructive delete+recreate prompt)
 # now lives in steps/user-ensure.sh so it can be run independently and always
 # emits a proper SUCCESS/ERROR line like the global steps.
-# REPO_DIR is already set above.
-# (was duplicated — removed the second assignment)
 export TARGET_USER
 export ADD_WHEEL
 

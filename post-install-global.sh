@@ -39,41 +39,26 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-# Set up dual logging: everything from this point on goes to the screen
-LOG_DIR="/var/log"
-mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/${USER:-root}-post-install-global-$(date +%Y%m%d-%H%M%S).log"
-export LOG_FILE
-exec > >(tee -a "$LOG_FILE") 2>&1
+export REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
+
+# Set up dual logging: tee to screen + /var/log
+init_installer_log "post-install-global"
 
 echo "=================================================="
 echo "Installer log started: $(date)"
 echo "Log file: $LOG_FILE (also duplicated to screen)"
 echo "=================================================="
-# Global setup (always run)
 echo "*****************************************************"
 echo "INITIALIZATION (Slackware Linux)"
 echo "*****************************************************"
 
-export REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+read_setup_keys
 
-echo "Reading Keys from setup.keys.root..."
-KEY_FILE="$REPO_DIR/setup.keys.root"
-if [ -f "$KEY_FILE" ]; then
-    while IFS='=' read -r key value; do
-      [[ -z "$key" || "$key" =~ ^# ]] && continue
-      export "$key"="$value"
-    done < "$KEY_FILE"
-else
-    echo "Warning: $KEY_FILE not found. No keys loaded."
-fi
-
-# Set timezone to Chicago (America/Chicago)
-if [ -f /usr/share/zoneinfo/America/Chicago ]; then
-    ln -sf /usr/share/zoneinfo/America/Chicago /etc/localtime
-    hwclock --hctosys 2>/dev/null || true
-    echo "Timezone set to America/Chicago"
-fi
+set_timezone_chicago
 
 # Global counters for FINAL SUMMARY (tracking Core, Networking, Hardware, and others)
 success_count=0
@@ -82,16 +67,11 @@ error_count=0
 
 firefox_ran=false
 
-# Source shared helpers (install_pkg, log_msg, etc.)
-if [ -f "$REPO_DIR/lib/common.sh" ]; then
-    . "$REPO_DIR/lib/common.sh"
-fi
-
 # (All individual setup steps have been moved to ./steps/*.sh)
 # They are now standalone scripts that exit 0 on success / 1 on error.
 # The main script only owns the menu, dispatch, and tally.
 #
-# Source the common helpers (already done above for the main script itself).
+# (lib/common.sh already sourced above — provides install_pkg, install_sbo, log_msg)
 # Category definitions (for Slackware: removed glibc-compat, renamed apk step)
 core_prereqs=("slackpkg-setup" "console-font" "ca-certificates" "xlibre" "root-dotfiles")
 networking=("wifi" "openvpn" "vnc")

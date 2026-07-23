@@ -74,8 +74,8 @@ if $ok; then
         cp bin/whisper-cli "$CLI_BIN" && chmod +x "$CLI_BIN" || ok=false
         cp bin/whisper-stream "$STREAM_BIN" && chmod +x "$STREAM_BIN" || ok=false
         mkdir -p "$MODEL_DIR"
-        cp models/ggml-tiny.en.bin "$TINY_MODEL" || ok=false
-        cp models/ggml-base.en.bin "$BASE_MODEL" || ok=false
+        cp "$SRC/models/ggml-tiny.en.bin" "$TINY_MODEL" || ok=false
+        cp "$SRC/models/ggml-base.en.bin" "$BASE_MODEL" || ok=false
         echo "  whisper-cli → $CLI_BIN"
         echo "  whisper-stream → $STREAM_BIN"
         echo "  tiny.en → $TINY_MODEL"

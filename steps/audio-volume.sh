@@ -19,6 +19,10 @@ if ! install_pkg "alsa-utils"; then ok=false; fi
 
 # The SOF firmware IS present on this system (see /lib/firmware/intel/sof/).
 # Do NOT force legacy HDA — the internal DMIC requires the SOF DSP driver.
+#
+# However, SOF firmware can fail to load on cold boot due to a firmware-loader
+# race (the driver probes before the rootfs is fully settled). Including the SOF
+# module + firmware in the initrd ensures it's available at probe time.
 if [ -f "$ELILO_CONF" ]; then
     sed -i 's/ snd-intel-dspcfg.dsp_driver=[0-9]//g' "$ELILO_CONF"
     echo "  Removed any snd-intel-dspcfg.dsp_driver override from elilo"
@@ -61,6 +65,55 @@ if [ -f /usr/share/pipewire/pipewire.conf ]; then
     else
         echo "  PipeWire ALSA backend already enabled"
     fi
+fi
+
+# ── Rebuild initrd with SOF audio for cold-boot reliability ──────
+# The SOF driver needs firmware at probe time. On some boots the firmware
+# loader races with rootfs availability and fails (ENOENT). Including the
+# module + firmware in the initrd fixes this permanently.
+SOF_MOD="snd_sof_pci_intel_cnl"
+INITRD_IMG="/boot/initrd.gz"
+CMDLINE_FILE="/boot/initrd-tree/command_line"
+if [ -d "/lib/firmware/intel/sof" ] && [ -f "/lib/firmware/intel/sof/sof-cnl.ri" ]; then
+    if ! zcat "$INITRD_IMG" 2>/dev/null | cpio -t 2>/dev/null | grep -q 'sof.*\.ri'; then
+        echo "Rebuilding initrd with SOF audio firmware for cold-boot reliability..."
+        if [ -f "$CMDLINE_FILE" ]; then
+            PREV_CMD=$(cat "$CMDLINE_FILE")
+            if echo "$PREV_CMD" | grep -q -- '-m '; then
+                # Strip any prior SOF_MOD from the list to avoid doubling up
+                CLEAN_CMD=$(echo "$PREV_CMD" | sed "s/:${SOF_MOD}//g")
+                NEW_CMD=$(echo "$CLEAN_CMD" | sed "s/-m [^ ]\+/&:${SOF_MOD}/")
+            else
+                NEW_CMD="$PREV_CMD -m ${SOF_MOD}"
+            fi
+            echo "  Running: $NEW_CMD"
+            # SOF modules don't declare firmware via modinfo (the firmware
+            # name is built dynamically at runtime). Manually copy firmware
+            # into the initrd-tree and repack so it's available at cold-boot
+            # probe time.
+            if [ -d "/boot/initrd-tree" ]; then
+                mkdir -p /boot/initrd-tree/lib/firmware/intel/sof
+                mkdir -p /boot/initrd-tree/lib/firmware/intel/sof-tplg
+                cp -a /lib/firmware/intel/sof/sof-cnl.ri /boot/initrd-tree/lib/firmware/intel/sof/ 2>/dev/null || true
+                cp -a /lib/firmware/intel/sof-tplg/sof-hda-generic-2ch.tplg /boot/initrd-tree/lib/firmware/intel/sof-tplg/ 2>/dev/null || true
+                # Also copy cml and cfl symlinks (Comet Lake uses sof-cml.ri)
+                for f in sof-cml.ri sof-cfl.ri; do
+                    if [ -L "/lib/firmware/intel/sof/$f" ]; then
+                        TGT=$(readlink "/lib/firmware/intel/sof/$f")
+                        ln -sf "$TGT" "/boot/initrd-tree/lib/firmware/intel/sof/$f" 2>/dev/null || true
+                    fi
+                done
+                echo "  Repacking initrd with SOF firmware..."
+                /sbin/mkinitrd 2>/dev/null || echo "  WARNING: initrd repack failed"
+            fi
+        else
+            echo "  WARNING: no command_line file — skipping initrd rebuild"
+        fi
+    else
+        echo "  SOF firmware already in initrd."
+    fi
+else
+    echo "  SOF firmware not found — skipping initrd rebuild."
 fi
 
 # Force duplex capture profile (jack detection may report mic as unavailable)

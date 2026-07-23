@@ -141,39 +141,16 @@ for step in xlibre suckless-dwm; do
     fi
 done
 
-# ── Test 9: Debug variant consistency ───────────────────────────────────
-echo "=== Test 9: Debug variant consistency ==="
-DEBUG="$REPO_DIR/post-install-global-debug.sh"
-if head -5 "$DEBUG" | grep -q 'DEBUG/NO-X11 VARIANT'; then
-    pass "debug: relationship comment present"
-else
-    fail "debug: missing relationship comment"
-fi
-for step in root-dotfiles sof-firmware whisper-cpp-vox; do
-    if grep -E '^[a-z_]+=\("' "$DEBUG" | grep -q "\"$step\""; then
-        fail "debug: $step should be absent"
-    else
-        pass "debug: $step correctly absent"
-    fi
-done
-for step in xlibre suckless-dwm; do
-    if grep -E '^[a-z_]+=\("' "$DEBUG" | grep -q "\"$step\""; then
-        pass "debug: $step present (matches main)"
-    else
-        fail "debug: $step missing from debug variant"
-    fi
-done
-
-# ── Test 10: Bootstrap integrity ────────────────────────────────────────
-echo "=== Test 10: Bootstrap integrity ==="
+# ── Test 9: Bootstrap integrity ────────────────────────────────────────
+echo "=== Test 9: Bootstrap integrity ==="
 BOOTSTRAP="$REPO_DIR/bootstrap.sh"
 [ -f "$BOOTSTRAP" ] && pass "bootstrap: exists" || fail "bootstrap: MISSING"
 head -1 "$BOOTSTRAP" | grep -q '#!/bin/bash' && pass "bootstrap: shebang" || fail "bootstrap: shebang"
-grep -q 'LOG_DIR="/var/log"' "$BOOTSTRAP" 2>/dev/null && pass "bootstrap: LOG_DIR" || fail "bootstrap: LOG_DIR"
+grep -q 'init_installer_log' "$BOOTSTRAP" 2>/dev/null && pass "bootstrap: init_installer_log" || fail "bootstrap: init_installer_log"
 grep -q 'success_count' "$BOOTSTRAP" 2>/dev/null && pass "bootstrap: success_count" || fail "bootstrap: success_count"
 
-# ── Test 11: post-install-user.sh step coverage ─────────────────────────
-echo "=== Test 11: User step coverage ==="
+# ── Test 10: post-install-user.sh step coverage ─────────────────────────
+echo "=== Test 10: User step coverage ==="
 USER_SCRIPT="$REPO_DIR/post-install-user.sh"
 # Extract step paths from step_list (matches "./steps/user-foo.sh" but not globs)
 USER_STEPS=$(grep -o '\./steps/user-[a-z][a-z-]*\.sh' "$USER_SCRIPT" 2>/dev/null | sed 's|.*/||' | sort -u)

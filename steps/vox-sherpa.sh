@@ -48,7 +48,9 @@ else
         if [ -d sherpa-onnx ]; then
             cd sherpa-onnx && git pull --ff-only 2>/dev/null || true
         else
+            echo "  Cloning sherpa-onnx (this may take a minute)..."
             git clone --depth 1 https://github.com/k2-fsa/sherpa-onnx
+            echo "  Clone complete."
         fi || { echo "ERROR: clone/update failed"; ok=false; }
 
         if $ok; then
@@ -56,6 +58,7 @@ else
             mkdir -p build && cd build
 
             if [ ! -f "$LIB" ]; then
+                echo "  Running cmake (configuring build)..."
                 cmake -DCMAKE_BUILD_TYPE=Release \
                       -DBUILD_SHARED_LIBS=ON \
                       -DSHERPA_ONNX_ENABLE_PYTHON=OFF \
@@ -63,6 +66,7 @@ else
                       -DSHERPA_ONNX_ENABLE_CHECK=OFF \
                       -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
                       .. || { echo "ERROR: cmake failed"; ok=false; }
+                echo "  cmake complete."
             fi
 
             if $ok && [ ! -f "$LIB" ]; then
@@ -103,8 +107,10 @@ else
     mkdir -p /usr/local/share/vox
     cd /usr/local/share/vox
 
-    curl -L --progress-bar -o zipformer-en-20M.tar.bz2 \
+    echo "  Downloading ~100MB model tarball (this may take a few minutes)..."
+    wget --show-progress -O zipformer-en-20M.tar.bz2 \
         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2" || ok=false
+    echo "  Download complete."
 
     if $ok; then
         tar xf zipformer-en-20M.tar.bz2 || ok=false

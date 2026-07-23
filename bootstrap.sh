@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # bootstrap.sh - Early bootstrap for Slackware Linux + pi installer
 # Run as root very early (e.g. from Slackware live environment or first boot after base install).
 # Installs minimal prerequisites, sets console font, installs the pi agent,
@@ -14,11 +13,16 @@
 #
 # After this, typically run post-install-global.sh (and then post-install-user.sh).
 
-LOG_DIR="/var/log"
-mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/${USER:-root}-bootstrap-$(date +%Y%m%d-%H%M%S).log"
-export LOG_FILE
-exec > >(tee -a "$LOG_FILE") 2>&1
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+export REPO_DIR
+
+# Source shared helpers early — we need init_installer_log, read_setup_keys, etc.
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
+
+# Set up dual logging: tee to screen + /var/log
+init_installer_log "bootstrap"
 
 echo "=================================================="
 echo "Bootstrap log started: $(date)"
@@ -29,24 +33,21 @@ echo "*****************************************************"
 echo "BOOTSTRAP INITIALIZATION (Slackware Linux + pi)"
 echo "*****************************************************"
 
-REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Load keys from setup.keys.root
+read_setup_keys
 
-echo "Reading Keys from setup.keys.root..."
-KEY_FILE="$REPO_DIR/setup.keys.root"
-if [ -f "$KEY_FILE" ]; then
-    while IFS='=' read -r key value; do
-      [[ -z "$key" || "$key" =~ ^# ]] && continue
-      export "$key"="$value"
-    done < "$KEY_FILE"
-    echo "  Keys loaded."
-else
-    echo "ERROR: $KEY_FILE not found. No keys loaded for bootstrap."
+# ------------------------------------------------------------------
+# Ensure internet connectivity (only touch WiFi if not already online)
+# ------------------------------------------------------------------
+ONLINE=false
+if command -v curl >/dev/null 2>&1; then
+    if curl --connect-timeout 5 -s https://github.com >/dev/null 2>&1; then
+        ONLINE=true
+        echo "Internet already reachable — skipping WiFi setup."
+    fi
 fi
 
-# ------------------------------------------------------------------
-# Connect to WiFi if credentials are provided
-# ------------------------------------------------------------------
-if [ -n "$WIFI_SSID" ] && [ -n "$WIFI_PASS" ]; then
+if [ "$ONLINE" = false ] && [ -n "$WIFI_SSID" ] && [ -n "$WIFI_PASS" ]; then
     echo "*****************************************************"
     echo "CONNECTING TO WIFI: $WIFI_SSID"
     echo "*****************************************************"
@@ -57,44 +58,34 @@ if [ -n "$WIFI_SSID" ] && [ -n "$WIFI_PASS" ]; then
 
     if command -v nmcli >/dev/null 2>&1; then
         echo "Running: nmcli device wifi connect \"$WIFI_SSID\" ..."
-        nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" && {
+        if nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS"; then
             echo "Connected to $WIFI_SSID."
-        } || {
+        else
             echo "WARNING: nmcli connection attempt returned non-zero."
             echo "  If you are already online via Ethernet, this is harmless."
-        }
+        fi
     else
         echo "ERROR: nmcli not found — cannot auto-connect WiFi."
         echo "  Use nmtui manually or connect via Ethernet."
     fi
 
-    if command -v curl >/dev/null 2>&1; then
-        echo "Testing internet connectivity (curl https://github.com)..."
-        if curl --connect-timeout 5 https://github.com >/dev/null 2>&1; then
-            echo "Internet reachable."
-        else
-            echo "WARNING: Internet not reachable. pi install may fail."
-        fi
+    # Re-test after WiFi attempt
+    if command -v curl >/dev/null 2>&1 && curl --connect-timeout 5 -s https://github.com >/dev/null 2>&1; then
+        echo "Internet reachable."
+    else
+        echo "WARNING: Internet not reachable. pi install may fail."
     fi
-else
-    echo "No WIFI_SSID / WIFI_PASS in setup.keys.root — skipping auto-connect."
-    echo "If not already online, use nmtui or Ethernet before proceeding."
+elif [ "$ONLINE" = false ]; then
+    echo "No internet and no WIFI_SSID / WIFI_PASS in setup.keys.root — cannot auto-connect."
+    echo "Use nmtui or Ethernet before proceeding."
 fi
 echo ""
 
 success_count=0
 error_count=0
 
-
 # Set timezone to Chicago early (before any timestamped operations)
-if [ -f /usr/share/zoneinfo/America/Chicago ]; then
-    ln -sf /usr/share/zoneinfo/America/Chicago /etc/localtime
-    hwclock --hctosys 2>/dev/null || true
-    echo "Timezone set to America/Chicago"
-fi
-if [ -f "$REPO_DIR/lib/common.sh" ]; then
-    . "$REPO_DIR/lib/common.sh"
-fi
+set_timezone_chicago
 
 echo "*****************************************************"
 echo "SBOPKG + BASE PACKAGES + NODE.JS"
@@ -151,9 +142,11 @@ else
     echo "ERROR: Node.js not found after install."
     error_count=$((error_count + 1))
 fi
+# Make Node.js (and pi once installed) available in current shell
+export PATH="$NODE_DIR/bin:$PATH"
 
-# Set readable console font
-setfont ter-v32b 2>/dev/null || true
+# --- Console font (delegated to step script) ---
+./steps/console-font.sh && success_count=$((success_count + 1)) || error_count=$((error_count + 1))
 
 echo "*****************************************************"
 echo "PI INSTALLER"
@@ -169,6 +162,11 @@ else
     if curl -fsSL https://pi.dev/install.sh | sh; then
         echo "SUCCESS: pi installed."
         success_count=$((success_count + 1))
+        ln -sf "$NODE_DIR/bin/pi" /usr/local/bin/pi
+        hash -r  # clear bash command cache so pi is found immediately
+        if ! command -v pi >/dev/null 2>&1; then
+            echo "WARNING: pi installed but not found in PATH — extension installs may fail."
+        fi
     else
         echo "ERROR: pi installation failed."
         error_count=$((error_count + 1))
@@ -176,13 +174,19 @@ else
 fi
 
 echo "Installing pi-hashline-edit..."
-if pi install npm:pi-hashline-edit; then
+if pi list 2>/dev/null | grep -qF "pi-hashline-edit"; then
+    echo "SUCCESS: pi-hashline-edit already installed — skipping."
+    success_count=$((success_count + 1))
+else
+    echo "(This may take a few minutes — downloading npm package...)"
+    if pi install npm:pi-hashline-edit 2>&1; then
         echo "SUCCESS: pi-hashline-edit installed."
         success_count=$((success_count + 1))
     else
         echo "ERROR: pi install npm:pi-hashline-edit failed."
         error_count=$((error_count + 1))
     fi
+fi
 echo "*****************************************************"
 echo "PI CONFIGURATION (root)"
 echo "*****************************************************"
@@ -236,35 +240,25 @@ fi
 echo "Deploying readonly-mode extension..."
 if cp "$REPO_DIR/dotfiles/pi/readonly-mode.ts" /root/.pi/extensions/readonly-mode.ts 2>/dev/null; then
     echo "  readonly-mode.ts copied."
-    if pi install /root/.pi/extensions/readonly-mode.ts; then
-        echo "SUCCESS: readonly-mode extension registered."
+    if pi list 2>/dev/null | grep -qF "readonly-mode"; then
+        echo "SUCCESS: readonly-mode extension already registered — skipping."
         success_count=$((success_count + 1))
     else
-        echo "ERROR: pi install readonly-mode.ts failed."
-        error_count=$((error_count + 1))
+        if pi install /root/.pi/extensions/readonly-mode.ts 2>&1; then
+            echo "SUCCESS: readonly-mode extension registered."
+            success_count=$((success_count + 1))
+        else
+            echo "ERROR: pi install readonly-mode.ts failed."
+            error_count=$((error_count + 1))
+        fi
     fi
 else
     echo "ERROR: could not copy readonly-mode.ts."
     error_count=$((error_count + 1))
 fi
 
-echo "*****************************************************"
-echo "ROOT DOTFILES (bashrc, bash_profile)"
-echo "*****************************************************"
-if cp "$REPO_DIR/dotfiles/shell/bashrc" /root/.bashrc 2>/dev/null; then
-    echo "SUCCESS: bashrc deployed."
-    success_count=$((success_count + 1))
-else
-    echo "ERROR: could not copy bashrc."
-    error_count=$((error_count + 1))
-fi
-if cp "$REPO_DIR/dotfiles/shell/bash_profile" /root/.bash_profile 2>/dev/null; then
-    echo "SUCCESS: bash_profile deployed."
-    success_count=$((success_count + 1))
-else
-    echo "ERROR: could not copy bash_profile."
-    error_count=$((error_count + 1))
-fi
+# --- Root dotfiles (delegated to step script) ---
+./steps/root-dotfiles.sh && success_count=$((success_count + 1)) || error_count=$((error_count + 1))
 
 # Log file location (before final summary)
 echo ""

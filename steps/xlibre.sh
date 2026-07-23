@@ -19,6 +19,16 @@ PREFIX="/usr/local"
 PKG_CONFIG_PATH="${PREFIX}/lib64/pkgconfig:${PREFIX}/share/pkgconfig:${PKG_CONFIG_PATH}"
 export PKG_CONFIG_PATH
 
+# ── Ensure meson ≥ 0.61.0 (XLibre requirement) ────────────────
+MESON_MIN="0.61.0"
+MESON_CUR=$(meson --version 2>/dev/null || echo "0")
+if ! python3 -c "from packaging.version import Version; exit(0 if Version('$MESON_CUR') >= Version('$MESON_MIN') else 1)" 2>/dev/null; then
+    echo "Upgrading meson ($MESON_CUR → ≥ $MESON_MIN) for XLibre..."
+    pip3 install "meson>=${MESON_MIN}" || { echo "ERROR: meson upgrade failed"; exit 1; }
+    echo "  meson $(meson --version) installed"
+else
+    echo "meson $MESON_CUR (≥ $MESON_MIN) — OK"
+fi
 # ── System build dependencies ───────────────────────────────
 echo "Checking system build dependencies..."
 install_pkg "libX11 libXext libXfont2 libXau libXdmcp libxcb xcb-proto xtrans"

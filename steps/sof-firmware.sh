@@ -62,6 +62,7 @@ else
 
     if $ok; then
         echo "Extracting topology..."
+        mkdir -p /lib/firmware/intel/sof-tplg
         if tar xzf "$SOF_TGZ" -C /lib/firmware/intel/sof-tplg/ \
             --strip-components=2 \
             "sof-bin-2024.09.1/sof-tplg/sof-hda-generic-2ch.tplg" 2>/dev/null; then
@@ -72,10 +73,11 @@ else
         fi
 
         echo "Extracting firmware..."
+        mkdir -p /lib/firmware/intel/sof
         if tar xzf "$SOF_TGZ" -C /lib/firmware/intel/sof/ \
-            --strip-components=2 \
-            "sof-bin-2024.09.1/sof/sof-cml.ri" 2>/dev/null; then
-            echo "  sof-cml.ri installed"
+            --strip-components=3 \
+            "sof-bin-2024.09.1/sof/intel-signed/" 2>/dev/null; then
+            echo "  sof-cml.ri installed (intel-signed)"
         else
             echo "  WARNING: firmware extraction failed"
             ok=false

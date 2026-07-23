@@ -9,7 +9,18 @@
 
 set -euo pipefail
 
-REPO_DIR="${REPO_DIR:-/root/Development/slackware-installer-for-rs}"
+REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
+LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
+
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+    . "$REPO_DIR/lib/common.sh"
+fi
+
+echo "*****************************************************"
+echo "LOG CONSISTENCY"
+echo "*****************************************************"
+
+ok=true
 
 # ── 1. Ensure /var/log/sessions exists with correct permissions ──────────
 echo "── log directory ──"
@@ -53,3 +64,11 @@ ln -sf /usr/local/bin/net-watch /usr/local/bin/net-watch.sh 2>/dev/null || true
 echo ""
 echo "Log consistency: all scripts now write to /var/log/sessions/"
 echo "Done."
+
+if $ok; then
+    echo "SUCCESS: Log consistency enforced — all scripts write to /var/log/sessions/"
+    exit 0
+else
+    echo "ERROR: Log consistency setup encountered errors."
+    exit 1
+fi

@@ -68,11 +68,18 @@ chmod +x /etc/rc.d/rc.local 2>/dev/null || true
 
 # 5. Connect to WiFi if keys provided
 if [ -n "$WIFI_SSID" ] && [ -n "$WIFI_PASS" ]; then
-    echo "Configuring WiFi for $WIFI_SSID..."
-    sleep 2  # Give NetworkManager time to start
-    nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID" 2>/dev/null || true
-    nmcli connection modify "$WIFI_SSID" connection.autoconnect yes 2>/dev/null || true
-    echo "SUCCESS: WiFi configured for auto-reconnect on reboot (NetworkManager)."
+    # Check if already connected to this SSID before forcing a reconnect
+    ALREADY_CONNECTED=$(nmcli -t -f NAME connection show --active 2>/dev/null | grep -Fx "$WIFI_SSID" || true)
+    if [ -n "$ALREADY_CONNECTED" ]; then
+        echo "Already connected to $WIFI_SSID — skipping reconnect."
+        nmcli connection modify "$WIFI_SSID" connection.autoconnect yes 2>/dev/null || true
+    else
+        echo "Configuring WiFi for $WIFI_SSID..."
+        sleep 2  # Give NetworkManager time to start
+        nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASS" name "$WIFI_SSID" 2>/dev/null || true
+        nmcli connection modify "$WIFI_SSID" connection.autoconnect yes 2>/dev/null || true
+        echo "SUCCESS: WiFi configured for auto-reconnect on reboot (NetworkManager)."
+    fi
 else
     echo "Missing connection keys (WIFI_SSID or WIFI_PASS) in setup.keys.root"
     echo "WiFi not auto-configured; use nmtui or nmcli manually."
