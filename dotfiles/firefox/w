@@ -6,13 +6,13 @@ if [ $# -gt 0 ]; then
         *://*) uri="$raw" ;;
         *)
             f="${HOME}/.web/shortcuts"
+            [ -f "$f" ] || f="${HOME}/.surf/shortcuts"
             [ -f "$f" ] || f="/etc/web/shortcuts.default"
+            [ -f "$f" ] || f="/etc/surf/shortcuts.default"
             if [ -f "$f" ]; then
                 resolved=$(awk -v key="$raw" '$1 == key {print $2; exit}' "$f")
                 [ -n "$resolved" ] && uri="$resolved"
             fi
-            # fallback: treat unrecognized input as a raw URL
-            [ "$uri" = "about:blank" ] && uri="$raw"
             ;;
     esac
 fi
