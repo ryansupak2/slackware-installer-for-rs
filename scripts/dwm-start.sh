@@ -11,6 +11,12 @@ LOGFILE="$LOG_DIR/${USER:-root}-dwm-$(date +%Y%m%d-%H%M%S).log"
 
 # ── Output routing ───────────────────────────────────────────────
 exec >>"$LOGFILE" 2>&1
+# ── Guard: refuse to run inside an existing X session ───────────
+if [ -n "$DISPLAY" ]; then
+    echo "ERROR: Already inside an X session (DISPLAY=$DISPLAY)." >&2
+    echo "dwm-start must be run from a text console, not from within X." >&2
+    exit 1
+fi
 
 echo "========================================"
 echo "DWM session starting — $(date)"
