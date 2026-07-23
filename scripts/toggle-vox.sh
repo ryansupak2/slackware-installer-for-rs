@@ -15,6 +15,7 @@ MODEL_REV="/usr/local/share/vox/ggml-base.en.bin"
 W="/usr/local/bin/whisper-cli"; T="/usr/bin/wtype"
 L="/var/log"; mkdir -p "$L" 2>/dev/null; VL="$L/${USER:-root}-vox.log"
 log_msg() { echo "$(date): $*" >> "$VL"; }
+set_temp_msg() { return 0; }  # fallback if temp-msg.sh not installed
 [ -f /usr/local/bin/temp-msg.sh ] && . /usr/local/bin/temp-msg.sh
 
 transcribe() {

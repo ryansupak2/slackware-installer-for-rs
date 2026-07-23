@@ -90,14 +90,8 @@ for link in pi node npm npx corepack; do
     fi
 done
 
+# 5. Done
 # ═══════════════════════════════════════════════════════════════
-# 5. pi-update alias in .bashrc (optional, just note it)
-# ═══════════════════════════════════════════════════════════════
-echo "--- bashrc ---"
-if [ -f /root/.bashrc ] && grep -q 'pi-update' /root/.bashrc 2>/dev/null; then
-    echo "  NOTE: pi-update alias found in /root/.bashrc."
-    echo "  This is harmless. Remove the alias line manually if desired."
-fi
 
 # ═══════════════════════════════════════════════════════════════
 # Done

@@ -5,8 +5,8 @@ if [ $# -gt 0 ]; then
     case "$raw" in
         *://*) uri="$raw" ;;
         *)
-            f="${HOME}/.surf/shortcuts"
-            [ -f "$f" ] || f="/etc/surf/shortcuts.default"
+            f="${HOME}/.web/shortcuts"
+            [ -f "$f" ] || f="/etc/web/shortcuts.default"
             if [ -f "$f" ]; then
                 resolved=$(awk -v key="$raw" '$1 == key {print $2; exit}' "$f")
                 [ -n "$resolved" ] && uri="$resolved"

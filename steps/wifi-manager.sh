@@ -32,12 +32,6 @@ if $ok; then
     # Convenience symlink
     ln -sf /usr/local/bin/wifi-manager /usr/local/bin/wifi-manager.sh 2>/dev/null || true
 fi
-echo "  Copied $SOURCE_SCRIPT -> /usr/local/bin/wifi-manager"
-
-# Convenience symlink (people sometimes type the .sh)
-ln -sf /usr/local/bin/wifi-manager /usr/local/bin/wifi-manager.sh 2>/dev/null || true
-# Aliases are deployed by bootstrap.sh (root bashrc) and post-install-user.sh (user bashrc)
-
 
 if $ok; then
     echo ""

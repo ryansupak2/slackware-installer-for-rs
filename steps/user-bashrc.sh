@@ -82,7 +82,7 @@ setup_bashrc() {
 }
 
 ok=true
-setup_bashrc
+setup_bashrc || ok=false
 
 chown "$TARGET_USER:$TARGET_USER" "$HOME_TARGET/.bashrc" "$HOME_TARGET/.bash_profile" "$HOME_TARGET/.bash_logout" 2>/dev/null || true
 

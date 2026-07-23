@@ -1,5 +1,5 @@
 #!/bin/bash
-f="${HOME}/.surf/shortcuts"
-[ -f "$f" ] || f="/etc/surf/shortcuts.default"
+f="${HOME}/.web/shortcuts"
+[ -f "$f" ] || f="/etc/web/shortcuts.default"
 echo "  Shortcuts (from $f):"
 while read -r k u; do case "$k" in ''|\#*) continue;; esac; printf "    %-8s → %s\n" "$k" "$u"; done < "$f"

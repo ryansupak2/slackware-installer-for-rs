@@ -158,44 +158,9 @@ else
     exit 1
 fi
 
-# ------------------------------------------------------------------
-# 6. Update bashrc on the live system
-# ------------------------------------------------------------------
 echo ""
-echo "6. Deploying updated bashrc (pi-update alias without patch)..."
-if [ -f "$REPO_DIR/dotfiles/shell/bashrc" ]; then
-    cp "$REPO_DIR/dotfiles/shell/bashrc" /root/.bashrc
-    echo "   /root/.bashrc updated."
-else
-    echo "   WARNING: bashrc not found in repo; skipping."
-fi
-
-# ------------------------------------------------------------------
-# 7. Verify: Kitty flags MUST be 7 (unpatched)
-# ------------------------------------------------------------------
-echo ""
-echo "7. Verifying Kitty protocol flags are unpatched..."
-UNPATCHED=$(find /usr/local/node-v* /usr/lib64/node_modules \
-    -path '*/pi-tui/dist/terminal.js' 2>/dev/null \
-    -exec grep -lF 'DESIRED_KITTY_KEYBOARD_PROTOCOL_FLAGS = 7' {} \; 2>/dev/null | wc -l)
-PATCHED=$(find /usr/local/node-v* /usr/lib64/node_modules \
-    -path '*/pi-tui/dist/terminal.js' 2>/dev/null \
-    -exec grep -lF 'DESIRED_KITTY_KEYBOARD_PROTOCOL_FLAGS = 5' {} \; 2>/dev/null | wc -l)
-
-if [ "$UNPATCHED" -gt 0 ] && [ "$PATCHED" -eq 0 ]; then
-    echo "   VERIFIED: Kitty flags = 7 (unpatched, default upstream)."
-elif [ "$PATCHED" -gt 0 ]; then
-    echo "   WARNING: Kitty flags still patched (5). This is unexpected."
-    echo "   You may need to re-run this step after a clean pi install."
-else
-    echo "   WARNING: Could not find terminal.js to verify flags."
-    echo "   This may be fine — pi might store it at a different path."
-fi
-
-echo ""
-echo "SUCCESS: pi clean reinstall complete (no Kitty patch applied)."
+echo "SUCCESS: pi clean reinstall complete."
 echo "  pi version: $(pi --version 2>/dev/null || echo 'unknown')"
 echo "  Config:     /root/.pi/agent/"
 echo "  Extensions: /root/.pi/extensions/"
-echo "  bashrc:     /root/.bashrc (pi-update alias updated)"
 exit 0

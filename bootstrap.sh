@@ -146,7 +146,7 @@ fi
 export PATH="$NODE_DIR/bin:$PATH"
 
 # --- Console font (delegated to step script) ---
-./steps/console-font.sh && success_count=$((success_count + 1)) || error_count=$((error_count + 1))
+"$REPO_DIR/steps/console-font.sh" && success_count=$((success_count + 1)) || error_count=$((error_count + 1))
 
 echo "*****************************************************"
 echo "PI INSTALLER"
@@ -258,7 +258,7 @@ else
 fi
 
 # --- Root dotfiles (delegated to step script) ---
-./steps/root-dotfiles.sh && success_count=$((success_count + 1)) || error_count=$((error_count + 1))
+"$REPO_DIR/steps/root-dotfiles.sh" && success_count=$((success_count + 1)) || error_count=$((error_count + 1))
 
 # Log file location (before final summary)
 echo ""

@@ -63,17 +63,15 @@ echo "Per-user setup log for $TARGET_USER started: $(date)"
 echo "Log file: $LOG_FILE (also duplicated to screen)"
 echo "=================================================="
 
-# The old monolithic user creation/setup logic has been replaced.
-# User account creation (and the new "user already exists?" + destructive delete+recreate prompt)
-# now lives in steps/user-ensure.sh so it can be run independently and always
-# emits a proper SUCCESS/ERROR line like the global steps.
+# User account creation now lives in steps/user-ensure.sh so it can be run
+# independently and always emits a proper SUCCESS/ERROR line like the global steps.
 export TARGET_USER
 export ADD_WHEEL
 
 # ------------------------------------------------------------------
 # PHASE 1: Ensure user account + groups
-# (This step now owns the "user already exists?" logic and the
-#  prompt that lets you DELETE the user completely and start fresh.)
+# ------------------------------------------------------------------
+# PHASE 1: Ensure user account + groups
 # ------------------------------------------------------------------
 echo ""
 echo "*****************************************************"
@@ -81,16 +79,16 @@ echo "PHASE: User account + desktop groups (via user-ensure)"
 echo "*****************************************************"
 
 # Ensure the step scripts are executable (defensive - they are sometimes created without +x)
-chmod +x ./steps/user-*.sh 2>/dev/null || true
+chmod +x "$REPO_DIR"/steps/user-*.sh 2>/dev/null || true
 
-if [ -x "./steps/user-ensure.sh" ]; then
-    TARGET_USER="$TARGET_USER" ADD_WHEEL="$ADD_WHEEL" ./steps/user-ensure.sh
+if [ -x "$REPO_DIR/steps/user-ensure.sh" ]; then
+    TARGET_USER="$TARGET_USER" ADD_WHEEL="$ADD_WHEEL" "$REPO_DIR/steps/user-ensure.sh"
     if [ $? -ne 0 ]; then
         echo "ERROR: user-ensure step failed. Aborting."
         exit 1
     fi
 else
-    echo "ERROR: ./steps/user-ensure.sh not found or not executable (even after chmod)."
+    echo "ERROR: $REPO_DIR/steps/user-ensure.sh not found or not executable (even after chmod)."
     exit 1
 fi
 
@@ -136,7 +134,7 @@ step_list=(
     "user-firefox:./steps/user-firefox.sh"
     "user-github-ssh:./steps/user-github-ssh.sh"
     "user-pi-agent:./steps/user-pi-agent.sh"
-    "user-firefox-shortcuts:./steps/user-surf-shortcuts.sh"
+    "user-firefox-shortcuts:./steps/user-web-shortcuts.sh"
 )
 # Build the human-readable menu entries
 options=()

@@ -8,7 +8,6 @@ alias f='yad --file & exit'  #help:f=file chooser
 alias help='/usr/local/bin/help.sh'  #help:help=this screen
 alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'  #help:neofetch=system info
 alias pi='pi --readonly'  #help:pi=AI coding assistant
-alias pi-update='pi update'  #help:pi-update=update pi
 alias wifi='wifi-manager'  #help:wifi=wifi network chooser
 alias net='net-watch'
 alias net-watch='/usr/local/bin/net-watch'

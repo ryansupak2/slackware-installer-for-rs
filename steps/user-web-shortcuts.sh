@@ -1,5 +1,5 @@
 #!/bin/bash
-# steps/user-surf-shortcuts.sh - FIREFOX URL SHORTCUTS FOR TARGET USER
+# steps/user-web-shortcuts.sh - FIREFOX URL SHORTCUTS FOR TARGET USER
 
 REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
 TARGET_USER="${TARGET_USER:-$1}"
@@ -19,10 +19,8 @@ echo "*****************************************************"
 echo "FIREFOX URL SHORTCUTS FOR $TARGET_USER"
 echo "*****************************************************"
 
-echo "FIREFOX URL SHORTCUTS FOR $TARGET_USER"
-
 HOME_TARGET=$(eval echo ~$TARGET_USER)
-SHORTCUT_DIR="$HOME_TARGET/.surf"
+SHORTCUT_DIR="$HOME_TARGET/.web"
 SHORTCUT_FILE="$SHORTCUT_DIR/shortcuts"
 
 mkdir -p "$SHORTCUT_DIR" 2>/dev/null
@@ -37,20 +35,8 @@ fi
 
 chown "$TARGET_USER:$TARGET_USER" "$SHORTCUT_DIR" "$SHORTCUT_FILE" 2>/dev/null || true
 
-ok=true
 
-if ! cp "$REPO_DIR/dotfiles/firefox/shortcuts.default" "$SHORTCUT_FILE" 2>/dev/null; then
-    ok=false
-fi
-
-chown "$TARGET_USER:$TARGET_USER" "$SHORTCUT_DIR" "$SHORTCUT_FILE" 2>/dev/null || true
-
-if $ok; then
-    echo "SUCCESS: Firefox URL shortcuts configured for $TARGET_USER."
-    echo "  Edit: $SHORTCUT_FILE"
-    echo "  Type shortcuts with 'w' (e.g., 'w y' → youtube.com): y g gr gm f x slsk"
-    exit 0
-else
-    echo "ERROR: Firefox URL shortcuts setup failed for $TARGET_USER."
-    exit 1
-fi
+echo "SUCCESS: Firefox URL shortcuts configured for $TARGET_USER."
+echo "  Edit: $SHORTCUT_FILE"
+echo "  Type shortcuts with 'w' (e.g., 'w y' → youtube.com): y g gr gm f x slsk"
+exit 0

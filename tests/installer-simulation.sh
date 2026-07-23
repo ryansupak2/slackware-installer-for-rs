@@ -60,7 +60,7 @@ done
 
 # ── Test 5: Step error handling ────────────────────────────────────────
 echo "=== Test 5: Step error handling ==="
-TRIVIAL="pi-update.sh pi-double-input-fix.sh"
+TRIVIAL=""
 for s in "$STEPS_DIR"/*.sh; do
     name=$(basename "$s")
     if echo "$TRIVIAL" | grep -qw "$name"; then
@@ -88,8 +88,8 @@ CAT_STEPS=$(grep -E '^[a-z_]+=\("' "$GLOBAL" | tr '"' '\n' | grep -E '^[a-z][a-z
 for step in $CAT_STEPS; do
     if [ -f "$STEPS_DIR/$step.sh" ]; then
         pass "coverage: $step → $step.sh"
-    elif [ "$step" = "root-shortcuts" ]; then
-        pass "coverage: root-shortcuts → user-surf-shortcuts.sh (by design)"
+    elif [ "$step" = "root-web-shortcuts" ]; then
+        pass "coverage: root-web-shortcuts → user-web-shortcuts.sh (by design)"
     else
         fail "coverage: $step → $step.sh MISSING"
     fi

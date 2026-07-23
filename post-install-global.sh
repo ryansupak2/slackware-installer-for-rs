@@ -63,7 +63,7 @@ success_count=0
 error_count=0
 
 
-firefox_ran=false
+firefox_ran_marker=/tmp/firefox-ran.marker
 
 # (All individual setup steps have been moved to ./steps/*.sh)
 # They are now standalone scripts that exit 0 on success / 1 on error.
@@ -71,15 +71,15 @@ firefox_ran=false
 #
 # (lib/common.sh already sourced above — provides install_pkg, install_sbo, log_msg)
 # Category definitions (for Slackware: removed glibc-compat, renamed apk step)
-core_prereqs=("slackpkg-setup" "console-font" "timezone" "ca-certificates" "xlibre" "root-dotfiles")
+core_prereqs=("slackpkg-setup" "console-font" "timezone" "ca-certificates" "xlibre" "root-dotfiles" "log-consistency")
 networking=("wifi" "openvpn" "vnc")
 hardware_config=("input-hardware" "screen-locking" "acpi-wakeup" "audio-volume" "brightness")
 security_access=("root-ssh-key" "keychain" "github-ssh")
 dev_tools=("vim" "git-lfs")
 ui_appearance=("neofetch" "additional-fonts" "suckless-dwm")
-applications=("firefox" "inkscape" "yad" "root-shortcuts" "slskd")
+applications=("firefox" "inkscape" "yad" "root-web-shortcuts" "slskd")
 utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux")
-audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox")
+audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox" "vox-sherpa")
 
 categories=("Core" "Networking" "Hardware Configuration" "Security & Access" "Development Tools" "User Interface & Appearance" "Applications" "Utilities" "Audio/DSP")
 
@@ -339,7 +339,6 @@ for section in "${selected[@]}"; do
             fi
             ;;
         "firefox")
-            firefox_ran=true
             if ./steps/firefox.sh; then
                 success_count=$((success_count + 1))
             else
@@ -360,8 +359,8 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
-        "root-shortcuts")
-            if ./steps/user-surf-shortcuts.sh root; then
+        "root-web-shortcuts")
+            if ./steps/user-web-shortcuts.sh root; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))
@@ -445,11 +444,26 @@ for section in "${selected[@]}"; do
             fi
             ;;
 
+        "log-consistency")
+            if ./steps/log-consistency.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        "vox-sherpa")
+            if ./steps/vox-sherpa.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+
     esac
 done
 
-# FireFox DRM notes (shown before final summary)
-if [ "$firefox_ran" = true ]; then
+# FireFox DRM notes (shown if firefox step ran and wrote marker)
+if [ -f "$firefox_ran_marker" ]; then
 echo ""
 echo "*****************************************************"
 echo "NEXT STEPS FOR FIREFOX + DRM"
