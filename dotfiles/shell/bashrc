@@ -7,7 +7,14 @@ alias 'w?'='/usr/local/bin/w?'  #help:w?=list url shortcuts
 alias f='yad --file & exit'  #help:f=file chooser
 alias help='/usr/local/bin/help.sh'  #help:help=this screen
 alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'  #help:neofetch=system info
-alias pi='pi --readonly'  #help:pi=AI coding assistant
+#help:pi=AI coding assistant (auto-loads ./SYSTEM.MD via @ if present)
+pi() {
+    if [ -f "./SYSTEM.MD" ]; then
+        command pi --readonly @SYSTEM.MD "$@"
+    else
+        command pi --readonly "$@"
+    fi
+}
 alias wifi='wifi-manager'  #help:wifi=wifi network chooser
 alias net='net-watch'
 alias net-watch='/usr/local/bin/net-watch'

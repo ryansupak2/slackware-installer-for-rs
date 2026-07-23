@@ -2750,8 +2750,9 @@ viewnext(const Arg *arg)
 {
 	Monitor *m = selmon;
 
-	/* Rule 3b: current tag must have windows to advance */
-	if (!tagisoccupied(m, m->curtagidx))
+	/* Rule 3b: current tag must have windows to advance,
+	 * except tag 1 (anchor) which stays in the bar even when empty. */
+	if (!tagisoccupied(m, m->curtagidx) && m->curtagidx > 0)
 		return;
 	if (m->curtagidx >= LENGTH(tags) - 1)
 		return;

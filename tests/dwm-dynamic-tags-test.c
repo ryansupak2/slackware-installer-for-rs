@@ -112,7 +112,8 @@ static void view(unsigned int mask) {
 }
 
 static void viewnext(void) {
-	if (!tagisoccupied(curtagidx))
+	/* Tag 1 (anchor) can advance even when empty */
+	if (!tagisoccupied(curtagidx) && curtagidx > 0)
 		return;
 	if (curtagidx >= TAGS_COUNT - 1)
 		return;
@@ -304,11 +305,15 @@ static void test_01_startup_single_tag(void) {
 }
 
 static void test_02_viewnext_empty_tag_noop(void) {
-	TEST("Rule 3b: Mod+Right from empty tag does nothing");
+	TEST("Rule 3b: Mod+Right from empty non-anchor tag does nothing");
 	reset_state();
+	/* Reveal tag 2, navigate to it (empty), then try viewnext — should block */
+	bartags |= (1 << 1);
+	curtagidx = 1;
+	tagset0 = tagset1 = 1 << 1;
 	viewnext();
-	ASSERT_CURTAG(0);
-	ASSERT_BARTAGS(1);
+	ASSERT_CURTAG(1);  /* still on tag 2, didn't advance */
+	ASSERT_BARTAGS(1 | (1 << 1));
 	PASS();
 }
 
@@ -615,11 +620,13 @@ static void test_25_no_client_tag_ops(void) {
 	PASS();
 }
 
-static void test_26_cant_advance_from_empty(void) {
-	TEST("Cannot advance from empty tag");
+static void test_26_advance_from_empty_tag1(void) {
+	TEST("Can advance from empty tag 1 (anchor) to reveal tag 2");
 	reset_state();
+	/* Tag 1 is empty but it's the anchor — viewnext must work to escape */
 	viewnext();
-	ASSERT_CURTAG(0);
+	ASSERT_CURTAG(1);
+	ASSERT_BARTAGS(1 | (1 << 1));
 	PASS();
 }
 
@@ -783,7 +790,7 @@ int main(void) {
 	test_23_viewnext_at_tag9_boundary();
 	test_24_tagnext_at_tag9_boundary();
 	test_25_no_client_tag_ops();
-	test_26_cant_advance_from_empty();
+	test_26_advance_from_empty_tag1();
 	test_27_viewprev_at_tag1_boundary();
 	test_28_multi_client_tag_stays();
 	test_29_full_workflow();

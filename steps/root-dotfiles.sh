@@ -16,10 +16,19 @@ echo "*****************************************************"
 ok=true
 
 # bashrc
+# bashrc — root
 if cp "$REPO_DIR/dotfiles/shell/bashrc" /root/.bashrc 2>/dev/null; then
-    echo "  bashrc deployed."
+    echo "  bashrc deployed to /root."
 else
-    echo "  ERROR: could not copy bashrc."
+    echo "  ERROR: could not copy bashrc to /root."
+    ok=false
+fi
+
+# bashrc — /etc/skel (new-user template)
+if cp "$REPO_DIR/dotfiles/shell/bashrc" /etc/skel/.bashrc 2>/dev/null; then
+    echo "  bashrc deployed to /etc/skel."
+else
+    echo "  ERROR: could not copy bashrc to /etc/skel."
     ok=false
 fi
 
