@@ -13,6 +13,12 @@ if [ $# -gt 0 ]; then
                 resolved=$(awk -v key="$raw" '$1 == key {print $2; exit}' "$f")
                 [ -n "$resolved" ] && uri="$resolved"
             fi
+            # If no shortcut matched and input looks like a domain/URL, add https://
+            if [ "$uri" = "about:blank" ]; then
+                case "$raw" in
+                    *.*) uri="https://$raw" ;;
+                esac
+            fi
             ;;
     esac
 fi
