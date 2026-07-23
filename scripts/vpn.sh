@@ -19,7 +19,7 @@ CONNECT_TIMEOUT=15
 LOG_DIR="/var/log/sessions"
 LOG_FILE="$LOG_DIR/${USER:-root}-vpn-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-# Redirect all output to both screen and log (matching wifi-manager / dwl-start pattern)
+# Redirect all output to both screen and log (matching wifi-manager pattern)
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 # Terminal formatting (matching wifi-manager)

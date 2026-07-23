@@ -1,3 +1,0 @@
-#!/bin/sh
-# gui — shortcut to start DWL/Wayland session
-exec dwl-start "$@"

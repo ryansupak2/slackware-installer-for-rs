@@ -1,6 +1,6 @@
 SLACKWARE LINUX POST-INSTALL
 =============================
-Fresh Slackware 15.0 install -> working Wayland desktop (ThinkPad X13).
+Fresh Slackware 15.0 install -> working X11/DWM desktop (ThinkPad X13).
 
 
 INSTALLING SLACKWARE
@@ -45,7 +45,7 @@ GOTCHAS — Slackware's installer is minimal. Know these before starting.
        D     Development tools (gcc, make, headers)
        L     Libraries
        N     Networking
-       X     X Window System + XWayland
+       X     X Window System
        XAP   X Applications (Firefox, Inkscape, etc.)
 
    PROMPT   — choose "full" (install everything without prompting)
@@ -108,7 +108,7 @@ STEPS
 5. START DESKTOP
    Log in as user, run:
 
-       dwl-start
+       dwm-start
 
 
 PACKAGE MANAGEMENT
@@ -132,11 +132,11 @@ rc.M runs executable scripts in /etc/rc.d/ at boot. rc.local is for
 custom startup commands.
 
 
-WAYLAND + DWL
+DWM + XLIBRE
 -------------
-Uses dwl (Wayland compositor, dwm port) + somebar + foot terminal.
-wayland and wayland-protocols are built from source. seatd-launch
-manages seat access per-session.
+Uses dwm (X11 window manager, suckless) + st terminal.
+xlibre provides screen color temperature adjustment (redshift
+alternative) for X11. Deployed as a step under the UI category.
 
 
 NEOFETCH

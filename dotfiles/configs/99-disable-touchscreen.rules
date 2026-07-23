@@ -1,5 +1,5 @@
 # Disable ELAN Touchscreen — phantom touch events cause random cursor
-# jumps, selections, and tab changes under Wayland/wlroots and X11.
+# jumps, selections, and tab changes under X11.
 # This works at the USB device level so it applies to ALL input stacks.
 #
 # Variant 1: udev marks device ignored for libinput (covers cold boots)

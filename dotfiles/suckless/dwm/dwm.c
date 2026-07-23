@@ -2158,7 +2158,7 @@ togglebar(const Arg *arg)
 	char f[256];
 	int was_hidemode = hidemode;
 
-	/* Always exit hide mode if it's on (matches dwl toggle-bar.sh behaviour). */
+	/* Always exit hide mode if it's on. */
 	if (hidemode) {
 		fprintf(stderr, "[dwm] togglebar: exiting hide mode\n");
 		hidemode = 0;

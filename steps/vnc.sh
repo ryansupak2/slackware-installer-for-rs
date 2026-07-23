@@ -1,5 +1,8 @@
 #!/bin/bash
-# steps/vnc.sh - VNC SCREEN SHARING (TigerVNC + wayvnc)
+# steps/vnc.sh - VNC SCREEN SHARING (x11vnc)
+#
+# Installs x11vnc (X11 VNC server) from SBo with password auth.
+# Deploys the vnc manager script to /usr/local/bin/vnc.
 
 REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
 LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
@@ -9,67 +12,32 @@ if [ -f "$REPO_DIR/lib/common.sh" ]; then
 fi
 
 echo "*****************************************************"
-echo "VNC SCREEN SHARING (wayvnc)"
+echo "VNC SCREEN SHARING (x11vnc)"
 echo "*****************************************************"
 
 ok=true
 
-echo "Installing VNC packages..."
-# fltk is SBo; tigervnc is in Slackware /extra
-install_sbo "fltk" || { echo "ERROR: fltk not available"; ok=false; }
-# Download tigervnc from /extra
-if $ok && ! command -v vncviewer >/dev/null 2>&1; then
-    echo "  Downloading tigervnc from Slackware /extra..."
-    TIGER_MIRROR="https://mirrors.slackware.com/slackware/slackware64-15.0/extra/tigervnc"
-    TIGER_PKG=$(curl -s "$TIGER_MIRROR/" 2>/dev/null | grep -o 'tigervnc-[0-9._-]*x86_64[^"]*\.txz' | head -1)
-    if [ -n "$TIGER_PKG" ]; then
-        wget -q "$TIGER_MIRROR/$TIGER_PKG" -O /tmp/tigervnc.txz && installpkg /tmp/tigervnc.txz && rm -f /tmp/tigervnc.txz || { echo "ERROR: tigervnc install failed"; ok=false; }
-    else
-        echo "ERROR: could not find tigervnc in /extra"; ok=false
-    fi
-fi
-# gnutls is in official N series
-if ! install_pkg "gnutls"; then
-    echo "WARNING: gnutls not installed (needed for TLS certs)"
+echo "Installing x11vnc from SBo..."
+if command -v x11vnc >/dev/null 2>&1; then
+    echo "  x11vnc already installed — skipping"
+else
+    install_sbo "x11vnc" || { echo "ERROR: x11vnc SBo build failed"; ok=false; }
 fi
 
 if $ok; then
-    echo "Configuring wayvnc authentication..."
-    mkdir -p /etc/wayvnc /usr/local/etc/wayvnc
+    echo "Configuring x11vnc authentication..."
+    PASSWD_DIR="/usr/local/etc/x11vnc"
+    mkdir -p "$PASSWD_DIR"
 
-    # Generate self-signed TLS cert if not already present
-    if [ ! -f /etc/wayvnc/cert.pem ] || [ ! -f /etc/wayvnc/key.pem ]; then
-        echo "  Generating self-signed TLS certificate for VNC auth..."
-        if command -v openssl >/dev/null 2>&1; then
-            openssl req -x509 -newkey rsa:2048 \
-                -keyout /etc/wayvnc/key.pem \
-                -out /etc/wayvnc/cert.pem \
-                -days 3650 -nodes \
-                -subj "/CN=screen-share" 2>/dev/null
-            chmod 644 /etc/wayvnc/key.pem
-            chmod 644 /etc/wayvnc/cert.pem
-        else
-            echo "  WARNING: openssl not found; TLS certs not generated."
-            ok=false
-        fi
-    else
-        echo "  TLS certs already present — skipping."
-    fi
-
-    # Deploy wayvnc config with auto-generated password
-    if [ ! -f /usr/local/etc/wayvnc/config ]; then
-        echo "  Creating wayvnc config with random password..."
+    if [ ! -f "$PASSWD_DIR/passwd" ]; then
+        echo "  Creating x11vnc password file..."
         VNC_PASS=$(head -c 10 /dev/urandom | base64 | tr -d '+/=' | head -c 10)
-        cat > /usr/local/etc/wayvnc/config << WVCFG
-enable_auth=true
-use_relative_paths=true
-password=${VNC_PASS}
-WVCFG
-        chmod 600 /usr/local/etc/wayvnc/config
+        x11vnc -storepasswd "$VNC_PASS" "$PASSWD_DIR/passwd" 2>/dev/null
+        chmod 600 "$PASSWD_DIR/passwd"
         echo "  VNC password: ${VNC_PASS}"
-        echo "  (Run 'vnc start' from within dwl, then connect with this password)"
+        echo "  (Run 'vnc start' from within your X11/dwm session, then connect with this password)"
     else
-        echo "  wayvnc config already exists — skipping."
+        echo "  x11vnc password file already exists — skipping."
     fi
 fi
 

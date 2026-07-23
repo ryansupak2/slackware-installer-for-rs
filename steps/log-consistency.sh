@@ -47,8 +47,6 @@ deploy() {
 echo "── session scripts ──"
 deploy "$REPO_DIR/scripts/dwm-start.sh"      /usr/local/bin/dwm-start
 deploy "$REPO_DIR/scripts/dwm-status.sh"     /usr/local/bin/dwm-status
-deploy "$REPO_DIR/scripts/dwl-start.sh"      /usr/local/bin/dwl-start
-deploy "$REPO_DIR/scripts/dwl-status.sh"     /usr/local/bin/dwl-status
 
 echo "── service scripts ──"
 deploy "$REPO_DIR/scripts/net-watch.sh"      /usr/local/bin/net-watch

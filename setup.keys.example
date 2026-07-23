@@ -35,3 +35,7 @@ SLSKD_SLSK_PORT=50300
 # Directories for shared files and downloads
 SLSKD_SHARE_DIR=/var/lib/slskd/music
 SLSKD_DOWNLOAD_DIR=/var/lib/slskd/downloads
+
+# === 5. Timezone ===
+# Timezone for the system clock (default: America/Chicago)
+TZ=America/Chicago

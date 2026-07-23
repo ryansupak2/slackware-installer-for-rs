@@ -1,10 +1,9 @@
 #!/bin/bash
-# lock-screen.sh — screen locker for dwl (wlock) + dwm (slock) + TTY (physlock)
+# lock-screen.sh — screen locker for dwm (slock) + TTY (physlock)
 # Called from keybinds and from ACPI/elogind hooks (system context, no env).
 #
 # Strategy:
 #   - In-session (Mod+Esc): lock the graphical session:
-#       · Wayland (dwl) → wlock
 #       · X11 (dwm)     → slock
 #   - System (lid close/sleep): if a graphical session is running, lock it;
 #     otherwise, lock TTY consoles with physlock.
@@ -39,7 +38,7 @@ LOG="$LOG_DIR/${USER:-root}-lock-screen-$(date +%Y%m%d-%H%M%S).log"
 exec >> "$LOG" 2>&1
 
 CURRENT_TTY=$(tty 2>/dev/null || echo "none")
-echo "$(date) lock-screen: WAYLAND='${WAYLAND_DISPLAY:-none}' DISPLAY='${DISPLAY:-none}' USER=$USER TTY=$CURRENT_TTY dwl=$(pgrep -c dwl 2>/dev/null || echo 0) dwm=$(pgrep -c dwm 2>/dev/null || echo 0) physlock_running=$(pgrep -c physlock 2>/dev/null || echo 0)"
+echo "$(date) lock-screen: DISPLAY='${DISPLAY:-none}' USER=$USER TTY=$CURRENT_TTY dwm=$(pgrep -c dwm 2>/dev/null || echo 0) physlock_running=$(pgrep -c physlock 2>/dev/null || echo 0)"
 
 # ── Helper: start physlock if available and not already running ──
 try_physlock() {
@@ -65,15 +64,6 @@ try_physlock() {
     fi
 }
 
-# ── In-session call (Mod+Esc from dwl) ─────────────────────────
-# Lock the current Wayland session with wlock and block until it exits.
-if [ -n "$WAYLAND_DISPLAY" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
-    command -v wlock >/dev/null 2>&1 || exit 1
-    wlock &
-    wait $! 2>/dev/null
-    exit 0
-fi
-
 # ── In-session call (Mod+Esc from dwm) ─────────────────────────
 # Lock the current X11 session with slock and block until it exits.
 if [ -n "$DISPLAY" ] && pgrep dwm >/dev/null 2>&1; then
@@ -89,52 +79,13 @@ if [ -n "$DISPLAY" ] && pgrep dwm >/dev/null 2>&1; then
 fi
 
 # ── System call (acpid / elogind / manual) ─────────────────────
-# If a graphical session (dwl) is running, lock it with wlock.
+# If a graphical session (dwm) is running, lock it with slock.
 # Running physlock here would steal the VT from the compositor and
 # cause a hard hang (DRM master conflict).
 #
 # If no graphical session exists, lock TTY consoles with physlock.
 
-if pgrep dwl >/dev/null 2>&1; then
-    echo "$(date) branch: dwl detected, trying wlock"
-
-    if ! command -v wlock >/dev/null 2>&1; then
-        # wlock not available — fall back to physlock
-        echo "$(date) wlock not found, falling back to physlock"
-        try_physlock
-        exit 0
-    fi
-
-    # Lock every active dwl session as its owner
-    wlock_started=0
-    for dwl_pid in $(pgrep dwl 2>/dev/null); do
-        [ "$(cat /proc/$dwl_pid/comm 2>/dev/null)" = "dwl" ] || continue
-        dwl_uid=$(awk '/^Uid:/{print $2}' /proc/$dwl_pid/status 2>/dev/null)
-        [ -z "$dwl_uid" ] && continue
-        dwl_user=$(getent passwd "$dwl_uid" 2>/dev/null | cut -d: -f1)
-        [ -z "$dwl_user" ] && continue
-        runtime="/run/user/$dwl_uid"
-        socket=$(ls "$runtime"/wayland-* 2>/dev/null | head -1)
-        [ -n "$socket" ] || continue
-        display=$(basename "$socket")
-        echo "$(date) starting wlock for $dwl_user on $display"
-        su "$dwl_user" -c "env XDG_RUNTIME_DIR=$runtime WAYLAND_DISPLAY=$display wlock" &
-        wlock_started=1
-    done
-
-    if [ "$wlock_started" -eq 0 ]; then
-        # dwl was found but no usable session existed (dying/zombie dwl,
-        # or socket already cleaned up). Fall back to physlock.
-        echo "$(date) no wlock started (dwl zombie?), falling back to physlock"
-        try_physlock
-        exit 0
-    fi
-
-    # Wait for wlock to finish (unlocking one session releases all)
-    echo "$(date) waiting for wlock..."
-    wait 2>/dev/null
-    echo "$(date) wlock finished"
-elif pgrep dwm >/dev/null 2>&1; then
+if pgrep dwm >/dev/null 2>&1; then
     echo "$(date) branch: dwm detected, trying slock"
 
     if ! command -v slock >/dev/null 2>&1; then
@@ -178,7 +129,7 @@ elif pgrep dwm >/dev/null 2>&1; then
     echo "$(date) slock finished"
     exit 0
 else
-    echo "$(date) branch: no dwl, using physlock"
+    echo "$(date) branch: no dwm, using physlock"
     # No graphical session — lock TTY consoles with physlock
     if ! try_physlock; then
         echo "$(date) ERROR: failed to start physlock"

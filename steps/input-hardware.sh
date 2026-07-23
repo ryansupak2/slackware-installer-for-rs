@@ -18,12 +18,12 @@ if ! mkdir -p /etc/X11/xorg.conf.d; then ok=false; fi
 if $ok; then
     if ! cp "$REPO_DIR/dotfiles/configs/99-disable-touchscreen.conf" /etc/X11/xorg.conf.d/99-disable-touchscreen.conf; then ok=false; fi
 fi
-# Also disable touchscreen for Wayland/wlroots via udev (Xorg config doesn't apply)
-echo "Deploying udev rule to disable ELAN Touchscreen for Wayland..."
+# Also disable touchscreen via udev (Xorg config doesn't apply everywhere)
+echo "Deploying udev rule to disable ELAN Touchscreen..."
 if ! cp "$REPO_DIR/dotfiles/configs/99-disable-touchscreen.rules" /etc/udev/rules.d/99-disable-touchscreen.rules; then ok=false; fi
 udevadm control --reload-rules 2>/dev/null || true
 udevadm trigger --subsystem-match=hid,input --action=change 2>/dev/null || true
-# Also unbind immediately from hid-multitouch in case seatd/dwl already grabbed it
+# Also unbind immediately from hid-multitouch in case it was already grabbed
 for hiddev in /sys/bus/hid/devices/*; do
     if grep -q 'ELAN Touchscreen' "$hiddev/uevent" 2>/dev/null; then
         echo -n "$(basename "$hiddev")" > /sys/bus/hid/drivers/hid-multitouch/unbind 2>/dev/null && \

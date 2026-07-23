@@ -1,2 +1,2 @@
-# Allow tty group read access to console TTYs for seatd (non-SUID)
+# Allow tty group read access to console TTYs
 SUBSYSTEM=="tty", KERNEL=="tty[0-9]*", GROUP="tty", MODE="0660"

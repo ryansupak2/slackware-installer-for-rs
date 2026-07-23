@@ -38,7 +38,6 @@
 
 /* X11 keycode cache — populated once at startup */
 static Display *g_x11_dpy = NULL;
-static int      g_use_wayland = 0;
 static KeyCode  g_keycodes[128];  /* ASCII → keycode */
 static int      g_need_shift[128]; /* ASCII → needs Shift? */
 
@@ -175,39 +174,11 @@ static void type_replace(int bs, const char *text) {
     if (bs > 0) memset(buf, '\b', bs);
     if (tlen > 0) memcpy(buf + bs, text, tlen);
 
-    log_msg("[TYPE] replace bs=%d + %d chars (%s)", bs, tlen,
-             g_use_wayland ? "wtype" : "XTest");
+    log_msg("[TYPE] replace bs=%d + %d chars (XTest)", bs, tlen);
 
-    if (g_use_wayland) {
-        /* Wayland: pipe buffer to wtype */
-        pid_t pid = fork();
-        if (pid == 0) {
-            int pipefd[2];
-            if (pipe(pipefd) != 0) _exit(1);
-            pid_t writer = fork();
-            if (writer == 0) {
-                close(pipefd[0]);
-                write(pipefd[1], buf, bufsz);
-                close(pipefd[1]);
-                _exit(0);
-            }
-            close(pipefd[1]);
-            dup2(pipefd[0], STDIN_FILENO);
-            close(pipefd[0]);
-            execl(WTYPE_BIN, "wtype", "-", (char *)NULL);
-            _exit(1);
-        }
-        free(buf);
-        if (pid > 0) {
-            int status; waitpid(pid, &status, 0);
-            if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
-                log_msg("[TYPE ERROR] wtype exit=%d", WEXITSTATUS(status));
-        }
-    } else {
-        /* X11: type directly via XTest */
-        x11_type(buf, bufsz);
-        free(buf);
-    }
+    /* X11: type directly via XTest */
+    x11_type(buf, bufsz);
+    free(buf);
 }
 
 /* ======================================================================
@@ -822,16 +793,10 @@ static void run_alsa_mode(void) {
  * Display auto-detection + X11 keycode cache
  * ====================================================================== */
 static void x11_init(void) {
-    const char *wayland_display = getenv("WAYLAND_DISPLAY");
-    if (wayland_display && *wayland_display) {
-        g_use_wayland = 1;
-        log_msg("Display: Wayland (%s) — using wtype", wayland_display);
-        return;
-    }
-
     const char *display = getenv("DISPLAY");
+
     if (!display || !*display) {
-        log_msg("WARNING: no DISPLAY or WAYLAND_DISPLAY — typing disabled");
+        log_msg("WARNING: no DISPLAY — typing disabled");
         return;
     }
 

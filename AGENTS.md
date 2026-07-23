@@ -19,11 +19,11 @@ make -j$(nproc) >/dev/null 2>&1
 All project components log to `/var/log/` with a consistent
 `<username>-<component>-YYYYMMDD-HHMMSS.log` pattern:
 
-- **Session scripts** (dwm, dwl, vpn, wifi-manager, vnc, net-watch): `/var/log/<user>-<component>-YYYYMMDD-HHMMSS.log`
+- **Session scripts** (dwm, vpn, wifi-manager, vnc, net-watch): `/var/log/<user>-<component>-YYYYMMDD-HHMMSS.log`
 - **Daemons** (voxd): `/var/log/<user>-vox.log` (single file, append-only, `YYYY-MM-DD HH:MM:SS: message` format)
 - **System/installer** (bootstrap, post-install-*, steps): `/var/log/<user>-<component>-YYYYMMDD-HHMMSS.log`
 - **Toggle scripts** (toggle-bar.sh, toggle-hide-mode.sh): log to stderr (captured by session log) via `log_me()` helper
-- **Hide-mode debug** (dwm.c/dwl.c): fprintf(stderr, ...) with `[dwm]` prefix (captured by session log)
+- **Hide-mode debug** (dwm.c): fprintf(stderr, ...) with `[dwm]` prefix (captured by session log)
 
 The canonical pattern for shell scripts:
 ```sh

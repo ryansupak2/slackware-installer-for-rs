@@ -1,8 +1,8 @@
 #!/bin/bash
-# scripts/vnc.sh - VNC SCREEN SHARING MANAGER (wayvnc)
+# scripts/vnc.sh - VNC SCREEN SHARING MANAGER (x11vnc)
 #
-# Starts wayvnc to share your actual Wayland/dwl screen with remote viewers.
-# Password-protected; uses wayvnc config at /usr/local/etc/wayvnc/config.
+# Starts x11vnc to share your actual X11/dwm screen with remote viewers.
+# Password-protected; uses password file at /usr/local/etc/x11vnc/passwd.
 #
 # Usage:
 #   vnc start          Start screen sharing
@@ -40,7 +40,7 @@ log_msg() {
 
 # ── State checks ───────────────────────────────────────────────────────
 is_running() {
-    pgrep wayvnc >/dev/null 2>&1
+    pgrep x11vnc >/dev/null 2>&1
 }
 
 is_client_connected() {
@@ -55,42 +55,52 @@ start_server() {
 
     if is_running; then
         echo "Screen sharing is already running."
-        log_msg INFO "wayvnc already running"
+        log_msg INFO "x11vnc already running"
         echo "Use 'vnc stop' to stop it first, or 'vnc status' for details."
         echo "*****************************************************"
         return 0
     fi
 
-    if ! command -v wayvnc >/dev/null 2>&1; then
-        echo "ERROR: wayvnc not found. Install it first:"
-        echo "  (run the remote-desktop or vnc installer step)"
-        log_msg ERROR "wayvnc binary not found"
+    if ! command -v x11vnc >/dev/null 2>&1; then
+        echo "ERROR: x11vnc not found. Install it first:"
+        echo "  (run the vnc installer step)"
+        log_msg ERROR "x11vnc binary not found"
         echo "*****************************************************"
         return 1
     fi
 
-    if [ -z "$WAYLAND_DISPLAY" ]; then
-        echo "ERROR: WAYLAND_DISPLAY not set."
-        echo "  wayvnc must be started from within your dwl/Wayland session."
-        echo "  Run 'vnc start' from a terminal inside dwl."
-        log_msg ERROR "WAYLAND_DISPLAY not set — not in a Wayland session"
+    if [ -z "$DISPLAY" ]; then
+        echo "ERROR: DISPLAY not set."
+        echo "  x11vnc must be started from within your X11/dwm session."
+        echo "  Run 'vnc start' from a terminal inside dwm."
+        log_msg ERROR "DISPLAY not set — not in an X11 session"
         echo "*****************************************************"
         return 1
     fi
-    echo "Starting wayvnc (screen capture) on port 5900..."
-    log_msg INFO "Starting wayvnc 0.0.0.0 5900"
-    WAYLAND_DISPLAY="$WAYLAND_DISPLAY" wayvnc -C /usr/local/etc/wayvnc/config 0.0.0.0 5900 2>/dev/null &
+
+    PASSWD_FILE="/usr/local/etc/x11vnc/passwd"
+    if [ ! -f "$PASSWD_FILE" ]; then
+        echo "ERROR: x11vnc password file not found at $PASSWD_FILE"
+        echo "  Run the vnc installer step to create one."
+        log_msg ERROR "password file missing: $PASSWD_FILE"
+        echo "*****************************************************"
+        return 1
+    fi
+
+    echo "Starting x11vnc (screen capture) on port 5900..."
+    log_msg INFO "Starting x11vnc -forever -shared -rfbauth $PASSWD_FILE"
+    x11vnc -forever -shared -rfbauth "$PASSWD_FILE" -quiet -bg 2>/dev/null
     sleep 1
     if is_running; then
         echo ""
         echo "SUCCESS: Screen sharing started."
-        log_msg OK "wayvnc started successfully"
+        log_msg OK "x11vnc started successfully"
         echo "  Connect with any VNC client:  $(hostname -i 2>/dev/null || ip -4 addr show scope global | awk '/inet / {print $2}' | cut -d/ -f1 | head -1)"
         echo "  Mac Screen Sharing: vnc://$(hostname -i 2>/dev/null || ip -4 addr show scope global | awk '/inet / {print $2}' | cut -d/ -f1 | head -1)"
     else
-        echo "ERROR: wayvnc failed to start."
-        log_msg ERROR "wayvnc failed to start"
-        echo "  Make sure you are running this inside a dwl/Wayland session."
+        echo "ERROR: x11vnc failed to start."
+        log_msg ERROR "x11vnc failed to start"
+        echo "  Make sure you are running this inside an X11/dwm session."
         echo "*****************************************************"
         return 1
     fi
@@ -105,18 +115,18 @@ stop_server() {
 
     if ! is_running; then
         echo "Screen sharing is not currently running."
-        log_msg INFO "No wayvnc running — nothing to stop"
+        log_msg INFO "No x11vnc running — nothing to stop"
         echo "*****************************************************"
         return 0
     fi
 
-    echo "Stopping wayvnc..."
-    log_msg INFO "Stopping wayvnc"
-    pkill wayvnc 2>/dev/null || true
+    echo "Stopping x11vnc..."
+    log_msg INFO "Stopping x11vnc"
+    pkill x11vnc 2>/dev/null || true
     sleep 0.5
 
     if is_running; then
-        pkill -9 wayvnc 2>/dev/null || true
+        pkill -9 x11vnc 2>/dev/null || true
         sleep 0.5
     fi
 
@@ -124,8 +134,8 @@ stop_server() {
         echo "SUCCESS: Screen sharing stopped."
         log_msg OK "Screen sharing stopped"
     else
-        echo "ERROR: Failed to stop wayvnc."
-        log_msg ERROR "Failed to stop wayvnc"
+        echo "ERROR: Failed to stop x11vnc."
+        log_msg ERROR "Failed to stop x11vnc"
         echo "*****************************************************"
         return 1
     fi
@@ -146,7 +156,7 @@ show_status() {
         fi
         echo ""
         echo "  Process:"
-        pgrep -a wayvnc 2>/dev/null | while read -r line; do
+        pgrep -a x11vnc 2>/dev/null | while read -r line; do
             echo "    $line"
         done
         echo ""

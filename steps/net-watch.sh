@@ -26,7 +26,7 @@ if cp "$SOURCE_SCRIPT" /usr/local/bin/net-watch; then
     chmod +x /usr/local/bin/net-watch
     ln -sf /usr/local/bin/net-watch /usr/local/bin/net-watch.sh 2>/dev/null || true
     echo "  Installed: /usr/local/bin/net-watch"
-    echo "  (background watcher auto-started by dwl-start at login)"
+    echo "  (background watcher auto-started at login)"
     echo "  It writes UP/DOWN to /tmp/net_status_\$(id -u) so the status bar can cheaply show reachability."
 else
     ok=false

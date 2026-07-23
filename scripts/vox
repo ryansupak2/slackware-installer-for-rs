@@ -2,7 +2,7 @@
 # vox — VOX voice dictation CLI (sherpa-onnx streaming Zipformer)
 #
 # Usage:
-#   vox on        Start recording (Mod+V equivalent) — [VOX] appears in somebar
+#   vox on        Start recording (Mod+V equivalent) — [VOX] appears in status bar
 #   vox off       Stop recording, transcribe, type at cursor
 #   vox --help    Show this help
 #
@@ -31,7 +31,7 @@ case "${1:-}" in
 vox — voice dictation (streaming Zipformer via sherpa-onnx)
 
 USAGE
-  vox on           Start recording — [VOX] appears in somebar
+  vox on           Start recording — [VOX] appears in status bar
   vox off          Stop recording — transcribes and types at cursor
   vox start        Same as 'vox on'
   vox stop         Same as 'vox off'

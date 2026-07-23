@@ -1,6 +1,6 @@
 # VOX — Voice Dictation
 
-Streaming speech-to-text for dwl/somebar using sherpa-onnx (Zipformer EN 20M).
+Streaming speech-to-text using sherpa-onnx (Zipformer EN 20M).
 
 ## How it works
 
@@ -20,7 +20,7 @@ Mod+V → toggle-vox.sh → SIGUSR1 → voxd daemon
                                       │
                           Incremental append via wtype
                                       │
-                          vox_state → somebar [VOX] badge
+                          vox_state → status bar [VOX] badge
                           ~/logs/vox.log
 ```
 

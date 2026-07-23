@@ -234,7 +234,7 @@ if $ok; then
     echo "SUCCESS: VOX sherpa-onnx dictation installed."
     echo ""
     echo "Usage:"
-    echo "  voxd &              Start daemon (auto-started by dwl session)"
+    echo "  voxd &              Start daemon (auto-started by dwm session)"
     echo "  voxd --file foo.wav  Test decode a WAV file"
     echo "  Mod+V                Toggle recording on/off"
     exit 0

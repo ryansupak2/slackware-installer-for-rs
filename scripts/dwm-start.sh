@@ -107,10 +107,13 @@ if [ -f /sys/class/leds/tpacpi::kbd_backlight/max_brightness ]; then
     echo "$half" > /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || true
 fi
 
-# Caps Lock → Super (matches dwl's xkb caps:super)
+# Caps Lock → Super
 xmodmap -e "clear lock" 2>/dev/null || true
 xmodmap -e "keysym Caps_Lock = Super_L" 2>/dev/null || true
 xmodmap -e "add mod4 = Super_L" 2>/dev/null || true
+
+# Keyboard repeat rate — FreeBSD snappy defaults (delay 250ms, 34 chars/sec)
+xset r rate 250 34 2>/dev/null || true
 
 # dbus session (for notifications, etc.)
 eval $(dbus-launch --sh-syntax) 2>/dev/null || true

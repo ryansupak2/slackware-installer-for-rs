@@ -55,7 +55,7 @@ static const char *state_read(void) {
     return "(empty)";
 }
 
-/* ── Badge display logic (matches dwm-status.sh / dwl-status.sh) ─── */
+/* ── Badge display logic (matches dwm-status.sh) ─── */
 static const char *badge_for_state(const char *state) {
     if (!state || !*state || strcmp(state, "(absent)") == 0 || strcmp(state, "(empty)") == 0)
         return "";

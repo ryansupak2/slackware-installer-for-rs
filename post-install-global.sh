@@ -12,8 +12,6 @@
 # Prerequisites:
 #   - Slackware base install with series: A, AP, D, L, N, X
 #   - Internet connection (NetworkManager or manual)
-#   - Wayland users: select "wayland-base" under Core (dwl compositor)
-#     (installs wlroots + mesa + seatd; no X server)
 #   - Run with setup.keys.root populated (WIFI_*, NORD_*, XAI_*, ROOT_SSH_*, GITHUB_INSTALLER_*)
 #
 # TODO: intermittent VPN fix
@@ -73,7 +71,7 @@ firefox_ran=false
 #
 # (lib/common.sh already sourced above — provides install_pkg, install_sbo, log_msg)
 # Category definitions (for Slackware: removed glibc-compat, renamed apk step)
-core_prereqs=("slackpkg-setup" "console-font" "ca-certificates" "xlibre" "root-dotfiles")
+core_prereqs=("slackpkg-setup" "console-font" "timezone" "ca-certificates" "xlibre" "root-dotfiles")
 networking=("wifi" "openvpn" "vnc")
 hardware_config=("input-hardware" "screen-locking" "acpi-wakeup" "audio-volume" "brightness")
 security_access=("root-ssh-key" "keychain" "github-ssh")
@@ -200,6 +198,13 @@ for section in "${selected[@]}"; do
             ;;
         "console-font")
             if ./steps/console-font.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        "timezone")
+            if ./steps/timezone.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))

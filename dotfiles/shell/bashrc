@@ -19,6 +19,7 @@ alias net-watch='/usr/local/bin/net-watch'
 ## meant to be run from a bare text console / login prompt, *before* any
 ## graphical session or .bashrc has been sourced. Aliasing it would be
 ## inappropriate and potentially confusing.
+alias X='/usr/local/bin/x'  #help:X=start X11/dwm session (original X server: /usr/bin/X)
 alias sound='alsamixer -c 0'  #help:sound=volume mixer
 alias vnc='/usr/local/bin/vnc'  #help:vnc=VNC server manager
 alias vpn='/usr/local/bin/vpn'  #help:vpn=openvpn toggle
@@ -27,19 +28,6 @@ alias gc='git commit'  #help:gc=git commit
 alias gs='git status'  #help:gs=git status
 alias gp='git push'  #help:gp=git push
 alias ga='git add'  #help:ga=git add
-## startx note (important):
-## We do NOT define any alias for startx here.
-## startx (the safe wrapper installed to /usr/local/bin/startx) is only ever
-## meant to be run from a bare text console / login prompt, *before* any
-## graphical session or .bashrc has been sourced. Aliasing it would be
-## inappropriate and potentially confusing.
-alias sound='alsamixer -c 0'
-alias vnc='/usr/local/bin/vnc'  #help:vnc=VNC server manager
-alias slsk='/usr/local/bin/slsk'
-alias gc='git commit'
-alias gs='git status'
-alias gp='git push'
-alias ga='git add'
 # Keyboard backlight: no longer set automatically on shell start.
 # (Set once at X session start by ~/.xinitrc to 50%.)
 

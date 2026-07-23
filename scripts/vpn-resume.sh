@@ -38,7 +38,7 @@ find_vpn_user() {
     return 1
 }
 
-# Write a temporary status message to the user's dwl bar
+# Write a temporary status message to the user's status bar
 notify_user() {
     local uid="$1" msg="$2" duration="${3:-4}"
     local runtime="/run/user/$uid"

@@ -1,22 +1,10 @@
 #!/bin/sh
 # toggle-bar.sh — toggle bar visibility (Mod+B)
 # Always exits Hide Mode, then toggles bar visibility.
-# Logs to stderr (captured by the dwm/dwl session log).
-
-LOG_TAG="toggle-bar"
-log_me() { echo "$(date): [$LOG_TAG] $*" >&2; }
-
-# Detect bar type: somebar-0 (Wayland) or dwmbar-0 (X11 dwm)
-BAR_FIFO="${XDG_RUNTIME_DIR}/somebar-0"
-[ ! -p "$BAR_FIFO" ] && BAR_FIFO="${XDG_RUNTIME_DIR}/dwmbar-0"
-FIFO="$BAR_FIFO"
+# Logs to stderr (captured by the dwm session log).
+FIFO="${XDG_RUNTIME_DIR}/dwmbar-0"
 HIDE_MODE_FILE="$XDG_RUNTIME_DIR/hide_mode"
-# State file: somebar sets bar_shown, dwm we track ourselves
-if [ "$BAR_FIFO" = "${XDG_RUNTIME_DIR}/dwmbar-0" ]; then
-	BAR_STATE="$XDG_RUNTIME_DIR/dwm_bar_shown"
-else
-	BAR_STATE="$XDG_RUNTIME_DIR/bar_shown"
-fi
+BAR_STATE="$XDG_RUNTIME_DIR/dwm_bar_shown"
 
 # Source shared temp-msg helper
 if [ -f /usr/local/bin/temp-msg.sh ]; then

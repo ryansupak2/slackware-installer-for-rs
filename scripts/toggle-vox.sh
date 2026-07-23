@@ -6,10 +6,7 @@
 
 XDG_RT="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 STATE_FILE="$XDG_RT/vox_state"; PID_F="$XDG_RT/vox_recorder_pid"
-# Prefer somebar-0 (Wayland), fall back to dwmbar-0 (X11)
-BAR_FIFO="${XDG_RT}/somebar-0"
-[ ! -p "$BAR_FIFO" ] && BAR_FIFO="${XDG_RT}/dwmbar-0"
-FIFO="$BAR_FIFO"
+FIFO="${XDG_RT}/dwmbar-0"
 FULL="$XDG_RT/vox-full"
 LOCK="$XDG_RT/vox-wtype-lock"
 plen_d="$XDG_RT/vox-plen-d"; plen_r="$XDG_RT/vox-plen-r"

@@ -35,7 +35,7 @@ check "owned by root"                           '[ "$(stat -c "%U" /var/log/sess
 
 # ── Test 2: All deployed scripts point to /var/log/sessions ────────────
 echo "── 2. Deployed scripts use /var/log/sessions ──"
-BINS="dwm-start dwm-status dwl-start dwl-status net-watch vnc vpn wifi-manager vpn-suspend"
+BINS="dwm-start dwm-status net-watch vnc vpn wifi-manager vpn-suspend"
 for bin in $BINS; do
     check "$bin uses LOG_DIR=/var/log/sessions" \
         "grep -q 'LOG_DIR=.*/var/log/sessions' /usr/local/bin/$bin 2>/dev/null"
