@@ -114,6 +114,14 @@ static const Key keys[] = {
 	{ 0,                            XF86XK_MonBrightnessUp, spawn, {.v = (const char*[]){"/usr/local/bin/brightness_up.sh", NULL} } },
 	{ ShiftMask,                    XF86XK_MonBrightnessDown, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_down.sh", NULL} } },
 	{ ShiftMask,                    XF86XK_MonBrightnessUp, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_up.sh", NULL} } },
+	// Fallback: some laptops send plain F-keys instead of XF86 multimedia keys
+	{ 0,                            XK_F1, spawn, {.v = (const char*[]){"/usr/local/bin/volume_mute.sh", NULL} } },
+	{ 0,                            XK_F2, spawn, {.v = (const char*[]){"/usr/local/bin/volume_down.sh", NULL} } },
+	{ 0,                            XK_F3, spawn, {.v = (const char*[]){"/usr/local/bin/volume_up.sh", NULL} } },
+	{ 0,                            XK_F5, spawn, {.v = (const char*[]){"/usr/local/bin/brightness_down.sh", NULL} } },
+	{ 0,                            XK_F6, spawn, {.v = (const char*[]){"/usr/local/bin/brightness_up.sh", NULL} } },
+	{ ShiftMask,                    XK_F5, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_down.sh", NULL} } },
+	{ ShiftMask,                    XK_F6, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_up.sh", NULL} } },
 };
 
 /* button definitions */
