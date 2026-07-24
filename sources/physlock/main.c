@@ -26,7 +26,7 @@
 #include <errno.h>
 #include <pwd.h>
 #include <signal.h>
-#include <security/pam_misc.h>
+#include <termios.h>
 
 static int oldvt;
 static vt_t vt;
@@ -36,8 +36,104 @@ static pid_t chpid;
 static int locked;
 static userinfo_t root, user;
 
+/* ─── PAM conversation with asterisk feedback ─────────────────── */
+#define MAX_PW_LEN 256
+
+static int
+pam_conv_fn(int num_msg, const struct pam_message **msg,
+            struct pam_response **resp, void *appdata)
+{
+	(void)appdata;
+	struct termios old_term, new_term;
+	char password[MAX_PW_LEN + 1];
+	int pw_len = 0;
+	char c;
+
+	if (num_msg <= 0 || num_msg > PAM_MAX_NUM_MSG)
+		return PAM_CONV_ERR;
+
+	struct pam_response *r = calloc(num_msg, sizeof(struct pam_response));
+	if (!r) return PAM_BUF_ERR;
+
+	for (int i = 0; i < num_msg; i++) {
+		if (msg[i]->msg_style == PAM_PROMPT_ECHO_OFF) {
+			/* Print prompt using raw write (fd 1 is the VT) */
+			if (msg[i]->msg) {
+				const char *p = msg[i]->msg;
+				write(1, p, strlen(p));
+			}
+
+			/* Save terminal attrs, switch to raw/no-echo */
+			if (tcgetattr(0, &old_term) == -1) {
+				free(r);
+				return PAM_CONV_ERR;
+			}
+			new_term = old_term;
+			new_term.c_lflag &= ~(ECHO | ICANON | ISIG);
+			new_term.c_cc[VMIN] = 1;
+			new_term.c_cc[VTIME] = 0;
+			tcsetattr(0, TCSAFLUSH, &new_term);
+
+			/* Read password char by char, echo asterisks */
+			pw_len = 0;
+			while (pw_len < MAX_PW_LEN) {
+				if (read(0, &c, 1) != 1) break;
+				if (c == '\n' || c == '\r') {
+					break;
+				} else if (c == 127 || c == '\b') {
+					if (pw_len > 0) {
+						pw_len--;
+						write(1, "\b \b", 3);
+					}
+				} else if (c == 21) {
+					/* Ctrl-U: clear all asterisks */
+					while (pw_len > 0) {
+						pw_len--;
+						write(1, "\b \b", 3);
+					}
+				} else if (c >= 32) {
+					password[pw_len++] = c;
+					write(1, "*", 1);
+				}
+			}
+			password[pw_len] = '\0';
+
+			/* Restore terminal and print newline */
+			tcsetattr(0, TCSAFLUSH, &old_term);
+			write(1, "\n", 1);
+
+			r[i].resp = strdup(password);
+			if (!r[i].resp) {
+				free(r);
+				return PAM_BUF_ERR;
+			}
+		} else if (msg[i]->msg_style == PAM_PROMPT_ECHO_ON) {
+			if (msg[i]->msg)
+				write(1, msg[i]->msg, strlen(msg[i]->msg));
+			char buf[256];
+			ssize_t n = read(0, buf, sizeof(buf) - 1);
+			if (n > 0) {
+				buf[n] = '\0';
+				r[i].resp = strdup(buf);
+			}
+		} else if (msg[i]->msg_style == PAM_TEXT_INFO) {
+			if (msg[i]->msg) {
+				write(1, msg[i]->msg, strlen(msg[i]->msg));
+				write(1, "\n", 1);
+			}
+		} else if (msg[i]->msg_style == PAM_ERROR_MSG) {
+			if (msg[i]->msg) {
+				write(1, msg[i]->msg, strlen(msg[i]->msg));
+				write(1, "\n", 1);
+			}
+		}
+	}
+	*resp = r;
+	return PAM_SUCCESS;
+}
+
 static struct pam_conv conv = {
-	misc_conv,
+	pam_conv_fn,
 	NULL
 };
 

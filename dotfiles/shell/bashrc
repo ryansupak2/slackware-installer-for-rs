@@ -77,8 +77,8 @@ export GDK_DPI_SCALE=1.5
 
 # Node.js + pi runtime (matches pi installer location)
 export PATH=/usr/local/node-v22.19.0-linux-x64/bin:$PATH
-# screen locking: 'lock' works in dwl (wlock) and on TTY (physlock)
-alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (wlock in dwl, physlock on TTY)
+# screen locking: physlock works identically for X11 (dwm) and TTY
+alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (physlock)
 LOG_DIR="/var/log"
 if [ ! -w "$LOG_DIR" ]; then
     LOG_DIR="$HOME/logs"

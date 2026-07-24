@@ -94,20 +94,8 @@ if $ok; then
 fi
 
 if $ok; then
-    # ── xlock (X11 screen locker) ────────────────────────────────
-    # xlockmore is the standard X11 locker with PAM support.
-    # Install from Slackware packages if not already present.
-    if [ -x /usr/bin/xlock ] || [ -x /usr/local/bin/xlock ]; then
-        echo "xlock already installed — skipping"
-    else
-        echo "Installing xlockmore (X11 screen locker)..."
-        install_pkg "xlockmore" 2>/dev/null || {
-            # If not in Slackware, try SBo
-            install_sbo "xlockmore" 2>/dev/null || {
-                echo "WARNING: xlockmore not available — screen locking in X11 will fall back to physlock"
-            }
-        }
-    fi
+    # physlock is the sole screen locker (deployed by steps/screen-locking.sh)
+    echo "Screen locking: physlock (deployed separately)"
 fi
 
 # ── Always deploy: session launcher + status scripts (independent of build) ──
