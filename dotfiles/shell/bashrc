@@ -15,6 +15,36 @@ pi() {
         command pi --readonly "$@"
     fi
 }
+#help:pid=pi with debug logging (TUI capture + stack trace for crash diagnosis)
+pid() {
+    local log_dir="/var/log"
+    [ -w "$log_dir" ] || log_dir="$HOME/logs"
+    mkdir -p "$log_dir" 2>/dev/null || true
+    local ts="$(date +%Y%m%d-%H%M%S)"
+    local tui_log="$log_dir/${USER:-root}-pi-tui-$ts.log"
+    local err_log="$log_dir/${USER:-root}-pi-stderr-$ts.log"
+    local nodecrashdump="$log_dir/${USER:-root}-pi-nodecrashdump-$ts.json"
+    ulimit -c unlimited 2>/dev/null || true
+    echo "pid: DEBUG MODE" >&2
+    echo "  TUI:    $tui_log" >&2
+    echo "  stderr: $err_log" >&2
+    echo "  nodecrashdump: $nodecrashdump" >&2
+    export PI_DEBUG=1
+    export NODE_OPTIONS="--trace-uncaught --report-on-fatalerror --report-uncaught-exception --report-filename=$nodecrashdump"
+    if [ -f "./SYSTEM.MD" ]; then
+        PI_TUI_WRITE_LOG="$tui_log" command pi --readonly @SYSTEM.MD "$@" 2>"$err_log"
+    else
+        PI_TUI_WRITE_LOG="$tui_log" command pi --readonly "$@" 2>"$err_log"
+    fi
+    local rc=$?
+    if [ $rc -ne 0 ]; then
+        echo "pid: pi crashed (exit=$rc)" >&2
+        echo "  stderr log: $err_log" >&2
+        echo "  TUI log:    $tui_log" >&2
+        echo "  node reports in: $log_dir/" >&2
+    fi
+    return $rc
+}
 alias pi-update='command pi update'  #help:pi-update=update pi coding agent
 alias wifi='wifi-manager'  #help:wifi=wifi network chooser
 alias net='net-watch'
