@@ -29,9 +29,11 @@ fi
 echo "Setting up keyboard backlight permissions..."
 if $ok; then
     if ! cp "$REPO_DIR/dotfiles/udev/90-keyboard-backlight.rules" /etc/udev/rules.d/ 2>/dev/null; then ok=false; fi
+    if ! cp "$REPO_DIR/dotfiles/udev/90-backlight.rules" /etc/udev/rules.d/ 2>/dev/null; then ok=false; fi
     if $ok; then
         udevadm control --reload-rules 2>/dev/null || true
         udevadm trigger --subsystem-match=leds 2>/dev/null || true
+        udevadm trigger --subsystem-match=backlight 2>/dev/null || true
     fi
 fi
 

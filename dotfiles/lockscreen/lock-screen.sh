@@ -37,6 +37,29 @@ trap 'rm -f "$LOCKFILE" 2>/dev/null' EXIT
 LOG="$LOG_DIR/${USER:-root}-lock-screen-$(date +%Y%m%d-%H%M%S).log"
 exec >> "$LOG" 2>&1
 
+# ── Gracefully toggle VOX OFF before locking ──────────────────────
+# Flushes final transcription, cleans state file, drops ALSA.
+# Only sends signal if vox is currently recording (safe toggle).
+vox_off() {
+    if pgrep -x voxd >/dev/null 2>&1; then
+        VOX_STATE=$(cat "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/vox_state" 2>/dev/null)
+        if [ "$VOX_STATE" = "recording" ] || [ "$VOX_STATE" = "recording+dump" ]; then
+            echo "$(date) pre-lock: toggling vox OFF (was $VOX_STATE)"
+            kill -USR1 $(pgrep -x voxd) 2>/dev/null
+            # Give voxd time to flush final transcription and clean state
+            for i in $(seq 1 30); do
+                if [ ! -f "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/vox_state" ]; then
+                    echo "$(date) pre-lock: vox state cleaned after $((i*100))ms"
+                    break
+                fi
+                usleep 100000
+            done
+        fi
+    fi
+}
+
+# Toggle VOX off before locking so mic isn't hot while screen is locked
+vox_off
 CURRENT_TTY=$(tty 2>/dev/null || echo "none")
 echo "$(date) lock-screen: DISPLAY='${DISPLAY:-none}' USER=$USER TTY=$CURRENT_TTY dwm=$(pgrep -c dwm 2>/dev/null || echo 0) physlock_running=$(pgrep -c physlock 2>/dev/null || echo 0)"
 
