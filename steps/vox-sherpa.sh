@@ -210,6 +210,13 @@ if [ -n "$PID" ]; then
     fi
     kill -USR1 $(pgrep -x voxd) 2>/dev/null
 else
+    # Stale state check: if state file says recording but voxd isn't running,
+    # something killed it (X restart, crash, OOM). Clean up so next toggle is sane.
+    if [ "$CUR_STATE" = "recording" ] || [ "$CUR_STATE" = "recording+dump" ]; then
+        log_toggle "stale state '$CUR_STATE' with no voxd process — clearing"
+        rm -f "$STATE_FILE"
+        CUR_STATE="off"
+    fi
     log_toggle "voxd not running — starting daemon"
     log_toggle ">>> VOX ON <<<"
     /usr/local/bin/voxd &

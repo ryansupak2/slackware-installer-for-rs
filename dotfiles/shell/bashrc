@@ -15,6 +15,7 @@ pi() {
         command pi --readonly "$@"
     fi
 }
+alias pi-update='command pi update'  #help:pi-update=update pi coding agent
 alias wifi='wifi-manager'  #help:wifi=wifi network chooser
 alias net='net-watch'
 alias net-watch='/usr/local/bin/net-watch'
