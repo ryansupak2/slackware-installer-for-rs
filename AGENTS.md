@@ -1,5 +1,25 @@
 # AGENTS.md — Agent guidelines for this repo
 
+## DESTRUCTIVE ACTIONS ARE FORBIDDEN
+
+**Never** perform any action that intentionally breaks, crashes, kills, or disrupts
+a running process, daemon, or application unless the user explicitly asks for it.
+This includes:
+- Running `node -e` scripts that throw uncaught exceptions
+- Killing processes with `kill`, `pkill`, `killall`
+- Sending signals (SIGTERM, SIGKILL, SIGHUP, etc.)
+- Calling `process.exit()`, `process.report.writeReport()`, or similar
+- Simulating crashes to "test" crash reporting
+- Any form of fault injection or chaos testing
+
+Verification of fixes should use non-destructive checks: inspect logs, check
+config syntax, test with `--help`, check `pgrep`, etc. If a destructive test
+is truly needed, ask the user first and get explicit confirmation.
+
+---
+
+# AGENTS.md — Agent guidelines for this repo
+
 ## Command output
 
 Always show output streaming live so the user can see progress. Never suppress

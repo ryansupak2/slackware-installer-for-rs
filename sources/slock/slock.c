@@ -28,7 +28,7 @@
 #include <X11/Xutil.h>
 
 /* ─── colors (matching wlock) ─────────────────────────────────────── */
-static const unsigned long COLOR_BG       = 0x000000; /* black background   */
+static const unsigned long COLOR_BG       = 0x556B2F; /* black background   */
 static const unsigned long COLOR_INPUT    = 0x00AA00; /* green while typing  */
 static const unsigned long COLOR_CHECKING = 0xAAAA00; /* yellow (checking)   */
 static const unsigned long COLOR_FAILED   = 0xAA0000; /* red flash on fail   */
@@ -236,24 +236,17 @@ handle_keypress(XKeyEvent *ev)
 static void
 grab_inputs(void)
 {
-	/* Retry grab for ~1 second in case another grab is active
-	 * (e.g., a dying locker hasn't released yet) */
-	for (int i = 0; i < 100; i++) {
+	while (1) {
 		int kg = XGrabKeyboard(dpy, win, True,
 			GrabModeAsync, GrabModeAsync, CurrentTime);
 		if (kg == GrabSuccess) {
 			int pg = XGrabPointer(dpy, win, False,
-				ButtonPressMask | ButtonReleaseMask |
-				PointerMotionMask,
-				GrabModeAsync, GrabModeAsync, None,
-				None, CurrentTime);
-			if (pg == GrabSuccess)
-				return;
+				ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+				GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
+			if (pg == GrabSuccess) return;
 			XUngrabKeyboard(dpy, CurrentTime);
 		}
-		usleep(10000); /* 10 ms */
 	}
-	die("cannot grab keyboard/pointer");
 }
 
 /* ─── main ────────────────────────────────────────────────────────── */
@@ -295,14 +288,20 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 
 	grab_inputs();
 
-	/* event loop */
+	/* event loop — black until keyboard buffer drains, then olive */
 	XEvent ev;
+	int ready = 0;
+
 	while (1) {
 		XNextEvent(dpy, &ev);
 
 		switch (ev.type) {
 		case KeyPress:
 			handle_keypress(&ev.xkey);
+			if (!ready && !XPending(dpy)) {
+				render();  /* olive — keyboard is truly live */
+				ready = 1;
+			}
 			break;
 		case Expose:
 			if (ev.xexpose.count == 0)

@@ -1,33 +1,94 @@
 #!/bin/bash
-# lock-screen.sh — lock the screen
-#   X11 dwm session:  slock (X overlay, no VT switch)
-#   TTY/no-X:         physlock -d (VT-based, asterisk feedback)
+# lock-screen.sh — screen locker for dwm (slock) + TTY (physlock)
+# Called from keybinds and from ACPI/elogind hooks (system context, no env).
+#
+# Strategy:
+#   - In-session (Mod+Esc): lock the graphical session:
+#       · X11 (dwm)     → slock
+#   - System (lid close/sleep): if a graphical session is running, lock it;
+#     otherwise, lock TTY consoles with physlock.
+#   - physlock's VT acquisition conflicts with the compositor's DRM master,
+#     so we never run physlock while a graphical session is active.
 
+# Ensure standard paths (acpid runs with minimal env)
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
-
+# Ensure log directory exists BEFORE redirecting output
 LOG_DIR="/var/log/sessions"
-mkdir -p "$LOG_DIR" 2>/dev/null || true
+
+# ── Mutex (mkdir is atomic — no PID race) ────────────────────
+LOCK=/tmp/lock-screen.mutex
+if ! mkdir "$LOCK" 2>/dev/null; then
+    exit 0
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT
+
+# Diagnostic logging (one log per invocation)
 LOG="$LOG_DIR/${USER:-root}-lock-screen-$(date +%Y%m%d-%H%M%S).log"
 exec >> "$LOG" 2>&1
 
-# Shut down VOX immediately before locking
-if pgrep -x voxd >/dev/null 2>&1; then
-    echo "$(date) shutting down vox"
-    kill -USR1 $(pgrep -x voxd) 2>/dev/null
-    for i in $(seq 1 30); do
-        if ! pgrep -x voxd >/dev/null 2>&1; then
-            echo "$(date) vox shut down after $((i*100))ms"
-            break
+# Kill VOX
+pkill -x voxd 2>/dev/null
+rm -f /run/user/*/vox_state 2>/dev/null
+
+CURRENT_TTY=$(tty 2>/dev/null || echo "none")
+echo "$(date) lock-screen: DISPLAY='${DISPLAY:-none}' USER=$USER TTY=$CURRENT_TTY dwm=$(pgrep -c dwm 2>/dev/null || echo 0) physlock_running=$(pgrep -c physlock 2>/dev/null || echo 0)"
+
+# ── Helper: start physlock if available and not already running ──
+try_physlock() {
+    if command -v physlock >/dev/null 2>&1; then
+        if pgrep -x physlock >/dev/null 2>&1; then
+            echo "$(date) physlock already running, skipping"
+            return 0
         fi
-        usleep 100000
-    done
+        echo "$(date) starting physlock -d"
+        physlock -d &
+        local physlock_pid=$!
+        sleep 0.3
+        if kill -0 "$physlock_pid" 2>/dev/null; then
+            echo "$(date) physlock started (pid $physlock_pid)"
+            return 0
+        else
+            echo "$(date) ERROR: physlock exited immediately (pid $physlock_pid)"
+            return 1
+        fi
+    else
+        echo "$(date) physlock not found!"
+        return 1
+    fi
+}
+
+# ── In-session call (Mod+Esc from dwm) ─────────────────────────
+# Lock the current X11 session with slock and block until it exits.
+if [ -n "$DISPLAY" ] && pgrep dwm >/dev/null 2>&1; then
+    if command -v slock >/dev/null 2>&1; then
+        echo "$(date) branch: X11 in-session, using slock"
+        slock
+        exit 0
+    else
+        echo "$(date) slock not found, falling back to physlock"
+        try_physlock
+        exit 0
+    fi
 fi
 
-echo "$(date) locking (USER=${USER:-?} DISPLAY=${DISPLAY:-none})"
+# ── System call (acpid / elogind / manual) ─────────────────────
+# If a graphical session (dwm) is running, lock it with slock.
+# Running physlock here would steal the VT from the compositor and
+# cause a hard hang (DRM master conflict).
+#
+# If no graphical session exists, lock TTY consoles with physlock.
 
-# X11 dwm is running — use slock
 if pgrep dwm >/dev/null 2>&1; then
-    # Find the dwm session owner and auth info
+    echo "$(date) branch: dwm detected, trying slock"
+
+    if ! command -v slock >/dev/null 2>&1; then
+        echo "$(date) slock not found, falling back to physlock"
+        try_physlock
+        exit 0
+    fi
+
+    # Lock every active dwm session as its owner
+    slock_started=0
     for dwm_pid in $(pgrep dwm 2>/dev/null); do
         [ "$(cat /proc/$dwm_pid/comm 2>/dev/null)" = "dwm" ] || continue
         dwm_uid=$(awk '/^Uid:/{print $2}' /proc/$dwm_pid/status 2>/dev/null)
@@ -35,6 +96,7 @@ if pgrep dwm >/dev/null 2>&1; then
         dwm_user=$(getent passwd "$dwm_uid" 2>/dev/null | cut -d: -f1)
         [ -z "$dwm_user" ] && continue
 
+        # Extract DISPLAY and XAUTHORITY from the dwm process environment
         dwm_display=$(tr '\0' '\n' < /proc/$dwm_pid/environ 2>/dev/null | grep '^DISPLAY=' | cut -d= -f2-)
         [ -n "$dwm_display" ] || dwm_display=":0"
         dwm_xauth=$(tr '\0' '\n' < /proc/$dwm_pid/environ 2>/dev/null | grep '^XAUTHORITY=' | cut -d= -f2-)
@@ -43,19 +105,28 @@ if pgrep dwm >/dev/null 2>&1; then
             dwm_xauth="${dwm_home:-/home/$dwm_user}/.Xauthority"
         fi
 
-        echo "$(date) branch: X11, starting slock for $dwm_user on $dwm_display"
+        echo "$(date) starting slock for $dwm_user on $dwm_display"
         su "$dwm_user" -c "env DISPLAY=$dwm_display XAUTHORITY=$dwm_xauth slock" &
-        exit 0
+        slock_started=1
     done
-    # dwm found but couldn't lock — fall through to physlock
-    echo "$(date) WARNING: dwm detected but could not start slock"
-fi
 
-# No X11 — use physlock
-if pgrep -x physlock >/dev/null 2>&1; then
-    echo "$(date) physlock already running — exiting"
+    if [ "$slock_started" -eq 0 ]; then
+        echo "$(date) no slock started (dwm zombie?), falling back to physlock"
+        try_physlock
+        exit 0
+    fi
+
+    # Wait for slock to finish
+    echo "$(date) waiting for slock..."
+    wait 2>/dev/null
+    echo "$(date) slock finished"
     exit 0
+else
+    echo "$(date) branch: no dwm, using physlock"
+    # No graphical session — lock TTY consoles with physlock
+    if ! try_physlock; then
+        echo "$(date) ERROR: failed to start physlock"
+    fi
 fi
 
-echo "$(date) branch: TTY/no-X, using physlock"
-exec physlock -d
+echo "$(date) lock-screen exiting"

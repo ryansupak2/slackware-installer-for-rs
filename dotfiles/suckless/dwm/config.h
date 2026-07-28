@@ -68,7 +68,7 @@ static const char *surfcmd[]  = { "/usr/local/bin/browser", NULL };
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
 	{ MODKEY,                       XK_r,      spawn,          {.v = dmenucmd } },
-	{ MODKEY|ShiftMask,             XK_Return, spawn,          {.v = termcmd } },
+	{ MODKEY,                       XK_Return, spawn,          {.v = termcmd } },
 	{ ControlMask|ShiftMask,        XK_t,      spawn,          {.v = termcmd } },
 	{ ControlMask|ShiftMask,        XK_b,      spawn,          {.v = surfcmd } },
 	{ MODKEY,                       XK_b,      togglebar,      {0} },
@@ -102,7 +102,7 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_s,      focusstack,     {.i = +1 } },
 	{ MODKEY,                       XK_a,      viewprev,       {0} },
 	{ MODKEY,                       XK_d,      viewnext,       {0} },
-	{ MODKEY|ControlMask|ShiftMask, XK_q,      quit,           {0} },
+	{ MODKEY|ShiftMask,             XK_q,      quit,           {0} },
 	{ MODKEY|ShiftMask,             XK_z,      killclient,     {0} },
 	{ MODKEY,                       XK_h,      togglehidemode, {0} },
 	{ MODKEY,                       XK_v,      spawn,          SHCMD("/usr/local/bin/toggle-vox.sh") },

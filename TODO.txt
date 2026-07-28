@@ -1,0 +1,25 @@
+TODO
+====
+
+[ ] VOX on/off switch reliability
+    The vox/sherpa-onnx pipeline has an intermittent issue where switching
+    voice activation on and off (the "fox switch") is unreliable. Not
+    addressing this now — revisit later and fix properly.
+
+[~] HHKB (Happy Hacking Keyboard) Studio support
+    Keymap remapped (see /tmp/hhkb-profile-custom.json).
+    - Meta→Fn, Alt→Meta, Fn1→RAlt on base layer
+    - Fn+WASD=arrows, Fn+TG=vol, Fn+FH=bright, Fn+IK=pgup/pgdn, Fn+JL=home/end
+    - Delete key is Backspace by default, Delete on Fn
+    TOUCH STRIP: MwUp/MwDn codes map to KEY_UP/KEY_DOWN (arrow keys),
+    not REL_WHEEL. The HHKB firmware translates these to keyboard events —
+    the touch strip cannot generate true mouse scroll. Only Cmd+Tab L/R
+    (0x5f8e/0x5f8f) or Alt+Tab L/R (0x5f8c/0x5f8d) gesture codes work.
+
+[ ] Laptop lid close/open lock reliability
+    Timing issues with screen locking on lid events. XScreenSaver
+    (xsclocks) and physlock locks sometimes fire out of order or race
+    on suspend/resume — lid close triggers a lock but lid open
+    occasionally bypasses or double-fires it. Investigate timing
+    and ordering of xscreensaver-command lock vs physlock on lid
+    events. Fix later.

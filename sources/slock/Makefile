@@ -7,7 +7,7 @@ CC        ?= gcc
 CFLAGS    += -std=c99 -Wall -Wextra -O2 -g
 PKGS      := x11
 CFLAGS    += $(shell pkg-config --cflags $(PKGS))
-LDFLAGS   += $(shell pkg-config --libs $(PKGS)) -lpam
+LDFLAGS   += $(shell pkg-config --libs $(PKGS)) -lpam -lXtst
 
 OBJ       := slock.o
 
