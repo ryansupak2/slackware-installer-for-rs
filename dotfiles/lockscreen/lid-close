@@ -1,2 +1,2 @@
 event=button/lid.*close
-action=slock & loginctl suspend
+action=/sbin/poweroff

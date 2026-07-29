@@ -34,6 +34,17 @@ done
 remaining=$(grep "\*enabled" /proc/acpi/wakeup | wc -l)
 echo "Remaining enabled: $remaining"
 
+# --- Ensure deep suspend (S3) is used, not s2idle ---
+# s2idle ignores /proc/acpi/wakeup and sysfs wakeup controls;
+# only deep sleep honors the power-button-only restrictions.
+if grep -q deep /sys/power/mem_sleep 2>/dev/null; then
+    echo deep > /sys/power/mem_sleep 2>/dev/null \
+        && echo "  mem_sleep set to: deep (s2idle would ignore wakeup restrictions)" \
+        || echo "  WARNING: could not set mem_sleep to deep"
+else
+    echo "  WARNING: deep sleep not supported by kernel"
+fi
+
 # Deploy a boot-time enforcer
 cat > /usr/local/bin/wakeup-power-only << 'EOF'
 #!/bin/sh
@@ -48,6 +59,9 @@ for wakefile in $(find /sys/devices -name "wakeup" -path "*/power/*" 2>/dev/null
         echo "disabled" > "$wakefile" 2>/dev/null || true
     fi
 done
+# Use deep suspend (S3) so ACPI wakeup restrictions actually work.
+# s2idle ignores all /proc/acpi/wakeup and sysfs wakeup controls.
+grep -q deep /sys/power/mem_sleep 2>/dev/null && echo deep > /sys/power/mem_sleep 2>/dev/null || true
 EOF
 chmod +x /usr/local/bin/wakeup-power-only
 
@@ -74,5 +88,6 @@ fi
 echo "  wakeup-power-only deployed to /usr/local/bin/wakeup-power-only"
 echo "  elogind post-resume hook deployed to $HOOK"
 
-echo "SUCCESS: Only power button will wake the machine."
+echo "SUCCESS: Only power button will wake the machine (deep sleep)."
+echo "         mem_sleep set to 'deep' — s2idle would ignore wakeup restrictions."
 exit 0

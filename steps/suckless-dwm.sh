@@ -94,8 +94,8 @@ if $ok; then
 fi
 
 if $ok; then
-    # physlock is the sole screen locker (deployed by steps/screen-locking.sh)
-    echo "Screen locking: physlock (deployed separately)"
+    # lid-close → shutdown deployed by steps/screen-locking.sh
+    echo "Lid-close: shutdown (deployed separately)"
 fi
 
 # ── Always deploy: session launcher + status scripts (independent of build) ──

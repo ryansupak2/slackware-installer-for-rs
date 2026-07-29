@@ -75,7 +75,6 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_Down,   focusstack,     {.i = +1 } },
 	{ MODKEY,                       XK_Up,     focusstack,     {.i = -1 } },
 	{ MODKEY,                       XK_bracketright, setmfact, {.f = +0.05f} },
-	{ MODKEY,                       XK_Escape, spawn,          SHCMD("/usr/local/bin/lock-screen.sh") },
 	{ MODKEY,                       XK_t,      setlayout,      {.v = &layouts[1]} },
 	{ MODKEY,                       XK_f,      setlayout,      {.v = &layouts[2]} },
 	{ MODKEY,                       XK_m,      setlayout,      {.v = &layouts[0]} },

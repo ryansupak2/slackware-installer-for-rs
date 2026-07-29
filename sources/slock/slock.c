@@ -1,12 +1,12 @@
-/* slock - X11 screen locker (with red/yellow/green colors like wlock)
+/* slock - X11 screen locker
  *
  * Minimal X11 screen locker with PAM authentication.
- * Colors mirror wlock:
- *   · Black  — idle (no input yet)
+ *
+ * Colors:
+ *   · Olive — idle (no input yet)
  *   · Green  — typing (password has characters)
  *   · Yellow — checking (PAM is hashing)
  *   · Red    — authentication failed
- *   · Gray   — success (brief flash before unlock)
  *
  * Build: make
  * Run:   slock
@@ -28,17 +28,15 @@
 #include <X11/Xutil.h>
 
 /* ─── colors (matching wlock) ─────────────────────────────────────── */
-static const unsigned long COLOR_BG       = 0x556B2F; /* black background   */
+static const unsigned long COLOR_BG       = 0x556B2F; /* olive background   */
 static const unsigned long COLOR_INPUT    = 0x00AA00; /* green while typing  */
 static const unsigned long COLOR_CHECKING = 0xAAAA00; /* yellow (checking)   */
 static const unsigned long COLOR_FAILED   = 0xAA0000; /* red flash on fail   */
-static const unsigned long COLOR_SUCCESS  = 0x555555; /* dim on success      */
 
 static unsigned long col_bg       = COLOR_BG;
 static unsigned long col_input    = COLOR_INPUT;
 static unsigned long col_checking = COLOR_CHECKING;
 static unsigned long col_failed   = COLOR_FAILED;
-static unsigned long col_success  = COLOR_SUCCESS;
 
 #define MAX_PW_LEN 256
 
@@ -153,10 +151,6 @@ try_auth(void)
 
 	if (pam_auth(user)) {
 		pw_checking = false;
-		/* dim grey flash on success */
-		XSetForeground(dpy, gc, col_success);
-		XFillRectangle(dpy, win, gc, 0, 0, width, height);
-		XFlush(dpy);
 		unlock_and_exit();
 	} else {
 		pw_checking = false;
@@ -267,10 +261,10 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 	/* simple black-and-white colormap */
 	cmap = DefaultColormap(dpy, screen);
 
-	/* create a fullscreen override-redirect window (above everything) */
+	/* fullscreen override-redirect window — black until grab succeeds */
 	XSetWindowAttributes wa = {
 		.override_redirect = True,
-		.background_pixel  = col_bg,
+		.background_pixel  = 0x000000,  /* black = not ready */
 		.event_mask        = KeyPressMask | ExposureMask |
 		                     StructureNotifyMask,
 	};
@@ -281,16 +275,18 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 		CWOverrideRedirect | CWBackPixel | CWEventMask, &wa);
 
 	gc = XCreateGC(dpy, win, 0, NULL);
-
-	/* map and raise */
 	XMapRaised(dpy, win);
 	XSync(dpy, False);
 
+	/* block until keyboard + pointer grab succeeds (retries on resume) */
 	grab_inputs();
 
-	/* event loop — black until keyboard buffer drains, then olive */
+	/* grab secured — keyboard is live, show olive */
+	XSetForeground(dpy, gc, col_bg);
+	XFillRectangle(dpy, win, gc, 0, 0, width, height);
+	XFlush(dpy);
+
 	XEvent ev;
-	int ready = 0;
 
 	while (1) {
 		XNextEvent(dpy, &ev);
@@ -298,10 +294,6 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 		switch (ev.type) {
 		case KeyPress:
 			handle_keypress(&ev.xkey);
-			if (!ready && !XPending(dpy)) {
-				render();  /* olive — keyboard is truly live */
-				ready = 1;
-			}
 			break;
 		case Expose:
 			if (ev.xexpose.count == 0)

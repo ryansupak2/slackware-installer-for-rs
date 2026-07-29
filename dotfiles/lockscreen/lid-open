@@ -1,2 +1,0 @@
-event=button/lid.*open
-action=logger -t acpi-lid "lid open"

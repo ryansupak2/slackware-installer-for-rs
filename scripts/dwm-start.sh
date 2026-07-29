@@ -1,42 +1,21 @@
 #!/bin/sh
-#
 # dwm-start — X11/dwm session launcher
-# Run from a text console.  Logs to /var/log/<user>-dwm-YYYYMMDD-HHMMSS.log
-# All output mirrored to terminal so the log captures everything.
 
-# Logging: consistent with project convention
 LOG_DIR="/var/log"
 [ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOGFILE="$LOG_DIR/${USER:-root}-dwm-$(date +%Y%m%d-%H%M%S).log"
-
-# ── Output routing ───────────────────────────────────────────────
 exec >>"$LOGFILE" 2>&1
-# ── Guard: refuse to run inside an existing X session ───────────
+
 if [ -n "$DISPLAY" ]; then
     echo "ERROR: Already inside an X session (DISPLAY=$DISPLAY)." >&2
-    echo "dwm-start must be run from a text console, not from within X." >&2
     exit 1
 fi
 
-echo "========================================"
 echo "DWM session starting — $(date)"
 echo "Log: $LOGFILE"
-echo "========================================"
 
-cleanup() {
-    echo "  · cleaning up..."
-    pkill -x voxd              2>/dev/null || true
-    rm -f "$XDG_RUNTIME_DIR/vox_state" 2>/dev/null || true
-    pkill -x pipewire-pulse       2>/dev/null || true
-    pkill -x pipewire-media-session 2>/dev/null || true
-    pkill -x wireplumber          2>/dev/null || true
-    pkill -x pipewire             2>/dev/null || true
-}
-trap cleanup EXIT
-
-
-# ── Runtime dir ───────────────────────────────────────────────
+# Runtime dir
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 if [ ! -d "$XDG_RUNTIME_DIR" ]; then
     sudo mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
@@ -45,44 +24,34 @@ if [ ! -d "$XDG_RUNTIME_DIR" ]; then
 fi
 export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
 
-# ── Helper: start a daemon and wait for it ────────────────────
-start_daemon() {
-    local name="$1" binary="$2" check="$3" wait_s="$4" tries="$5"
-    local i=0
-    $binary &
-    while [ $i -lt "$tries" ]; do
-        sleep "$wait_s"
-        eval "$check" 2>/dev/null && return 0
-        i=$((i + 1))
-    done
-    echo "  WARNING: $name failed to start"
-    return 1
-}
-
-# ── Audio (all optional — never block dwm) ────────────────────
+# ── Audio ──
 echo "── audio ──"
-
-pkill -x pulseaudio             2>/dev/null || true
-pkill -x pipewire-pulse          2>/dev/null || true
-pkill -x pipewire-media-session  2>/dev/null || true
-pkill -x wireplumber             2>/dev/null || true
-pkill -x pipewire                2>/dev/null || true
+pkill -x pulseaudio 2>/dev/null || true
+pkill -x pipewire 2>/dev/null || true
+pkill -x pipewire-media-session 2>/dev/null || true
+pkill -x wireplumber 2>/dev/null || true
+pkill -x pipewire-pulse 2>/dev/null || true
 sleep 0.5
-
-rm -f  "$XDG_RUNTIME_DIR/pipewire-0" "$XDG_RUNTIME_DIR/pipewire-0.lock" 2>/dev/null || true
+rm -f "$XDG_RUNTIME_DIR/pipewire-0" "$XDG_RUNTIME_DIR/pipewire-0.lock" 2>/dev/null || true
 rm -rf "$XDG_RUNTIME_DIR/pulse" 2>/dev/null || true
 
 echo "  pipewire..."
-start_daemon "pipewire"             pipewire \
-    '[ -S "$XDG_RUNTIME_DIR/pipewire-0" ]' 0.1 10 || true
+pipewire &
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    sleep 0.1
+    [ -S "$XDG_RUNTIME_DIR/pipewire-0" ] && break
+done
 
 echo "  pipewire-media-session..."
-start_daemon "pipewire-media-session" pipewire-media-session \
-    'pgrep -f pipewire-media-session >/dev/null' 0.2 10 || true
+pipewire-media-session &
+sleep 0.2
 
 echo "  pipewire-pulse..."
-start_daemon "pipewire-pulse"      pipewire-pulse \
-    '[ -S "$XDG_RUNTIME_DIR/pulse/native" ]' 0.1 10 || true
+pipewire-pulse &
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    sleep 0.1
+    [ -S "$XDG_RUNTIME_DIR/pulse/native" ] && break
+done
 
 # Unmute hardware
 amixer -c0 cset numid=9  87           >/dev/null 2>&1 || true
@@ -95,17 +64,13 @@ for nid in 35 38 39 40 46 47; do
     amixer -c0 cset numid=$nid 32,32 >/dev/null 2>&1 || true
 done
 
-# ── X11 / dwm ─────────────────────────────────────────────────
-
-# Enforce power-button-only wake (resets on boot)
+# ── X11 / dwm ──
 /usr/local/bin/wakeup-power-only 2>/dev/null || true
 echo "── dwm + st ──"
 
 pkill -f dwm-status 2>/dev/null || true
 sleep 0.3
 
-# Generate a minimal xinitrc on the fly so dwm-start is self-contained.
-# Keyboard backlight: set to 50% at X session start.
 XINITRC="/tmp/xinitrc-dwm-$$"
 cat > "$XINITRC" << 'XEOF'
 #!/bin/sh
@@ -122,47 +87,38 @@ xmodmap -e "clear lock" 2>/dev/null || true
 xmodmap -e "keysym Caps_Lock = Super_L" 2>/dev/null || true
 xmodmap -e "add mod4 = Super_L" 2>/dev/null || true
 
-# Keyboard repeat rate — FreeBSD snappy defaults (delay 250ms, 34 chars/sec)
+# Keyboard repeat rate
 xset r rate 250 34 2>/dev/null || true
 
-# TrackPoint scroll sensitivity (middle-button + trackpoint scroll)
+# TrackPoint scroll sensitivity
 xinput set-prop "Elan TrackPoint" "libinput Scrolling Factor" 3.0 2>/dev/null || true
 
-# Desktop background — signal red (root only)
+# Desktop background — signal red for root
 [ "$(whoami)" = "root" ] && xsetroot -solid "#CC0000" 2>/dev/null || true
 
-# dbus session (for notifications, etc.)
+# dbus session
 eval $(dbus-launch --sh-syntax) 2>/dev/null || true
 
-# Status bar content generator (battery, vpn, time) — also initializes hide mode
+# Status bar + network watcher
 /usr/local/bin/dwm-status &
-
-# Network watcher (idempotent)
 /usr/local/bin/net-watch &
 
-# First terminal: neofetch runs via bashrc DWL_FIRST_TERMINAL hook
+# First terminal
 DWL_FIRST_TERMINAL=1 st-logged &
 
-# Cleanup on X session exit — disconnect VPN, stop VOX recording
 cleanup() {
     echo "[dwm-start] X session ending — cleaning up..."
     /usr/local/bin/vpn disconnect 2>/dev/null || true
-    pkill -USR1 voxd 2>/dev/null || true   # toggle VOX off if recording
+    pkill -USR1 voxd 2>/dev/null || true
     echo "[dwm-start] cleanup complete"
 }
 trap cleanup EXIT
 
-# Start dwm
 dwm
 XEOF
 chmod +x "$XINITRC"
 
-# Launch dwm via startx with our generated xinitrc
 startx "$XINITRC"
-
-# Cleanup generated xinitrc
 rm -f "$XINITRC" 2>/dev/null || true
 
-echo ""
 echo "DWM session ended — $(date)"
-echo "════════════════════════════════════════"
