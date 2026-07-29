@@ -141,6 +141,7 @@ typedef struct {
 } DC;
 
 static inline ushort sixd_to_16bit(int);
+static int xerrorhandler(Display *, XErrorEvent *);
 static int xmakeglyphfontspecs(XftGlyphFontSpec *, const Glyph *, int, int, int);
 static void xdrawglyphfontspecs(const XftGlyphFontSpec *, Glyph, int, int, int);
 static void xdrawglyph(Glyph, int, int);
@@ -1128,6 +1129,16 @@ xicdestroy(XIC xim, XPointer client, XPointer call)
 
 /* X11 I/O error handler — logs the error so we can diagnose crashes */
 int
+xerrorhandler(Display *dpy, XErrorEvent *ee)
+{
+	/* Suppress BadLength on RenderAddGlyphs (oversized glyphs e.g. color emoji).
+	 * The glyph simply won't render, but st stays alive. */
+	if (ee->error_code == BadLength && ee->minor_code == 20)
+		return 0;
+	return 0;
+}
+
+int
 xioerror(Display *dpy)
 {
 	fprintf(stderr, "st: X11 I/O error — connection broken (explicit kill or server shutdown)\n");
@@ -1146,6 +1157,7 @@ xinit(int cols, int rows)
 	if (!(xw.dpy = XOpenDisplay(NULL)))
 		die("can't open display\n");
 	XSetIOErrorHandler(xioerror);
+	XSetErrorHandler(xerrorhandler);
 	xw.scr = XDefaultScreen(xw.dpy);
 	xw.vis = XDefaultVisual(xw.dpy, xw.scr);
 
@@ -1369,6 +1381,24 @@ xmakeglyphfontspecs(XftGlyphFontSpec *specs, const Glyph *glyphs, int len, int x
 			FcCharSetDestroy(fccharset);
 		}
 
+		XGlyphInfo ext;
+		XftGlyphExtents(xw.dpy, frc[f].font, &glyphidx, 1, &ext);
+		/* Skip oversized fallback glyphs (color emoji) — use replacement. */
+		if (ext.width > 300 || ext.height > 300) {
+			rune = 0xFFFD;
+			glyphidx = XftCharIndex(xw.dpy, font->match, rune);
+			if (!glyphidx) {
+				xp += runewidth;
+				continue;
+			}
+			specs[numspecs].font = font->match;
+			specs[numspecs].glyph = glyphidx;
+			specs[numspecs].x = (short)xp;
+			specs[numspecs].y = (short)yp;
+			xp += runewidth;
+			numspecs++;
+			continue;
+		}
 		specs[numspecs].font = frc[f].font;
 		specs[numspecs].glyph = glyphidx;
 		specs[numspecs].x = (short)xp;
