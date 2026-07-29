@@ -106,6 +106,9 @@ cp "$REPO_DIR/scripts/dwm-status.sh" /usr/local/bin/dwm-status
 chmod +x /usr/local/bin/dwm-status
 cp "$REPO_DIR/scripts/toggle-bar.sh" /usr/local/bin/toggle-bar.sh
 chmod +x /usr/local/bin/toggle-bar.sh
+cp "$REPO_DIR/scripts/st-logged" /usr/local/bin/st-logged
+chmod +x /usr/local/bin/st-logged
+echo "  st-logged deployed to /usr/local/bin/st-logged"
 cp "$REPO_DIR/scripts/toggle-hide-mode.sh" /usr/local/bin/toggle-hide-mode.sh
 chmod +x /usr/local/bin/toggle-hide-mode.sh
 cp "$REPO_DIR/scripts/temp-msg.sh" /usr/local/bin/temp-msg.sh

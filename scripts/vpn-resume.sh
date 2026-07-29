@@ -6,9 +6,10 @@
 
 export PATH="/usr/sbin:/sbin:/usr/bin:/bin:/usr/local/bin:$PATH"
 
-LOG_DIR="/var/log/sessions"
+LOG_DIR="/var/log"
+[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG="$LOG_DIR/${USER:-root}-vpn-suspend-$(date +%Y%m%d-%H%M%S).log"
+LOG="$LOG_DIR/${USER:-root}-vpnsuspend-$(date +%Y%m%d-%H%M%S).log"
 exec >>"$LOG" 2>&1
 
 echo "=================================================="
@@ -104,7 +105,7 @@ if [ "$1" = "post" ]; then
         exit 0
     fi
 
-    # vpn-suspend-fix: already-connected guard — skip restore if user reconnected manually
+    # vpnsuspend-fix: already-connected guard — skip restore if user reconnected manually
     if /sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then
         log_msg INFO "tun0 already UP — user already reconnected manually; skipping restore"
         exit 0

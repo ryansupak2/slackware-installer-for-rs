@@ -13,7 +13,8 @@
 # Ensure standard paths (acpid runs with minimal env)
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 # Ensure log directory exists BEFORE redirecting output
-LOG_DIR="/var/log/sessions"
+LOG_DIR="/var/log"
+[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
 
 # ── Mutex (mkdir is atomic — no PID race) ────────────────────
 LOCK=/tmp/lock-screen.mutex
@@ -23,7 +24,7 @@ fi
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 
 # Diagnostic logging (one log per invocation)
-LOG="$LOG_DIR/${USER:-root}-lock-screen-$(date +%Y%m%d-%H%M%S).log"
+LOG="$LOG_DIR/${USER:-root}-lockscreen-$(date +%Y%m%d-%H%M%S).log"
 exec >> "$LOG" 2>&1
 
 # Kill VOX

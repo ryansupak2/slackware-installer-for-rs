@@ -4,8 +4,9 @@
 # Run from a text console.  Logs to /var/log/<user>-dwm-YYYYMMDD-HHMMSS.log
 # All output mirrored to terminal so the log captures everything.
 
-# Logging: all users write to /var/log/sessions (sticky, world-writable)
-LOG_DIR="/var/log/sessions"
+# Logging: consistent with project convention
+LOG_DIR="/var/log"
+[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOGFILE="$LOG_DIR/${USER:-root}-dwm-$(date +%Y%m%d-%H%M%S).log"
 
@@ -95,6 +96,9 @@ for nid in 35 38 39 40 46 47; do
 done
 
 # ── X11 / dwm ─────────────────────────────────────────────────
+
+# Enforce power-button-only wake (resets on boot)
+/usr/local/bin/wakeup-power-only 2>/dev/null || true
 echo "── dwm + st ──"
 
 pkill -f dwm-status 2>/dev/null || true
@@ -137,7 +141,7 @@ eval $(dbus-launch --sh-syntax) 2>/dev/null || true
 /usr/local/bin/net-watch &
 
 # First terminal: neofetch runs via bashrc DWL_FIRST_TERMINAL hook
-DWL_FIRST_TERMINAL=1 st &
+DWL_FIRST_TERMINAL=1 st-logged &
 
 # Cleanup on X session exit — disconnect VPN, stop VOX recording
 cleanup() {

@@ -1,2 +1,2 @@
 event=button/lid.*open
-action=/usr/local/bin/lock-screen.sh &
+action=logger -t acpi-lid "lid open"

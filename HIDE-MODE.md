@@ -78,4 +78,4 @@ Synced by `updatebarvisibility()` in dwm.c.
 
 All components log to stderr (captured in the dwm session log):
 - `[dwm]` prefix — dwm.c keypresses, FIFO handling, hide mode transitions
-- dwm-status.sh logs to `/var/log/sessions/<user>-dwm-status-YYYYMMDD-HHMMSS.log`
+- dwm-status.sh logs to `/var/log/<user>-dwm-status-YYYYMMDD-HHMMSS.log` (or `~/logs/`)

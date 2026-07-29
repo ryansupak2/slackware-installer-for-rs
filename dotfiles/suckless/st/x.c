@@ -1126,6 +1126,14 @@ xicdestroy(XIC xim, XPointer client, XPointer call)
 	return 1;
 }
 
+/* X11 I/O error handler — logs the error so we can diagnose crashes */
+int
+xioerror(Display *dpy)
+{
+	fprintf(stderr, "st: X11 I/O error — connection broken (explicit kill or server shutdown)\n");
+	_exit(1);
+}
+
 void
 xinit(int cols, int rows)
 {
@@ -1137,6 +1145,7 @@ xinit(int cols, int rows)
 
 	if (!(xw.dpy = XOpenDisplay(NULL)))
 		die("can't open display\n");
+	XSetIOErrorHandler(xioerror);
 	xw.scr = XDefaultScreen(xw.dpy);
 	xw.vis = XDefaultVisual(xw.dpy, xw.scr);
 

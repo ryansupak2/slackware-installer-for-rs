@@ -2,13 +2,16 @@
 
 ## How crash dumps work
 
-Every pi session (both normal `pi` and debug `pid`) now writes a Node.js crash
-report on any uncaught exception. Reports land in `/var/log/` with this pattern:
+Every pi session (both normal `pi` and debug `pid`) writes a Node.js crash
+report on any uncaught exception. Reports land in the project log directory,
+which follows the convention `/var/log` if writable, else `$HOME/logs`:
 
 ```
-/var/log/<user>-pi-nodecrashdump-YYYYMMDD-HHMMSS.json
+/var/log/<user>-pi_nodecrashdump-YYYYMMDD-HHMMSS.json   (root)
+~/logs/<user>-pi_nodecrashdump-YYYYMMDD-HHMMSS.json        (non-root)
 ```
 
+All project components use this same pattern — no separate `/var/log/sessions/`.
 ### The two launchers
 
 Both are bash functions defined in `~/.bashrc` (canonical source: `dotfiles/shell/bashrc`).
@@ -20,7 +23,7 @@ pi() {
     [ -w "$log_dir" ] || log_dir="$HOME/logs"
     mkdir -p "$log_dir" 2>/dev/null || true
     local ts="$(date +%Y%m%d-%H%M%S)"
-    local nodecrashdump="$log_dir/${USER:-root}-pi-nodecrashdump-$ts.json"
+    local nodecrashdump="$log_dir/${USER:-root}-pi_nodecrashdump-$ts.json"
     export NODE_OPTIONS="--report-on-fatalerror --report-uncaught-exception --report-filename=$nodecrashdump"
     # ... launches "command pi --readonly" with optional @SYSTEM.MD
 }
@@ -30,9 +33,10 @@ pi() {
 ```bash
 pid() {
     # Creates three timestamped log files:
-    #   1. /var/log/root-pi-tui-YYYYMMDD-HHMMSS.log      (terminal output)
-    #   2. /var/log/root-pi-stderr-YYYYMMDD-HHMMSS.log    (stderr)
-    #   3. /var/log/root-pi-nodecrashdump-YYYYMMDD-HHMMSS.json  (node report)
+    # Creates three timestamped log files:
+    #   1. $log_dir/<user>-pi_tui-YYYYMMDD-HHMMSS.log         (terminal output)
+    #   2. $log_dir/<user>-pi_stderr-YYYYMMDD-HHMMSS.log       (stderr)
+    #   3. $log_dir/<user>-pi_nodecrashdump-YYYYMMDD-HHMMSS.json  (node report)
     export PI_DEBUG=1
     export NODE_OPTIONS="--trace-uncaught --report-on-fatalerror --report-uncaught-exception --report-filename=$nodecrashdump"
     PI_TUI_WRITE_LOG="$tui_log" command pi --readonly ... 2>"$err_log"
@@ -42,14 +46,44 @@ pid() {
 Key difference: `pid` adds `--trace-uncaught` and `PI_TUI_WRITE_LOG` for full
 TUI capture. Both set `--report-filename` so crashes produce a JSON dump.
 
-## Where to find crash evidence
+## Where to find ALL log files
 
-| Artifact | Path | Contents |
-|----------|------|----------|
-| **Node crash dump** | `/var/log/<user>-pi-nodecrashdump-*.json` | Full Node.js diagnostic report (stack, heap, libuv, env, limits, shared objects) |
-| **TUI log** (pid only) | `/var/log/<user>-pi-tui-*.log` | All terminal output from the pi session |
-| **stderr log** (pid only) | `/var/log/<user>-pi-stderr-*.log` | stderr capture (often empty unless crash occurred) |
-| **zipped crash bundle** | `/root/pi-crash-YYYYMMDD-HHMM.zip` | Archive of crash dumps for sharing/diagnosis |
+When investigating a crash (pi, st, or anything else), look here first.
+All components follow the same convention: `/var/log` if writable, else `$HOME/logs`.
+
+| Component | Log path | Content |
+|-----------|----------|---------|
+| **pi node crash dump** | `<dir>/<user>-pi_nodecrashdump-YYYYMMDD-HHMMSS.json` | Full Node.js diagnostic (stack, heap, libuv, env) |
+| **pi TUI** (pid mode) | `<dir>/<user>-pi_tui-YYYYMMDD-HHMMSS.log` | Full terminal output from pi session |
+| **pi stderr** (pid mode) | `<dir>/<user>-pi_stderr-YYYYMMDD-HHMMSS.log` | stderr capture (often empty unless crash) |
+| **st (terminal) errors** | `<dir>/<user>-st.log` (append-only) | X11 I/O errors, font errors, etc. |
+| **dwm session** | `<dir>/<user>-dwm-YYYYMMDD-HHMMSS.log` | Entire X session output (dwm + all children) |
+| **dwm status bar** | `<dir>/<user>-dwmstatus-YYYYMMDD-HHMMSS.log` | Status bar generator output |
+| **net-watch** | `<dir>/<user>-netwatch-YYYYMMDD-HHMMSS.log` | Internet connectivity watcher |
+| **VPN** | `<dir>/<user>-vpn-YYYYMMDD-HHMMSS.log` | VPN connect/disconnect/output |
+| **VPN suspend** | `<dir>/<user>-vpnsuspend-YYYYMMDD-HHMMSS.log` | VPN suspend/resume handler |
+| **VNC** | `<dir>/<user>-vnc-YYYYMMDD-HHMMSS.log` | Screen sharing manager |
+| **wifi-manager** | `<dir>/<user>-wifimanager-YYYYMMDD-HHMMSS.log` | WiFi connection tool |
+| **screen lock** | `<dir>/<user>-lockscreen-YYYYMMDD-HHMMSS.log` | Lock/unlock events |
+| **lid/sleep** | `<dir>/<user>-slocksleep-YYYYMMDD-HHMMSS.log` | Lid close/suspend/resume |
+| **shell init** | `<dir>/<user>-shellinit.log` (single file) | Shell startup errors |
+| **audio boot** | `<dir>/<user>-audioboot-YYYYMMDD-HHMMSS.log` | Audio device initialization |
+
+`<dir>` = `/var/log` for root, `~/logs` for other users.
+
+### st crash investigation
+
+If pi crashes silently (no nodecrashdump, empty stderr), the terminal (st)
+likely died first. Check:
+
+```bash
+# st error log (append-only — all st windows write here)
+tail -50 /var/log/root-st.log       # root
+tail -50 ~/logs/rs-st.log           # rs
+
+# dwm session log (st runs inside this)
+ls -lt /var/log/root-dwm-*.log | head -1   # latest dwm session
+```
 
 ## Crash dump JSON structure
 
@@ -100,20 +134,39 @@ ask them to confirm before proceeding.
 
 ## Log conventions (project-wide)
 
-## Log conventions (project-wide)
+All project components log to `/var/log/<user>-<component>-YYYYMMDD-HHMMSS.log`
+if writable, otherwise `~/logs/<user>-<component>-YYYYMMDD-HHMMSS.log`.
 
-All project components log to `/var/log/` following the pattern:
-```
-/var/log/<user>-<component>-YYYYMMDD-HHMMSS.log
-```
-
-See `AGENTS.md` for full logging conventions across session scripts, daemons,
-toggle scripts, and C code.
+Component names have no dashes (e.g., `dwmstatus` not `dwm-status`,
+`pi_tui` not `pi-tui`). See the table above for every component.
 
 ## Quick diagnosis checklist
 
-1. **Did pi crash?** — Check for new `nodecrashdump` files: `ls -lt /var/log/*nodecrashdump*`
-2. **What crashed?** — Inspect `javascriptStack.message` and `javascriptStack.stack` in the JSON
-3. **What was the environment?** — Look at `environmentVariables` in the JSON
-4. **Need full TUI replay?** — Use `pid` mode and check the `-pi-tui-*.log`
-5. **Sharing with others?** — Zip the crash dump: `zip pi-crash-$(date +%Y%m%d-%H%M).zip /var/log/root-pi-nodecrashdump-*.json`
+1. **Did anything crash?** — Scan recent logs across all components:
+   ```bash
+   ls -lt /var/log/root-* /var/log/rs-* $HOME/logs/rs-* 2>/dev/null | head -20
+   ```
+
+2. **Did pi crash?** — Check for new nodecrashdump files:
+   ```bash
+   ls -lt /var/log/*nodecrashdump* $HOME/logs/*nodecrashdump* 2>/dev/null
+   ```
+   If found, inspect `javascriptStack.message` in the JSON.
+
+3. **Did st crash?** — No nodecrashdump + empty pi stderr + st window vanished:
+   ```bash
+   tail -50 /var/log/root-st.log          # X11 I/O error messages
+   tail -50 /var/log/root-dwm-*.log | tail -50  # dwm session log (st output)
+   ```
+
+4. **Need full TUI replay?** — `pid` mode writes `-pi_tui-*.log`.
+
+5. **Sharing with others?** — Zip the evidence:
+   ```bash
+   zip pi-crash-$(date +%Y%m%d-%H%M).zip \
+     $log_dir/${USER}-pi_nodecrashdump-*.json \
+     $log_dir/${USER}-pi_tui-*.log \
+     $log_dir/${USER}-pi_stderr-*.log \
+     $log_dir/${USER}-st.log \
+     $log_dir/${USER}-dwm-*.log
+   ```

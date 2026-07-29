@@ -6,9 +6,10 @@
 # Never blocks the bar; completely asynchronous.
 # Launched from .xinitrc (or manually). Idempotent (won't start duplicates).
 
-LOG_DIR="/var/log/sessions"
+LOG_DIR="/var/log"
+[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/${USER:-root}-net-watch-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="$LOG_DIR/${USER:-root}-netwatch-$(date +%Y%m%d-%H%M%S).log"
 
 # Redirect all output (stdout+stderr) to the log file (append).
 # Screen output is not needed for a background watcher.
@@ -51,7 +52,7 @@ ping_timeout=2            # seconds
 interval=5                # seconds between pings (cheap & responsive)
 
 # Prevent multiple instances for this user/session.
-PIDFILE="/tmp/net-watch-$(id -u).pid"
+PIDFILE="/tmp/netwatch-$(id -u).pid"
 if [ -f "$PIDFILE" ]; then
     oldpid=$(cat "$PIDFILE" 2>/dev/null || echo 0)
     if [ "$oldpid" -gt 0 ] && kill -0 "$oldpid" 2>/dev/null; then

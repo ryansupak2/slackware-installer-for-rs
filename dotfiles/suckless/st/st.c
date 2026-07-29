@@ -192,6 +192,7 @@ static void tnewline(int);
 static void tputtab(int);
 static void tputc(Rune);
 static void treset(void);
+/* CUSTOM SCROLLBACK PATCH */
 static void tscrollup(int, int, int);
 static void tscrolldown(int, int, int);
 static void tsetattr(const int *, int);
@@ -1068,6 +1069,7 @@ tswapscreen(void)
 }
 
 void
+/* CUSTOM SCROLLBACK PATCH */
 kscrolldown(const Arg* a)
 {
 	int n = a->i;
@@ -1101,6 +1103,7 @@ kscrollup(const Arg* a)
 }
 
 void
+/* CUSTOM SCROLLBACK PATCH */
 tscrolldown(int orig, int n, int copyhist)
 {
 	int i;

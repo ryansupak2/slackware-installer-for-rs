@@ -2,11 +2,12 @@
 #
 # dwm-status.sh — status bar content generator for dwm
 # Writes to xsetroot -name so dwm's built-in bar renders it.
-# Logs to /var/log/<user>-dwm-status-YYYYMMDD-HHMMSS.log
+# Logs to /var/log/<user>-dwmstatus-YYYYMMDD-HHMMSS.log
 
-LOG_DIR="/var/log/sessions"
+LOG_DIR="/var/log"
+[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOGFILE="$LOG_DIR/${USER:-root}-dwm-status-$(date +%Y%m%d-%H%M%S).log"
+LOGFILE="$LOG_DIR/${USER:-root}-dwmstatus-$(date +%Y%m%d-%H%M%S).log"
 exec >>"$LOGFILE" 2>&1
 
 echo "dwm-status starting: $(date)"

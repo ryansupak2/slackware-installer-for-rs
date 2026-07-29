@@ -2,7 +2,7 @@
 # steps/screen-locking.sh - SCREEN LOCKING (Slackware edition)
 
 REPO_DIR="${REPO_DIR:-/root/slackware-installer-for-rs}"
-LOG_FILE="${LOG_FILE:-/var/log/sessions/installer.log}"
+LOG_FILE="${LOG_FILE:-/var/log/installer.log}"
 
 if [ -f "$REPO_DIR/lib/common.sh" ]; then
     . "$REPO_DIR/lib/common.sh"
@@ -24,9 +24,7 @@ if $ok; then
     cp "$REPO_DIR/dotfiles/lockscreen/lid-close" /etc/acpi/events/lid-close 2>/dev/null || ok=false
     cp "$REPO_DIR/dotfiles/lockscreen/lid-open" /etc/acpi/events/lid-open 2>/dev/null || ok=false
     cp "$REPO_DIR/dotfiles/lockscreen/lock-screen.sh" /usr/local/bin/lock-screen.sh 2>/dev/null || ok=false
-    cp "$REPO_DIR/dotfiles/lockscreen/lid-timer.sh" /usr/local/bin/lid-timer.sh 2>/dev/null || true
     chmod +x /usr/local/bin/lock-screen.sh 2>/dev/null || true
-    chmod +x /usr/local/bin/lid-timer.sh 2>/dev/null || true
 fi
 
 # --- elogind system-sleep hook (lock screen before/after suspend) ---
