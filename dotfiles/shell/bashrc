@@ -1,6 +1,6 @@
 
 alias vi='vim'  #help:vi=vim
-alias draw='inkscape & exit'  #help:draw=inkscape
+alias draw='/usr/local/bin/draw & exit'  #help:draw=inkscape
 w() { /usr/local/bin/w "$@" & exit; }  #help:w=firefox (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
 alias firefox='/usr/local/bin/firefox & exit'  #help:firefox=launch firefox, close terminal
 alias 'w?'='/usr/local/bin/w?'  #help:w?=list url shortcuts

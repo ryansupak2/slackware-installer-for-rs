@@ -121,6 +121,9 @@ xmodmap -e "add mod4 = Super_L" 2>/dev/null || true
 # Keyboard repeat rate — FreeBSD snappy defaults (delay 250ms, 34 chars/sec)
 xset r rate 250 34 2>/dev/null || true
 
+# TrackPoint scroll sensitivity (middle-button + trackpoint scroll)
+xinput set-prop "Elan TrackPoint" "libinput Scrolling Factor" 3.0 2>/dev/null || true
+
 # Desktop background — signal red (root only)
 [ "$(whoami)" = "root" ] && xsetroot -solid "#CC0000" 2>/dev/null || true
 

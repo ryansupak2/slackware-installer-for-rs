@@ -1,0 +1,721 @@
+
+{
+  "header": {
+    "reportVersion": 5,
+    "event": "JavaScript API",
+    "trigger": "API",
+    "filename": "report.20260728.104616.9456.0.001.json",
+    "dumpEventTime": "2026-07-28T10:46:16Z",
+    "dumpEventTimeStamp": "1785253576326",
+    "processId": 9456,
+    "threadId": 0,
+    "cwd": "/root/Development/slackware-installer-for-rs",
+    "commandLine": [
+      "node",
+      "/usr/local/node-v22.19.0-linux-x64/bin/pi",
+      "--readonly"
+    ],
+    "nodejsVersion": "v22.19.0",
+    "glibcVersionRuntime": "2.33",
+    "glibcVersionCompiler": "2.28",
+    "wordSize": 64,
+    "arch": "x64",
+    "platform": "linux",
+    "componentVersions": {
+      "acorn": "8.15.0",
+      "ada": "2.9.2",
+      "amaro": "1.1.0",
+      "ares": "1.34.5",
+      "brotli": "1.1.0",
+      "cjs_module_lexer": "2.1.0",
+      "cldr": "47.0",
+      "icu": "77.1",
+      "llhttp": "9.3.0",
+      "modules": "127",
+      "napi": "10",
+      "nbytes": "0.1.1",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.64.0",
+      "node": "22.19.0",
+      "openssl": "3.0.17",
+      "simdjson": "3.13.0",
+      "simdutf": "6.4.2",
+      "sqlite": "3.50.4",
+      "tz": "2025b",
+      "undici": "6.21.2",
+      "unicode": "16.0",
+      "uv": "1.51.0",
+      "uvwasi": "0.0.21",
+      "v8": "12.4.254.21-node.29",
+      "zlib": "1.3.1-470d3a2",
+      "zstd": "1.5.7"
+    },
+    "release": {
+      "name": "node",
+      "lts": "Jod",
+      "headersUrl": "https://nodejs.org/download/release/v22.19.0/node-v22.19.0-headers.tar.gz",
+      "sourceUrl": "https://nodejs.org/download/release/v22.19.0/node-v22.19.0.tar.gz"
+    },
+    "osName": "Linux",
+    "osRelease": "5.15.19",
+    "osVersion": "#1 SMP PREEMPT Wed Feb 2 01:50:51 CST 2022",
+    "osMachine": "x86_64",
+    "cpus": [
+      {
+        "model": "Intel(R) Core(TM) i5-10310U CPU @ 1.70GHz",
+        "speed": 3099,
+        "user": 71010,
+        "nice": 0,
+        "sys": 37170,
+        "idle": 215420,
+        "irq": 0
+      },
+      {
+        "model": "Intel(R) Core(TM) i5-10310U CPU @ 1.70GHz",
+        "speed": 3100,
+        "user": 71610,
+        "nice": 0,
+        "sys": 39100,
+        "idle": 213860,
+        "irq": 0
+      },
+      {
+        "model": "Intel(R) Core(TM) i5-10310U CPU @ 1.70GHz",
+        "speed": 3100,
+        "user": 70800,
+        "nice": 0,
+        "sys": 36150,
+        "idle": 217860,
+        "irq": 0
+      },
+      {
+        "model": "Intel(R) Core(TM) i5-10310U CPU @ 1.70GHz",
+        "speed": 3100,
+        "user": 72440,
+        "nice": 0,
+        "sys": 28720,
+        "idle": 223800,
+        "irq": 0
+      },
+      {
+        "model": "Intel(R) Core(TM) i5-10310U CPU @ 1.70GHz",
+        "speed": 3100,
+        "user": 76520,
+        "nice": 0,
+        "sys": 99980,
+        "idle": 148750,
+        "irq": 0
+      },
+      {
+        "model": "Intel(R) Core(TM) i5-10310U CPU @ 1.70GHz",
+        "speed": 3100,
+        "user": 72540,
+        "nice": 0,
+        "sys": 20560,
+        "idle": 231920,
+        "irq": 0
+      },
+      {
+        "model": "Intel(R) Core(TM) i5-10310U CPU @ 1.70GHz",
+        "speed": 3100,
+        "user": 70330,
+        "nice": 0,
+        "sys": 13170,
+        "idle": 241180,
+        "irq": 0
+      },
+      {
+        "model": "Intel(R) Core(TM) i5-10310U CPU @ 1.70GHz",
+        "speed": 3099,
+        "user": 69560,
+        "nice": 0,
+        "sys": 8820,
+        "idle": 246090,
+        "irq": 0
+      }
+    ],
+    "networkInterfaces": [
+      {
+        "name": "lo",
+        "internal": true,
+        "mac": "00:00:00:00:00:00",
+        "address": "127.0.0.1",
+        "netmask": "255.0.0.0",
+        "family": "IPv4"
+      },
+      {
+        "name": "wlan0",
+        "internal": false,
+        "mac": "b0:a4:60:de:b7:82",
+        "address": "10.0.1.31",
+        "netmask": "255.255.255.0",
+        "family": "IPv4"
+      },
+      {
+        "name": "lo",
+        "internal": true,
+        "mac": "00:00:00:00:00:00",
+        "address": "::1",
+        "netmask": "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+        "family": "IPv6",
+        "scopeid": 0
+      },
+      {
+        "name": "wlan0",
+        "internal": false,
+        "mac": "b0:a4:60:de:b7:82",
+        "address": "2601:2c4:4300:c8b2:df7d:6864:9b1a:9f23",
+        "netmask": "ffff:ffff:ffff:ffff::",
+        "family": "IPv6",
+        "scopeid": 0
+      },
+      {
+        "name": "wlan0",
+        "internal": false,
+        "mac": "b0:a4:60:de:b7:82",
+        "address": "fe80::2905:fbf0:bc91:f799",
+        "netmask": "ffff:ffff:ffff:ffff::",
+        "family": "IPv6",
+        "scopeid": 3
+      }
+    ],
+    "host": "purr.ch0rale.org"
+  },
+  "javascriptStack": {
+    "message": "Error [ERR_SYNTHETIC]: JavaScript Callstack",
+    "stack": [
+      "at Object.writeReport (node:internal/process/report:30:13)",
+      "at InteractiveMode.uncaughtCrash (file:///usr/local/node-v22.19.0-linux-x64/lib/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2942:30)",
+      "at process.uncaughtExceptionHandler (file:///usr/local/node-v22.19.0-linux-x64/lib/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js:2984:58)",
+      "at process.emit (node:events:519:28)",
+      "at process.processEmit [as emit] (/usr/local/node-v22.19.0-linux-x64/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/signal-exit/index.js:199:34)"
+    ],
+    "errorProperties": {
+      "code": "ERR_SYNTHETIC"
+    }
+  },
+  "javascriptHeap": {
+    "totalMemory": 97652736,
+    "executableMemory": 6455296,
+    "totalCommittedMemory": 95186944,
+    "availableMemory": 4288294512,
+    "totalGlobalHandlesMemory": 466944,
+    "usedGlobalHandlesMemory": 222880,
+    "usedMemory": 55280864,
+    "memoryLimit": 4345298944,
+    "mallocedMemory": 1081456,
+    "externalMemory": 4365763,
+    "peakMallocedMemory": 27879936,
+    "nativeContextCount": 2,
+    "detachedContextCount": 0,
+    "doesZapGarbage": 0,
+    "heapSpaces": {
+      "read_only_space": {
+        "memorySize": 0,
+        "committedMemory": 0,
+        "capacity": 0,
+        "used": 0,
+        "available": 0
+      },
+      "new_space": {
+        "memorySize": 33554432,
+        "committedMemory": 31268864,
+        "capacity": 16494592,
+        "used": 449288,
+        "available": 16045304
+      },
+      "old_space": {
+        "memorySize": 48287744,
+        "committedMemory": 48287744,
+        "capacity": 47379528,
+        "used": 40535096,
+        "available": 6844432
+      },
+      "code_space": {
+        "memorySize": 5767168,
+        "committedMemory": 5586944,
+        "capacity": 5406016,
+        "used": 5090752,
+        "available": 315264
+      },
+      "shared_space": {
+        "memorySize": 0,
+        "committedMemory": 0,
+        "capacity": 0,
+        "used": 0,
+        "available": 0
+      },
+      "trusted_space": {
+        "memorySize": 3710976,
+        "committedMemory": 3710976,
+        "capacity": 3643544,
+        "used": 2977456,
+        "available": 666088
+      },
+      "new_large_object_space": {
+        "memorySize": 0,
+        "committedMemory": 0,
+        "capacity": 16777216,
+        "used": 0,
+        "available": 16777216
+      },
+      "large_object_space": {
+        "memorySize": 5644288,
+        "committedMemory": 5644288,
+        "capacity": 5574960,
+        "used": 5574960,
+        "available": 0
+      },
+      "code_large_object_space": {
+        "memorySize": 688128,
+        "committedMemory": 688128,
+        "capacity": 653312,
+        "used": 653312,
+        "available": 0
+      },
+      "shared_large_object_space": {
+        "memorySize": 0,
+        "committedMemory": 0,
+        "capacity": 0,
+        "used": 0,
+        "available": 0
+      },
+      "trusted_large_object_space": {
+        "memorySize": 0,
+        "committedMemory": 0,
+        "capacity": 0,
+        "used": 0,
+        "available": 0
+      }
+    }
+  },
+  "nativeStack": [
+    {
+      "pc": "0x0000000001027af0",
+      "symbol": "node::TriggerNodeReport(v8::Isolate*, node::Environment*, char const*, char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, v8::Local<v8::Value>) [pi]"
+    },
+    {
+      "pc": "0x000000000102825b",
+      "symbol": "node::TriggerNodeReport(node::Environment*, char const*, char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, v8::Local<v8::Value>) [pi]"
+    },
+    {
+      "pc": "0x000000000102ccc7",
+      "symbol": "node::report::WriteReport(v8::FunctionCallbackInfo<v8::Value> const&) [pi]"
+    },
+    {
+      "pc": "0x00007f133be0f5e2",
+      "symbol": ""
+    }
+  ],
+  "resourceUsage": {
+    "free_memory": 15682015232,
+    "total_memory": 16532946944,
+    "rss": 193662976,
+    "constrained_memory": 18446744073709551615,
+    "available_memory": 15682015232,
+    "userCpuSeconds": 25.911,
+    "kernelCpuSeconds": 0.508576,
+    "cpuConsumptionPercent": 9.71309,
+    "userCpuConsumptionPercent": 9.52612,
+    "kernelCpuConsumptionPercent": 0.186976,
+    "maxRss": 193949696,
+    "pageFaults": {
+      "IORequired": 161,
+      "IONotRequired": 160777
+    },
+    "fsActivity": {
+      "reads": 55216,
+      "writes": 400
+    }
+  },
+  "uvthreadResourceUsage": {
+    "userCpuSeconds": 22.8061,
+    "kernelCpuSeconds": 0.427405,
+    "cpuConsumptionPercent": 8.54173,
+    "userCpuConsumptionPercent": 8.38459,
+    "kernelCpuConsumptionPercent": 0.157134,
+    "fsActivity": {
+      "reads": 53728,
+      "writes": 376
+    }
+  },
+  "libuv": [
+    {
+      "type": "async",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007696f10"
+    },
+    {
+      "type": "async",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000006894880"
+    },
+    {
+      "type": "timer",
+      "is_active": true,
+      "is_referenced": true,
+      "address": "0x000000000774c7b0",
+      "repeat": 0,
+      "firesInMsFromNow": 2,
+      "expired": false
+    },
+    {
+      "type": "check",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x000000000774c848"
+    },
+    {
+      "type": "idle",
+      "is_active": false,
+      "is_referenced": true,
+      "address": "0x000000000774c8c0"
+    },
+    {
+      "type": "prepare",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x000000000774c938"
+    },
+    {
+      "type": "check",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x000000000774c9b0"
+    },
+    {
+      "type": "async",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x000000000774ca28"
+    },
+    {
+      "type": "tty",
+      "is_active": false,
+      "is_referenced": true,
+      "address": "0x0000000007728408",
+      "fd": 20,
+      "writeQueueSize": 0,
+      "readable": true,
+      "writable": true
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007923b90",
+      "signum": 28,
+      "signal": "SIGWINCH"
+    },
+    {
+      "type": "tty",
+      "is_active": false,
+      "is_referenced": true,
+      "address": "0x0000000007728668",
+      "writeQueueSize": 0,
+      "readable": false,
+      "writable": false
+    },
+    {
+      "type": "tty",
+      "is_active": false,
+      "is_referenced": true,
+      "address": "0x0000000007923568",
+      "fd": 23,
+      "writeQueueSize": 0,
+      "readable": true,
+      "writable": true
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a2ad90",
+      "signum": 6,
+      "signal": "SIGABRT"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007835130",
+      "signum": 14,
+      "signal": "SIGALRM"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a1f6d0",
+      "signum": 1,
+      "signal": "SIGHUP"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a1f850",
+      "signum": 2,
+      "signal": "SIGINT"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a1f9d0",
+      "signum": 15,
+      "signal": "SIGTERM"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a1fb50",
+      "signum": 26,
+      "signal": "SIGVTALRM"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a20de0",
+      "signum": 24,
+      "signal": "SIGXCPU"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a20f60",
+      "signum": 25,
+      "signal": "SIGXFSZ"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a210e0",
+      "signum": 12,
+      "signal": "SIGUSR2"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a21260",
+      "signum": 5,
+      "signal": "SIGTRAP"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a213e0",
+      "signum": 31,
+      "signal": "SIGSYS"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a21560",
+      "signum": 3,
+      "signal": "SIGQUIT"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a216e0",
+      "signum": 6,
+      "signal": "SIGABRT"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a21820",
+      "signum": 29,
+      "signal": "SIGIO"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a1fcd0",
+      "signum": 29,
+      "signal": "SIGIO"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a1fe10",
+      "signum": 30,
+      "signal": "SIGPWR"
+    },
+    {
+      "type": "signal",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x0000000007a1ff90",
+      "signum": 16,
+      "signal": "SIGSTKFLT"
+    },
+    {
+      "type": "async",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x00000000077b96a8"
+    },
+    {
+      "type": "fs_event",
+      "is_active": true,
+      "is_referenced": true,
+      "address": "0x0000000007a2d1d0",
+      "filename": "/root/Development/slackware-installer-for-rs/.git"
+    },
+    {
+      "type": "tcp",
+      "is_active": true,
+      "is_referenced": true,
+      "address": "0x0000000007e3f168",
+      "localEndpoint": {
+        "host": "10.0.1.31",
+        "ip4": "10.0.1.31",
+        "port": 52232
+      },
+      "remoteEndpoint": {
+        "host": "3.173.21.63",
+        "ip4": "3.173.21.63",
+        "port": 443
+      },
+      "sendBufferSize": 252416,
+      "recvBufferSize": 131072,
+      "fd": 25,
+      "writeQueueSize": 0,
+      "readable": true,
+      "writable": true
+    },
+    {
+      "type": "timer",
+      "is_active": true,
+      "is_referenced": false,
+      "address": "0x00000000080db418",
+      "repeat": 0,
+      "firesInMsFromNow": 4342,
+      "expired": false
+    },
+    {
+      "type": "loop",
+      "is_active": true,
+      "address": "0x00000000068a8420",
+      "loopIdleTimeSeconds": 249.396
+    }
+  ],
+  "workers": [
+  ],
+  "environmentVariables": {
+    "SHELL": "/bin/bash",
+    "WINDOWID": "6291461",
+    "GDK_DPI_SCALE": "1.5",
+    "PKG_CONFIG_PATH": "/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig:/usr/lib64/pkgconfig:/usr/share/pkgconfig",
+    "GNOME_KEYRING_CONTROL": "/root/.cache/keyring-0BBWS3",
+    "G_BROKEN_FILENAMES": "1",
+    "HOSTNAME": "purr.ch0rale.org",
+    "MINICOM": "-c on",
+    "XDG_SEAT": "seat0",
+    "PWD": "/root/Development/slackware-installer-for-rs",
+    "LOGNAME": "root",
+    "XDG_SESSION_TYPE": "tty",
+    "XAUTHORITY": "/root/.Xauthority",
+    "LS_OPTIONS": "-F -b -T 0 --color=auto",
+    "WINDOWPATH": "1",
+    "HOME": "/root",
+    "LANG": "en_US.UTF-8",
+    "LS_COLORS": "no=00:fi=00:di=01;34:ln=01;36:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.bat=01;32:*.btm=01;32:*.cmd=01;32:*.com=01;32:*.dll=01;32:*.exe=01;32:*.7z=01;31:*.ace=01;31:*.arj=01;31:*.bz2=01;31:*.cpio=01;31:*.deb=01;31:*.dz=01;31:*.gz=01;31:*.jar=01;31:*.lha=01;31:*.lz=01;31:*.lzh=01;31:*.lzma=01;31:*.rar=01;31:*.rpm=01;31:*.rz=01;31:*.tar=01;31:*.taz=01;31:*.tb2=01;31:*.tbz2=01;31:*.tbz=01;31:*.tgz=01;31:*.tlz=01;31:*.trz=01;31:*.txz=01;31:*.tz=01;31:*.tz2=01;31:*.tzst=01;31:*.xz=01;31:*.z=01;31:*.zip=01;31:*.zoo=01;31:*.zst=01;31:*.aac=01;35:*.anx=01;35:*.asf=01;35:*.au=01;35:*.axa=01;35:*.axv=01;35:*.avi=01;35:*.bmp=01;35:*.divx=01;35:*.flac=01;35:*.flv=01;35:*.gif=01;35:*.ico=01;35:*.jpg=01;35:*.jpeg=01;35:*.m2a=01;35:*.m2t=01;35:*.m2v=01;35:*.m4a=01;35:*.m4p=01;35:*.m4v=01;35:*.mid=01;35:*.midi=01;35:*.mka=01;35:*.mkv=01;35:*.mov=01;35:*.mp3=01;35:*.mp4=01;35:*.mp4v=01;35:*.mpc=01;35:*.mpeg=01;35:*.mpg=01;35:*.nuv=01;35:*.oga=01;35:*.ogv=01;35:*.ogx=01;35:*.ogg=01;35:*.opus=01;35:*.pbm=01;35:*.pgm=01;35:*.png=01;35:*.ppm=01;35:*.qt=01;35:*.ra=01;35:*.ram=01;35:*.rm=01;35:*.spx=01;35:*.svg=01;35:*.svgz=01;35:*.tga=01;35:*.tif=01;35:*.tiff=01;35:*.vob=01;35:*.wav=01;35:*.webm=01;35:*.webp=01;35:*.wma=01;35:*.wmv=01;35:*.xbm=01;35:*.xcf=01;35:*.xpm=01;35:*.xspf=01;35:*.xwd=01;35:*.xvid=01;35:",
+    "XDG_SESSION_CLASS": "user",
+    "TERM": "st-256color",
+    "G_FILENAME_ENCODING": "@locale",
+    "LESSOPEN": "|lesspipe.sh %s",
+    "USER": "root",
+    "T1LIB_CONFIG": "/usr/share/t1lib/t1lib.config",
+    "GDK_USE_XFT": "1",
+    "DISPLAY": ":0",
+    "SHLVL": "4",
+    "INPUTRC": "/etc/inputrc",
+    "XDG_VTNR": "1",
+    "XDG_SESSION_ID": "1",
+    "XDG_RUNTIME_DIR": "/run/user/0",
+    "PS1": "\\[\\e[32m\\]\\u@\\[\\e[38;5;153m\\]\\W\\[\\e[0m\\]\\$ ",
+    "QT5DIR": "/usr/lib64/qt5",
+    "LC_COLLATE": "C",
+    "VDPAU_LOG": "0",
+    "PATH": "/usr/local/node-v22.19.0-linux-x64/bin:/usr/local/node-v22.19.0-linux-x64/bin:/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin:/usr/games:/usr/lib64/qt5/bin",
+    "DBUS_SESSION_BUS_ADDRESS": "unix:abstract=/tmp/dbus-5m8D4pxr4F,guid=4ad83a05cc6328bc118f62346a68cd96",
+    "MAIL": "/var/mail/root",
+    "PULSE_SERVER": "unix:/run/user/0/pulse/native",
+    "OLDPWD": "/root/Development",
+    "_": "/usr/local/node-v22.19.0-linux-x64/bin/pi",
+    "PI_CODING_AGENT": "true"
+  },
+  "userLimits": {
+    "core_file_size_blocks": {
+      "soft": 0,
+      "hard": "unlimited"
+    },
+    "data_seg_size_bytes": {
+      "soft": "unlimited",
+      "hard": "unlimited"
+    },
+    "file_size_blocks": {
+      "soft": "unlimited",
+      "hard": "unlimited"
+    },
+    "max_locked_memory_bytes": {
+      "soft": 65536,
+      "hard": 65536
+    },
+    "max_memory_size_bytes": {
+      "soft": "unlimited",
+      "hard": "unlimited"
+    },
+    "open_files": {
+      "soft": 4096,
+      "hard": 4096
+    },
+    "stack_size_bytes": {
+      "soft": 8388608,
+      "hard": "unlimited"
+    },
+    "cpu_time_seconds": {
+      "soft": "unlimited",
+      "hard": "unlimited"
+    },
+    "max_user_processes": {
+      "soft": 63003,
+      "hard": 63003
+    },
+    "virtual_memory_bytes": {
+      "soft": "unlimited",
+      "hard": "unlimited"
+    }
+  },
+  "sharedObjects": [
+    "linux-vdso.so.1",
+    "/lib64/libdl.so.2",
+    "/usr/lib64/libstdc++.so.6",
+    "/lib64/libm.so.6",
+    "/usr/lib64/libgcc_s.so.1",
+    "/lib64/libpthread.so.0",
+    "/lib64/libc.so.6",
+    "/lib64/ld-linux-x86-64.so.2",
+    "/usr/local/node-v22.19.0-linux-x64/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/@mariozechner/clipboard-linux-x64-gnu/clipboard.linux-x64-gnu.node",
+    "/lib64/librt.so.1",
+    "/lib64/libnss_files.so.2",
+    "/lib64/libnss_dns.so.2",
+    "/lib64/libresolv.so.2"
+  ]
+}
