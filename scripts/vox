@@ -41,7 +41,7 @@ KEYBINDING
   Mod+V            Toggles recording on/off (same as vox on / vox off)
 
 LOGS
-  ~/logs/vox.log   Detailed session log (toggle on/off, transcription, timing)
+  /var/log/vox.log   Detailed session log (toggle on/off, transcription, timing)
 
 REQUIRES
   sherpa-onnx + streaming Zipformer EN 20M model (installed by vox-sherpa step)

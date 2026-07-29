@@ -27,7 +27,7 @@
 #define WTYPE_BIN "/usr/bin/wtype"
 
 /* --- state files (built at runtime from $HOME) --- */
-/* /var/log/vox.log  — append-only, "$(date): message" format */
+/* /var/log/<user>/vox.log  — append-only, "$(date): message" format */
 /* $XDG_RUNTIME_DIR/vox_state — "loading" | "recording" | deleted */
 
 #endif

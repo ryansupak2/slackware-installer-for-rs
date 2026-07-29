@@ -169,8 +169,8 @@ cat > "$TOGGLE" << 'TOGGLE_EOF'
 # Model loads lazily on first use inside voxd, not at daemon startup.
 # Lock file prevents races when Mod+V fires twice in quick succession.
 
-LOG_DIR="/var/log"
-TOGGLE_LOG="$LOG_DIR/${USER:-root}-vox-toggle.log"
+LOG_DIR="/var/log/${USER:-root}"
+TOGGLE_LOG="$LOG_DIR/voxtoggle-$(date +%Y%m%d-%H%M%S).log"
 LOCK="$XDG_RUNTIME_DIR/vox-toggle-lock"
 
 log_toggle() { echo "$(date '+%Y-%m-%d %H:%M:%S'): toggle-vox: $*" >> "$TOGGLE_LOG"; }
@@ -248,8 +248,8 @@ cat > "$TOGGLE_REC" << 'TOGGLE_REC_EOF'
 # Evidence-based: no arbitrary sleeps, polls for process state.
 # Lock file prevents races when Mod+Shift+V fires twice in quick succession.
 
-LOG_DIR="/var/log"
-TOGGLE_LOG="$LOG_DIR/${USER:-root}-vox-toggle.log"
+LOG_DIR="/var/log/${USER:-root}"
+TOGGLE_LOG="$LOG_DIR/voxtoggle-$(date +%Y%m%d-%H%M%S).log"
 LOCK="$XDG_RUNTIME_DIR/vox-toggle-rec-lock"
 
 log_toggle() { echo "$(date '+%Y-%m-%d %H:%M:%S'): toggle-rec: $*" >> "$TOGGLE_LOG"; }

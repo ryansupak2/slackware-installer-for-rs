@@ -1,8 +1,7 @@
 #!/bin/sh
 # Wrapper: redirects st's stderr to capture X11 I/O error messages.
-# Matches the project log convention: /var/log if writable, else $HOME/logs.
-LOG_DIR="/var/log"
-[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
+# Matches the project log convention: /var/log.
+LOG_DIR="/var/log/${USER:-root}"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/${USER:-$(whoami)}-st.log"
+LOG_FILE="$LOG_DIR/st-$(date +%Y%m%d-%H%M%S).log"
 exec /usr/local/bin/st 2>>"$LOG_FILE"

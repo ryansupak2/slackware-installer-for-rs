@@ -1,10 +1,9 @@
 #!/bin/sh
 # dwm-start — X11/dwm session launcher
 
-LOG_DIR="/var/log"
-[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log/${USER:-root}"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOGFILE="$LOG_DIR/${USER:-root}-dwm-$(date +%Y%m%d-%H%M%S).log"
+LOGFILE="$LOG_DIR/dwm-$(date +%Y%m%d-%H%M%S).log"
 exec >>"$LOGFILE" 2>&1
 
 if [ -n "$DISPLAY" ]; then

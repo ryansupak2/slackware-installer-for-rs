@@ -4,11 +4,10 @@
 
 Every pi session (both normal `pi` and debug `pid`) writes a Node.js crash
 report on any uncaught exception. Reports land in the project log directory,
-which follows the convention `/var/log` if writable, else `$HOME/logs`:
+which follows the convention `/var/log`:
 
 ```
-/var/log/<user>-pi_nodecrashdump-YYYYMMDD-HHMMSS.json   (root)
-~/logs/<user>-pi_nodecrashdump-YYYYMMDD-HHMMSS.json        (non-root)
+/var/log/<user>/pi_nodecrashdump-YYYYMMDD-HHMMSS.json
 ```
 
 All project components use this same pattern — no separate `/var/log/sessions/`.
@@ -19,11 +18,10 @@ Both are bash functions defined in `~/.bashrc` (canonical source: `dotfiles/shel
 **`pi()` — normal mode** (crash dump only, no overhead):
 ```bash
 pi() {
-    local log_dir="/var/log"
-    [ -w "$log_dir" ] || log_dir="$HOME/logs"
+    local log_dir="/var/log/${USER:-root}"
     mkdir -p "$log_dir" 2>/dev/null || true
     local ts="$(date +%Y%m%d-%H%M%S)"
-    local nodecrashdump="$log_dir/${USER:-root}-pi_nodecrashdump-$ts.json"
+    local nodecrashdump="$log_dir/pi_nodecrashdump-$ts.json"
     export NODE_OPTIONS="--report-on-fatalerror --report-uncaught-exception --report-filename=$nodecrashdump"
     # ... launches "command pi --readonly" with optional @SYSTEM.MD
 }
@@ -33,10 +31,9 @@ pi() {
 ```bash
 pid() {
     # Creates three timestamped log files:
-    # Creates three timestamped log files:
-    #   1. $log_dir/<user>-pi_tui-YYYYMMDD-HHMMSS.log         (terminal output)
-    #   2. $log_dir/<user>-pi_stderr-YYYYMMDD-HHMMSS.log       (stderr)
-    #   3. $log_dir/<user>-pi_nodecrashdump-YYYYMMDD-HHMMSS.json  (node report)
+    #   1. $log_dir/pi_tui-YYYYMMDD-HHMMSS.log         (terminal output)
+    #   2. $log_dir/pi_stderr-YYYYMMDD-HHMMSS.log       (stderr)
+    #   3. $log_dir/pi_nodecrashdump-YYYYMMDD-HHMMSS.json  (node report)
     export PI_DEBUG=1
     export NODE_OPTIONS="--trace-uncaught --report-on-fatalerror --report-uncaught-exception --report-filename=$nodecrashdump"
     PI_TUI_WRITE_LOG="$tui_log" command pi --readonly ... 2>"$err_log"
@@ -49,27 +46,27 @@ TUI capture. Both set `--report-filename` so crashes produce a JSON dump.
 ## Where to find ALL log files
 
 When investigating a crash (pi, st, or anything else), look here first.
-All components follow the same convention: `/var/log` if writable, else `$HOME/logs`.
+All components follow the same convention: `/var/log`.
 
 | Component | Log path | Content |
 |-----------|----------|---------|
-| **pi node crash dump** | `<dir>/<user>-pi_nodecrashdump-YYYYMMDD-HHMMSS.json` | Full Node.js diagnostic (stack, heap, libuv, env) |
-| **pi TUI** (pid mode) | `<dir>/<user>-pi_tui-YYYYMMDD-HHMMSS.log` | Full terminal output from pi session |
-| **pi stderr** (pid mode) | `<dir>/<user>-pi_stderr-YYYYMMDD-HHMMSS.log` | stderr capture (often empty unless crash) |
-| **st (terminal) errors** | `<dir>/<user>-st.log` (append-only) | X11 I/O errors, font errors, etc. |
-| **dwm session** | `<dir>/<user>-dwm-YYYYMMDD-HHMMSS.log` | Entire X session output (dwm + all children) |
-| **dwm status bar** | `<dir>/<user>-dwmstatus-YYYYMMDD-HHMMSS.log` | Status bar generator output |
-| **net-watch** | `<dir>/<user>-netwatch-YYYYMMDD-HHMMSS.log` | Internet connectivity watcher |
-| **VPN** | `<dir>/<user>-vpn-YYYYMMDD-HHMMSS.log` | VPN connect/disconnect/output |
-| **VPN suspend** | `<dir>/<user>-vpnsuspend-YYYYMMDD-HHMMSS.log` | VPN suspend/resume handler |
-| **VNC** | `<dir>/<user>-vnc-YYYYMMDD-HHMMSS.log` | Screen sharing manager |
-| **wifi-manager** | `<dir>/<user>-wifimanager-YYYYMMDD-HHMMSS.log` | WiFi connection tool |
-| **screen lock** | `<dir>/<user>-lockscreen-YYYYMMDD-HHMMSS.log` | Lock/unlock events |
-| **lid/sleep** | `<dir>/<user>-slocksleep-YYYYMMDD-HHMMSS.log` | Lid close/suspend/resume |
-| **shell init** | `<dir>/<user>-shellinit.log` (single file) | Shell startup errors |
-| **audio boot** | `<dir>/<user>-audioboot-YYYYMMDD-HHMMSS.log` | Audio device initialization |
+| **pi node crash dump** | `<dir>/pi_nodecrashdump-YYYYMMDD-HHMMSS.json` | Full Node.js diagnostic (stack, heap, libuv, env) |
+| **pi TUI** (pid mode) | `<dir>/pi_tui-YYYYMMDD-HHMMSS.log` | Full terminal output from pi session |
+| **pi stderr** (pid mode) | `<dir>/pi_stderr-YYYYMMDD-HHMMSS.log` | stderr capture (often empty unless crash) |
+| **st (terminal) errors** | `<dir>/st-YYYYMMDD-HHMMSS.log` | X11 I/O errors, font errors, etc. |
+| **dwm session** | `<dir>/dwm-YYYYMMDD-HHMMSS.log` | Entire X session output (dwm + all children) |
+| **dwm status bar** | `<dir>/dwmstatus-YYYYMMDD-HHMMSS.log` | Status bar generator output |
+| **net-watch** | `<dir>/netwatch-YYYYMMDD-HHMMSS.log` | Internet connectivity watcher |
+| **VPN** | `<dir>/vpn-YYYYMMDD-HHMMSS.log` | VPN connect/disconnect/output |
+| **VPN suspend** | `<dir>/vpnsuspend-YYYYMMDD-HHMMSS.log` | VPN suspend/resume handler |
+| **VNC** | `<dir>/vnc-YYYYMMDD-HHMMSS.log` | Screen sharing manager |
+| **wifi-manager** | `<dir>/wifimanager-YYYYMMDD-HHMMSS.log` | WiFi connection tool |
+| **shell init** | `<dir>/shellinit-YYYYMMDD-HHMMSS.log` | Shell startup errors |
+| **audio boot** | `<dir>/audioboot-YYYYMMDD-HHMMSS.log` | Audio device initialization |
+| **vox daemon** | `<dir>/vox-YYYYMMDD-HHMMSS.log` | Voice dictation daemon |
+| **vox toggle** | `<dir>/voxtoggle-YYYYMMDD-HHMMSS.log` | Dictation toggle events |
 
-`<dir>` = `/var/log` for root, `~/logs` for other users.
+`<dir>` = `/var/log/<user>`.  E.g. `/var/log/rs/dwm-20260729-120000.log`.
 
 ### st crash investigation
 
@@ -77,12 +74,12 @@ If pi crashes silently (no nodecrashdump, empty stderr), the terminal (st)
 likely died first. Check:
 
 ```bash
-# st error log (append-only — all st windows write here)
-tail -50 /var/log/root-st.log       # root
-tail -50 ~/logs/rs-st.log           # rs
+# st error log (each st window gets its own timestamped log)
+ls -lt /var/log/rs/st-*.log | head -3
 
 # dwm session log (st runs inside this)
-ls -lt /var/log/root-dwm-*.log | head -1   # latest dwm session
+ls -lt /var/log/rs/dwm-*.log | head -1   # latest dwm session
+```
 ```
 
 ## Crash dump JSON structure
@@ -134,8 +131,7 @@ ask them to confirm before proceeding.
 
 ## Log conventions (project-wide)
 
-All project components log to `/var/log/<user>-<component>-YYYYMMDD-HHMMSS.log`
-if writable, otherwise `~/logs/<user>-<component>-YYYYMMDD-HHMMSS.log`.
+All project components log to `/var/log/<user>/<component>-YYYYMMDD-HHMMSS.log`.
 
 Component names have no dashes (e.g., `dwmstatus` not `dwm-status`,
 `pi_tui` not `pi-tui`). See the table above for every component.
@@ -144,19 +140,19 @@ Component names have no dashes (e.g., `dwmstatus` not `dwm-status`,
 
 1. **Did anything crash?** — Scan recent logs across all components:
    ```bash
-   ls -lt /var/log/root-* /var/log/rs-* $HOME/logs/rs-* 2>/dev/null | head -20
+   ls -lt /var/log/rs/* /var/log/root/* 2>/dev/null | head -20
    ```
 
 2. **Did pi crash?** — Check for new nodecrashdump files:
    ```bash
-   ls -lt /var/log/*nodecrashdump* $HOME/logs/*nodecrashdump* 2>/dev/null
+   ls -lt /var/log/*/pi_nodecrashdump* 2>/dev/null
    ```
    If found, inspect `javascriptStack.message` in the JSON.
 
 3. **Did st crash?** — No nodecrashdump + empty pi stderr + st window vanished:
    ```bash
-   tail -50 /var/log/root-st.log          # X11 I/O error messages
-   tail -50 /var/log/root-dwm-*.log | tail -50  # dwm session log (st output)
+   tail -50 /var/log/rs/st-*.log | tail -50          # X11 I/O error messages
+   tail -50 /var/log/rs/dwm-*.log | tail -50  # dwm session log (st output)
    ```
 
 4. **Need full TUI replay?** — `pid` mode writes `-pi_tui-*.log`.
@@ -164,9 +160,9 @@ Component names have no dashes (e.g., `dwmstatus` not `dwm-status`,
 5. **Sharing with others?** — Zip the evidence:
    ```bash
    zip pi-crash-$(date +%Y%m%d-%H%M).zip \
-     $log_dir/${USER}-pi_nodecrashdump-*.json \
-     $log_dir/${USER}-pi_tui-*.log \
-     $log_dir/${USER}-pi_stderr-*.log \
-     $log_dir/${USER}-st.log \
-     $log_dir/${USER}-dwm-*.log
+     $log_dir/pi_nodecrashdump-*.json \
+     $log_dir/pi_tui-*.log \
+     $log_dir/pi_stderr-*.log \
+     $log_dir/st-*.log \
+     $log_dir/dwm-*.log
    ```

@@ -5,7 +5,7 @@
 #
 # Consistent with bootstrap.sh and post-install-global.sh:
 # - Uses REPO_DIR for all paths (no reliance on cwd)
-# - Dual logging to screen + ~/logs/post-install-user-YYYYMMDD-HHMMSS.log (uniquely identifiable, mirrors post-install-global.sh)
+# - Dual logging to screen + /var/log/post-install-user-YYYYMMDD-HHMMSS.log (uniquely identifiable, mirrors post-install-global.sh)
 
 if [ "$1" = "--help" ]; then
     echo "Usage: $0 --user <username> [--wheel]"

@@ -17,17 +17,12 @@ pi() {
 }
 #help:pid=pi with debug logging (TUI capture + stack trace for crash diagnosis)
 pid() {
-    local log_dir
-    if [ "$(id -u)" -eq 0 ]; then
-        log_dir="/var/log"
-    else
-        log_dir="$HOME/logs"
-    fi
+    local log_dir="/var/log/${USER:-root}"
     mkdir -p "$log_dir" 2>/dev/null || true
     local ts="$(date +%Y%m%d-%H%M%S)"
-    local tui_log="$log_dir/${USER:-root}-pi_tui-$ts.log"
-    local err_log="$log_dir/${USER:-root}-pi_stderr-$ts.log"
-    local nodecrashdump="$log_dir/${USER:-root}-pi_nodecrashdump-$ts.json"
+    local tui_log="$log_dir/pi_tui-$ts.log"
+    local err_log="$log_dir/pi_stderr-$ts.log"
+    local nodecrashdump="$log_dir/pi_nodecrashdump-$ts.json"
     ulimit -c unlimited 2>/dev/null || true
     echo "pid: DEBUG MODE" >&2
     echo "  TUI:    $tui_log" >&2
@@ -83,11 +78,8 @@ export GDK_DPI_SCALE=1.5
 export PATH=/usr/local/node-v22.19.0-linux-x64/bin:$PATH
 # screen locking: physlock works identically for X11 (dwm) and TTY
 alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (physlock)
-LOG_DIR="/var/log"
-if [ "$(id -u)" -ne 0 ]; then
-    LOG_DIR="$HOME/logs"
-fi
-LOG="$LOG_DIR/${USER:-root}-shellinit.log"
+LOG_DIR="/var/log/${USER:-root}"
+LOG="$LOG_DIR/shellinit-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOG_DIR" 2>/dev/null
 # First X terminal: neofetch + audio device log (once per session)
 if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
@@ -96,7 +88,7 @@ if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
     neofetch
     # "Need Help?" message is appended by the neofetch alias (line 9)
     # Log audio capture devices for post-boot diagnosis
-    AUDIO_LOG="$LOG_DIR/${USER:-root}-audioboot-$(date +%Y%m%d-%H%M%S).log"
+    AUDIO_LOG="$LOG_DIR/audioboot-$(date +%Y%m%d-%H%M%S).log"
     echo "=== $(date) ===" >> "$AUDIO_LOG"
     dmesg 2>/dev/null | grep -i "snd\|sof\|audio\|dmic\|microphone" >> "$AUDIO_LOG" 2>/dev/null
     echo "arecord -l:" >> "$AUDIO_LOG"

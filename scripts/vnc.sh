@@ -13,9 +13,8 @@
 # Installed as /usr/local/bin/vnc
 
 # ── Configuration ──────────────────────────────────────────────────────
-LOG_DIR="/var/log"
-[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
-LOG_FILE="$LOG_DIR/${USER:-root}-vnc-$(date +%Y%m%d-%H%M%S).log"
+LOG_DIR="/var/log/${USER:-root}"
+LOG_FILE="$LOG_DIR/vnc-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 exec > >(tee -a "$LOG_FILE") 2>&1

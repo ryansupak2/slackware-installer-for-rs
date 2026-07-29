@@ -7,7 +7,7 @@ Streaming speech-to-text using sherpa-onnx (Zipformer EN 20M).
 1. Press **Mod+V** to toggle dictation on/off
 2. Words appear incrementally as you speak — no backspacing, only append
 3. A trailing space is added after each utterance (0.6s pause)
-4. Use `voxd --dump-audio` to save audio recordings to `~/logs/`
+4. Use `voxd --dump-audio` to save audio recordings to `/var/log/`
 
 ## Architecture
 
@@ -21,7 +21,7 @@ Mod+V → toggle-vox.sh → SIGUSR1 → voxd daemon
                           Incremental append via wtype
                                       │
                           vox_state → status bar [VOX] badge
-                          ~/logs/vox.log
+                          /var/log/vox.log
 ```
 
 ## Key behaviors
@@ -40,9 +40,9 @@ Mod+V → toggle-vox.sh → SIGUSR1 → voxd daemon
 | `/usr/local/bin/voxd` | Daemon binary (C, sherpa-onnx) |
 | `/usr/local/bin/toggle-vox.sh` | Mod+V handler |
 | `/usr/local/bin/vox` | CLI wrapper (`vox on`/`vox off`) |
-| `~/logs/vox.log` | Session log |
-| `~/logs/vox-YYYYMMDD-HHMMSS.wav` | Audio recording (`--dump-audio` mode) |
-| `~/logs/vox-YYYYMMDD-HHMMSS.txt` | Transcription log (`--dump-audio` mode) |
+| `/var/log/vox.log` | Session log |
+| `/var/log/vox-YYYYMMDD-HHMMSS.wav` | Audio recording (`--dump-audio` mode) |
+| `/var/log/vox-YYYYMMDD-HHMMSS.txt` | Transcription log (`--dump-audio` mode) |
 | `/usr/local/share/vox/` | Model files |
 
 ## Commands

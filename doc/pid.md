@@ -13,7 +13,7 @@ pid [args...]
 ## What it does
 
 1. Creates a single timestamp (`ts`) via `date +%Y%m%d-%H%M%S`.
-2. Sets up three log paths under `/var/log` (falls back to `$HOME/logs`):
+2. Sets up three log paths under `/var/log`:
    - **TUI log**:   `${USER}-pi-tui-$ts.log`     — full terminal output via `PI_TUI_WRITE_LOG`
    - **stderr log**: `${USER}-pi-stderr-$ts.log`  — stderr captured with `2>`
    - **node crash dump**: `${USER}-pi-nodecrashdump-$ts.json` — Node.js diagnostic report

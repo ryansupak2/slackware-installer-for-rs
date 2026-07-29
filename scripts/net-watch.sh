@@ -6,10 +6,9 @@
 # Never blocks the bar; completely asynchronous.
 # Launched from .xinitrc (or manually). Idempotent (won't start duplicates).
 
-LOG_DIR="/var/log"
-[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log/${USER:-root}"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/${USER:-root}-netwatch-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="$LOG_DIR/netwatch-$(date +%Y%m%d-%H%M%S).log"
 
 # Redirect all output (stdout+stderr) to the log file (append).
 # Screen output is not needed for a background watcher.

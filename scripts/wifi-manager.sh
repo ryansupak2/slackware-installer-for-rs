@@ -19,7 +19,7 @@
 # Prerequisites (normally already present from post-install-global):
 #   NetworkManager should be running (started by post-install-global wifi step)
 #   nmcli should be available
-# Logging is duplicated to screen + ~/logs/wifimanager-<timestamp>.log (like the global installer).
+# Logging is duplicated to screen + /var/log/wifimanager-<timestamp>.log (like the global installer).
 
 if [ "$(id -u)" -ne 0 ] && ! id -nG 2>/dev/null | tr ' ' '\n' | grep -qx netdev; then
     echo "ERROR: This script must be run as root or by a member of the netdev group."
@@ -60,10 +60,9 @@ YELLOW='\033[33m'
 NC='\033[0m'
 
 # Dual logging (everything goes to screen AND the log file)
-LOG_DIR="/var/log"
-[ -w "$LOG_DIR" ] || LOG_DIR="$HOME/logs"
+LOG_DIR="/var/log/${USER:-root}"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/${USER:-root}-wifimanager-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="$LOG_DIR/wifimanager-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "=================================================="
