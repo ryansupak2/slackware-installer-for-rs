@@ -25,11 +25,11 @@ export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
 
 # ── Audio ──
 echo "── audio ──"
-pkill -x pulseaudio 2>/dev/null || true
-pkill -x pipewire 2>/dev/null || true
-pkill -x pipewire-media-session 2>/dev/null || true
-pkill -x wireplumber 2>/dev/null || true
-pkill -x pipewire-pulse 2>/dev/null || true
+sudo pkill -x pulseaudio 2>/dev/null || true
+sudo pkill -x pipewire 2>/dev/null || true
+sudo pkill -x pipewire-media-session 2>/dev/null || true
+sudo pkill -x wireplumber 2>/dev/null || true
+sudo pkill -x pipewire-pulse 2>/dev/null || true
 sleep 0.5
 rm -f "$XDG_RUNTIME_DIR/pipewire-0" "$XDG_RUNTIME_DIR/pipewire-0.lock" 2>/dev/null || true
 rm -rf "$XDG_RUNTIME_DIR/pulse" 2>/dev/null || true
@@ -109,6 +109,11 @@ cleanup() {
     echo "[dwm-start] X session ending — cleaning up..."
     /usr/local/bin/vpn disconnect 2>/dev/null || true
     pkill -USR1 voxd 2>/dev/null || true
+    pkill -x pipewire-pulse 2>/dev/null || true
+    pkill -x pipewire-media-session 2>/dev/null || true
+    pkill -x pipewire 2>/dev/null || true
+    rm -f "$XDG_RUNTIME_DIR/pipewire-0" "$XDG_RUNTIME_DIR/pipewire-0.lock" 2>/dev/null || true
+    rm -rf "$XDG_RUNTIME_DIR/pulse" 2>/dev/null || true
     echo "[dwm-start] cleanup complete"
 }
 trap cleanup EXIT
