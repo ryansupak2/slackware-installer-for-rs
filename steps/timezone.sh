@@ -62,6 +62,19 @@ else
     echo "  WARNING: $NTP_CONF not found"
 fi
 
+# ── Fix restrictive default rules that block client sync ─────────
+# The Slackware default ntp.conf uses 'nopeer' in the restrict default
+# line, which prevents ntpd from forming associations with pool servers.
+# Remove it so ntpd can actually sync.
+if grep -q 'restrict default.*nopeer' "$NTP_CONF" 2>/dev/null; then
+    echo "  Removing nopeer from restrict default (blocks pool sync)"
+    sed -i 's/\(restrict.*default.*\)nopeer[[:space:]]*/\1/' "$NTP_CONF"
+    NTPD_NEEDS_RESTART=true
+    echo "  Fixed restrict default lines"
+else
+    echo "  restrict default already allows client sync"
+fi
+
 # ── Enable NTP at boot ────────────────────────────────────────
 echo "Enabling NTP at boot..."
 if [ -f /etc/rc.d/rc.ntpd ]; then
