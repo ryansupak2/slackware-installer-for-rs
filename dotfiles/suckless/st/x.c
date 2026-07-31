@@ -1384,7 +1384,6 @@ xmakeglyphfontspecs(XftGlyphFontSpec *specs, const Glyph *glyphs, int len, int x
 
 		XGlyphInfo ext;
 		XftGlyphExtents(xw.dpy, frc[f].font, &glyphidx, 1, &ext);
-		/* Skip oversized fallback glyphs (color emoji) — use replacement. */
 		if (ext.width > 300 || ext.height > 300) {
 			rune = 0xFFFD;
 			glyphidx = XftCharIndex(xw.dpy, font->match, rune);

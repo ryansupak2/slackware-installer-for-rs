@@ -169,8 +169,8 @@ cat > "$TOGGLE" << 'TOGGLE_EOF'
 # Model loads lazily on first use inside voxd, not at daemon startup.
 # Lock file prevents races when Mod+V fires twice in quick succession.
 
-LOG_DIR="/var/log/${USER:-root}"
-TOGGLE_LOG="$LOG_DIR/voxtoggle-$(date +%Y%m%d-%H%M%S).log"
+LOG_DIR="/var/log"
+TOGGLE_LOG="$LOG_DIR/${USER:-root}-vox-toggle.log"
 LOCK="$XDG_RUNTIME_DIR/vox-toggle-lock"
 
 log_toggle() { echo "$(date '+%Y-%m-%d %H:%M:%S'): toggle-vox: $*" >> "$TOGGLE_LOG"; }
@@ -202,6 +202,10 @@ if [ -n "$PID" ]; then
         pkill -x voxd 2>/dev/null
         while pgrep -x voxd >/dev/null 2>&1; do usleep 50000; done
         /usr/local/bin/voxd &
+    fi
+    if [ "$CUR_STATE" = "loading" ]; then
+        log_toggle "SKIPPED (voxd is loading — toggle already in progress)"
+        exit 0
     fi
     if [ "$CUR_STATE" = "recording" ] || [ "$CUR_STATE" = "recording+dump" ]; then
         log_toggle ">>> VOX OFF <<<"
