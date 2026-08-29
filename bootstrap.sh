@@ -16,7 +16,7 @@
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 export REPO_DIR
 
-# Source shared helpers early — we need init_installer_log, read_setup_keys, etc.
+# Source shared helpers early — read_setup_keys, install_pkg, set_timezone_chicago.
 if [ -f "$REPO_DIR/lib/common.sh" ]; then
     . "$REPO_DIR/lib/common.sh"
 fi
