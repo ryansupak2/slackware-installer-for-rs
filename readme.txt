@@ -139,7 +139,7 @@ xlibre provides screen color temperature adjustment (redshift
 alternative) for X11. Deployed as a step under the UI category.
 
 
-NEOFETCH
---------
+FASTFETCH
+---------
 Uses bobdobbs.txt ASCII art as the default splash. Deployed to both
-root and each user's ~/.config/neofetch/.
+root and each user's ~/.config/fastfetch/.

@@ -43,7 +43,7 @@
         { "type": "wmtheme", "key": "WM Theme" },
         { "type": "theme",   "key": "Theme" },
         { "type": "icons",   "key": "Icons" },
-        { "type": "command", "key": "Terminal",      "text": "echo xterm" },
+        { "type": "command", "key": "Terminal",      "text": "echo st" },
         { "type": "command", "key": "Font",          "text": "echo 'Berkeley Mono 24'" },
         { "type": "command", "key": "Browser",       "text": "echo firefox" },
         { "type": "cpu",     "key": "CPU" },
