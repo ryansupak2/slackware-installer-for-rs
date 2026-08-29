@@ -130,7 +130,7 @@ step_list=(
     "user-audio:./steps/user-audio.sh"
     "user-vim:./steps/user-vim.sh"
     "user-ssh:./steps/user-ssh.sh"
-    "user-neofetch:./steps/user-neofetch.sh"
+    "user-fastfetch:./steps/user-fastfetch.sh"
     "user-firefox:./steps/user-firefox.sh"
     "user-github-ssh:./steps/user-github-ssh.sh"
     "user-pi-agent:./steps/user-pi-agent.sh"

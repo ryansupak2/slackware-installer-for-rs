@@ -76,7 +76,7 @@ networking=("wifi" "openvpn" "vnc")
 hardware_config=("input-hardware" "screen-locking" "acpi-wakeup" "audio-volume" "brightness")
 security_access=("root-ssh-key" "keychain" "github-ssh")
 dev_tools=("vim" "git-lfs")
-ui_appearance=("neofetch" "additional-fonts" "suckless-dwm")
+ui_appearance=("fastfetch" "additional-fonts" "suckless-dwm")
 applications=("firefox" "inkscape" "yad" "root-web-shortcuts" "slskd")
 utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux")
 audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox" "vox-sherpa")
@@ -303,8 +303,8 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
-        "neofetch")
-            if ./steps/neofetch.sh; then
+        "fastfetch")
+            if ./steps/fastfetch.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))

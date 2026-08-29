@@ -3,9 +3,9 @@
 #
 # Usage:
 #   vpn us              Connect to US (tries up to 3 servers, exits after)
-#   vpn disconnect      Disconnect
+#   vpn list            List available country codes
+#   vpn stop            Disconnect
 #   vpn status          Show connection status
-#   vpn                 Interactive menu (no args)
 
 export PATH="/usr/sbin:/sbin:$PATH"
 
@@ -41,9 +41,9 @@ as_root() {
     if [ "$(id -u)" -eq 0 ]; then
         "$@"
     elif command -v sudo >/dev/null 2>&1; then
-        sudo "$@"
+        sudo -n "$@"
     elif command -v doas >/dev/null 2>&1; then
-        doas "$@"
+        doas -n "$@"
     else
         log_msg ERROR "not root and neither sudo nor doas installed"
         return 1
@@ -70,7 +70,54 @@ owns_vpn() {
 }
 
 has_configs() {
-    [ -d "$CONFIG_DIR" ] && ls "$CONFIG_DIR"/*.ovpn >/dev/null 2>&1
+    [ -d "$CONFIG_DIR" ] && find "$CONFIG_DIR" -maxdepth 1 -name '*.ovpn' -print -quit | grep -q .
+}
+
+# ── Country name mapping ───────────────────────────────────────────────
+declare -A COUNTRY_NAMES=(
+    [al]="Albania" [dz]="Algeria" [ar]="Argentina" [au]="Australia"
+    [at]="Austria" [be]="Belgium" [ba]="Bosnia and Herzegovina"
+    [br]="Brazil" [bg]="Bulgaria" [ca]="Canada" [cl]="Chile" [co]="Colombia"
+    [cr]="Costa Rica" [hr]="Croatia" [cy]="Cyprus" [cz]="Czech Republic"
+    [dk]="Denmark" [eg]="Egypt" [ee]="Estonia" [fi]="Finland" [fr]="France"
+    [ge]="Georgia" [de]="Germany" [gr]="Greece" [hk]="Hong Kong"
+    [hu]="Hungary" [is]="Iceland" [in]="India" [id]="Indonesia" [ie]="Ireland"
+    [il]="Israel" [it]="Italy" [jp]="Japan" [kz]="Kazakhstan" [lv]="Latvia"
+    [lt]="Lithuania" [lu]="Luxembourg" [my]="Malaysia" [mx]="Mexico"
+    [md]="Moldova" [nl]="Netherlands" [nz]="New Zealand"
+    [mk]="North Macedonia" [no]="Norway" [pl]="Poland" [pt]="Portugal"
+    [ro]="Romania" [rs]="Serbia" [sg]="Singapore" [sk]="Slovakia"
+    [si]="Slovenia" [za]="South Africa" [kr]="South Korea" [es]="Spain"
+    [se]="Sweden" [ch]="Switzerland" [tw]="Taiwan" [th]="Thailand"
+    [tr]="Turkey" [ua]="Ukraine" [ae]="United Arab Emirates"
+    [gb]="United Kingdom" [us]="United States" [vn]="Vietnam"
+)
+
+country_name() {
+    local cc="$1"
+    echo "${COUNTRY_NAMES[$cc]:-$cc}"
+}
+
+# ── List ───────────────────────────────────────────────────────────────
+list_countries() {
+    if [ ! -f "$DNS_FILE" ]; then
+        log_msg ERROR "country file not found: $DNS_FILE"
+        return 1
+    fi
+    echo "Available country codes (abbreviation: country):"
+    echo ""
+    while IFS=: read -r cc _; do
+        cc=$(echo "$cc" | tr '[:upper:]' '[:lower:]')
+        printf '  %-4s %s\n' "$cc" "$(country_name "$cc")"
+    done < "$DNS_FILE"
+}
+
+print_usage() {
+    echo "Usage: vpn <country>     connect to country (e.g. us, uk, mx, jp)"
+    echo "       vpn list          list available country codes"
+    echo "       vpn stop          disconnect"
+    echo "       vpn status        show connection status"
+    echo "       vpn               interactive menu"
 }
 
 # ── IPv6 leak prevention ───────────────────────────────────────────────
@@ -124,6 +171,8 @@ connect_country() {
         if [ -n "$dns" ]; then
             echo "dhcp-option DNS $dns" >> "$tmpcfg"
         fi
+        # Strip deprecated NordVPN options that spam stderr
+        sed -i '/^persist-key$/d; /^fast-io$/d' "$tmpcfg"
         sed -i '/^auth-user-pass/d' "$tmpcfg"
         echo "auth-user-pass $AUTH_FILE" >> "$tmpcfg"
         echo "redirect-gateway ipv6" >> "$tmpcfg"
@@ -225,8 +274,15 @@ interactive_menu() {
 # ── CLI mode ───────────────────────────────────────────────────────────
 run_cli() {
     case "$1" in
-        disconnect|down|d)
+        stop|disconnect|down|d)
             disconnect_vpn
+            ;;
+        list)
+            list_countries
+            ;;
+        --help)
+            print_usage
+            exit 0
             ;;
         status|st|s)
             if is_connected; then
@@ -243,10 +299,7 @@ run_cli() {
         *)
             # Assume it's a country code
             if [ ${#1} -ne 2 ]; then
-                echo "Usage: vpn [us|uk|mx|...]   connect to country"
-                echo "       vpn disconnect       disconnect"
-                echo "       vpn status           show status"
-                echo "       vpn                  interactive menu"
+                print_usage
                 exit 1
             fi
             if is_connected; then

@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/select.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -2016,7 +2017,7 @@ setup(void)
 			snprintf(fifopath, sizeof(fifopath), "%s/dwmbar-0", rundir);
 			if (mkfifo(fifopath, 0666) < 0 && errno != EEXIST)
 				fprintf(stderr, "[dwm] setup: mkfifo(%s) failed: %s\n", fifopath, strerror(errno));
-			fifofd = open(fifopath, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+			fifofd = open(fifopath, O_RDWR | O_NONBLOCK | O_CLOEXEC);
 			if (fifofd < 0)
 				fprintf(stderr, "[dwm] setup: open FIFO %s failed: %s\n", fifopath, strerror(errno));
 			else
@@ -2092,7 +2093,7 @@ spawn(const Arg *arg)
 	if (fork() == 0) {
 		if (dpy)
 			close(ConnectionNumber(dpy));
-		setsid();
+		setpgid(0, 0);
 
 		sigemptyset(&sa.sa_mask);
 		sa.sa_flags = 0;

@@ -30,6 +30,10 @@ static const Rule rules[] = {
 	 *	WM_NAME(STRING) = title
 	 */
 	/* class      instance    title       tags mask     isfloating   monitor */
+	{ NULL,       NULL,       "Open File",    0,            1,           -1 },
+	{ NULL,       NULL,       "Save File",    0,            1,           -1 },
+	{ NULL,       NULL,       "Save As",      0,            1,           -1 },
+	{ NULL,       NULL,       "Select File",  0,            1,           -1 },
 	{ "Gimp",     NULL,       NULL,       0,            1,           -1 },
 	{ "Firefox",  NULL,       NULL,       1 << 8,       0,           -1 },
 };
@@ -62,7 +66,7 @@ static const Layout layouts[] = {
 /* commands */
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
 static const char *dmenucmd[] = { "bemenu-run", NULL };
-static const char *termcmd[]  = { "st", NULL };
+static const char *termcmd[]  = { "xterm", NULL };
 static const char *surfcmd[]  = { "/usr/local/bin/browser", NULL };
 
 static const Key keys[] = {
@@ -108,21 +112,16 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_h,      togglehidemode, {0} },
 	{ MODKEY,                       XK_v,      spawn,          SHCMD("/usr/local/bin/toggle-vox.sh") },
 	{ MODKEY|ShiftMask,             XK_v,      spawn,          SHCMD("/usr/local/bin/toggle-vox-record.sh") },
+	/* Media keys: bare top-row keys emit XF86* keysyms (ThinkPad/Dell media
+	 * layer). Fn+key emits plain F1-F12, left unbound so F-keys keep their
+	 * normal function and media actions stay consistent with the bare keys. */
 	{ 0,                            XF86XK_AudioLowerVolume, spawn, {.v = (const char*[]){"/usr/local/bin/volume_down.sh", NULL} } },
 	{ 0,                            XF86XK_AudioRaiseVolume, spawn, {.v = (const char*[]){"/usr/local/bin/volume_up.sh", NULL} } },
 	{ 0,                            XF86XK_AudioMute,        spawn, {.v = (const char*[]){"/usr/local/bin/volume_mute.sh", NULL} } },
 	{ 0,                            XF86XK_MonBrightnessDown, spawn, {.v = (const char*[]){"/usr/local/bin/brightness_down.sh", NULL} } },
 	{ 0,                            XF86XK_MonBrightnessUp, spawn, {.v = (const char*[]){"/usr/local/bin/brightness_up.sh", NULL} } },
-	{ ShiftMask,                    XF86XK_MonBrightnessDown, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_down.sh", NULL} } },
-	{ ShiftMask,                    XF86XK_MonBrightnessUp, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_up.sh", NULL} } },
-	// Fallback: some laptops send plain F-keys instead of XF86 multimedia keys
-	{ 0,                            XK_F1, spawn, {.v = (const char*[]){"/usr/local/bin/volume_mute.sh", NULL} } },
-	{ 0,                            XK_F2, spawn, {.v = (const char*[]){"/usr/local/bin/volume_down.sh", NULL} } },
-	{ 0,                            XK_F3, spawn, {.v = (const char*[]){"/usr/local/bin/volume_up.sh", NULL} } },
-	{ 0,                            XK_F5, spawn, {.v = (const char*[]){"/usr/local/bin/brightness_down.sh", NULL} } },
-	{ 0,                            XK_F6, spawn, {.v = (const char*[]){"/usr/local/bin/brightness_up.sh", NULL} } },
-	{ ShiftMask,                    XK_F5, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_down.sh", NULL} } },
-	{ ShiftMask,                    XK_F6, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_up.sh", NULL} } },
+	{ 0,                            XF86XK_KbdBrightnessDown, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_down.sh", NULL} } },
+	{ 0,                            XF86XK_KbdBrightnessUp, spawn, {.v = (const char*[]){"/usr/local/bin/kbd_backlight_up.sh", NULL} } },
 };
 
 /* button definitions */

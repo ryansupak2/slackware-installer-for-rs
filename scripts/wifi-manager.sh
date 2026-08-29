@@ -52,17 +52,24 @@ case "${1:-}" in
         ;;
 esac
 
-# Terminal formatting
-BOLD='\033[1m'
-GREEN='\033[32m'
-RED='\033[31m'
-YELLOW='\033[33m'
-NC='\033[0m'
+# Terminal formatting (colors only when stdout is a TTY, so logs stay clean)
+BOLD=''
+GREEN=''
+RED=''
+YELLOW=''
+NC=''
+if [ -t 1 ]; then
+    BOLD=$(printf '\033[1m')
+    GREEN=$(printf '\033[32m')
+    RED=$(printf '\033[31m')
+    YELLOW=$(printf '\033[33m')
+    NC=$(printf '\033[0m')
+fi
 
 # Dual logging (everything goes to screen AND the log file)
-LOG_DIR="/var/log/${USER:-root}"
+LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-LOG_FILE="$LOG_DIR/wifimanager-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="$LOG_DIR/${USER:-root}-wifi-manager-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "=================================================="

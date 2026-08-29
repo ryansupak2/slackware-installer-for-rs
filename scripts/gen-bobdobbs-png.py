@@ -7,8 +7,8 @@ import sys
 
 # Resolve paths relative to the repo root
 REPO_DIR = os.environ.get("REPO_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-TEXT_PATH = os.path.join(REPO_DIR, "dotfiles", "neofetch", "bobdobbs.txt")
-OUT_PATH  = os.path.join(REPO_DIR, "dotfiles", "neofetch", "bobdobbs.png")
+TEXT_PATH = os.path.join(REPO_DIR, "dotfiles", "fastfetch", "bobdobbs.txt")
+OUT_PATH  = os.path.join(REPO_DIR, "dotfiles", "fastfetch", "bobdobbs.png")
 
 FONT_PATH = "/usr/share/fonts/TTF/BerkeleyMono-Regular.ttf"
 FONT_SIZE = 18

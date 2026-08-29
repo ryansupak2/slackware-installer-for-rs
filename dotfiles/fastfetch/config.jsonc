@@ -1,0 +1,56 @@
+// fastfetch config — Slackware edition
+//
+// Splash logo: bobdobbs.txt rendered as ASCII art.
+// Mirrors the FreeBSD installer's fastfetch layout (colors, key width,
+// separator, module ordering) with Slackware-specific values.
+
+{
+    "logo": {
+        "type": "ascii",
+        "source": "~/.config/fastfetch/bobdobbs.txt",
+        "padding": {
+            "top": 0,
+            "right": 2
+        }
+    },
+
+    "display": {
+        "separator": ": ",
+        "color": {
+            "keys": "yellow",
+            "title": "yellow",
+            "output": "white",
+            "separator": "white"
+        },
+        "brightColor": true,
+        "key": {
+            "width": 20
+        }
+    },
+
+    "modules": [
+        { "type": "title", "fqdn": true },
+        { "type": "break" },
+        { "type": "command", "key": "OS",            "text": "grep '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"'" },
+        { "type": "host",    "key": "Host" },
+        { "type": "kernel",  "key": "Kernel" },
+        { "type": "uptime",  "key": "Uptime" },
+        { "type": "command", "key": "Packages",      "text": "echo \"pkg:$(ls /var/log/packages/ 2>/dev/null | wc -l | tr -d ' ') npm:$(npm list -g --depth=0 2>/dev/null | grep -c '@') pip:$(pip list 2>/dev/null | tail -n +3 | wc -l | tr -d ' ')\"" },
+        { "type": "shell",   "key": "Shell" },
+        { "type": "display", "key": "Resolution" },
+        { "type": "de",      "key": "DE" },
+        { "type": "wm",      "key": "WM" },
+        { "type": "wmtheme", "key": "WM Theme" },
+        { "type": "theme",   "key": "Theme" },
+        { "type": "icons",   "key": "Icons" },
+        { "type": "command", "key": "Terminal",      "text": "echo xterm" },
+        { "type": "command", "key": "Font",          "text": "echo 'Berkeley Mono 24'" },
+        { "type": "command", "key": "Browser",       "text": "echo firefox" },
+        { "type": "cpu",     "key": "CPU" },
+        { "type": "gpu",     "key": "GPU" },
+        { "type": "command", "key": "Disk",          "text": "df -h / 2>/dev/null | awk 'NR==2{printf \"%s / %s (%s)\",$3,$2,$5}'" },
+        { "type": "memory",  "key": "Memory" },
+        { "type": "break" },
+        { "type": "colors" }
+    ]
+}
