@@ -21,8 +21,13 @@ if [ -f "$REPO_DIR/lib/common.sh" ]; then
     . "$REPO_DIR/lib/common.sh"
 fi
 
-# Set up dual logging: tee to screen + /var/log
-init_installer_log "bootstrap"
+# Local logging: full bootstrap output goes to the run directory (USB stick or
+# local repo folder), matching the FreeBSD installer. Dual-logged to screen.
+LOG_DIR="$REPO_DIR"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+LOG_FILE="$LOG_DIR/${USER:-root}-bootstrap-$(date +%Y%m%d-%H%M%S).log"
+export LOG_FILE
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "=================================================="
 echo "Bootstrap log started: $(date)"
@@ -36,15 +41,24 @@ echo "*****************************************************"
 # Load keys from setup.keys.root
 read_setup_keys
 
+# Connectivity probe: wget (Slackware base) first, then curl if present.
+probe_net() {
+    if command -v wget >/dev/null 2>&1; then
+        wget -q -T 5 -O /dev/null https://github.com 2>/dev/null
+    elif command -v curl >/dev/null 2>&1; then
+        curl --connect-timeout 5 -s https://github.com >/dev/null 2>&1
+    else
+        return 1
+    fi
+}
+
 # ------------------------------------------------------------------
 # Ensure internet connectivity (only touch WiFi if not already online)
 # ------------------------------------------------------------------
 ONLINE=false
-if command -v curl >/dev/null 2>&1; then
-    if curl --connect-timeout 5 -s https://github.com >/dev/null 2>&1; then
-        ONLINE=true
-        echo "Internet already reachable — skipping WiFi setup."
-    fi
+if probe_net; then
+    ONLINE=true
+    echo "Internet already reachable — skipping WiFi setup."
 fi
 
 if [ "$ONLINE" = false ] && [ -n "$WIFI_SSID" ] && [ -n "$WIFI_PASS" ]; then
@@ -70,7 +84,7 @@ if [ "$ONLINE" = false ] && [ -n "$WIFI_SSID" ] && [ -n "$WIFI_PASS" ]; then
     fi
 
     # Re-test after WiFi attempt
-    if command -v curl >/dev/null 2>&1 && curl --connect-timeout 5 -s https://github.com >/dev/null 2>&1; then
+    if probe_net; then
         echo "Internet reachable."
     else
         echo "WARNING: Internet not reachable. pi install may fail."
