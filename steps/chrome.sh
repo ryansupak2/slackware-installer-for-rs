@@ -116,11 +116,21 @@ fi
 # 3. /usr/local/bin/chrome — single entry point for w / wk / Mod+b
 # -------------------------------------------------------------------
 if [ -x "$CHROME_DIR/chrome" ]; then
+    # UI scale. This panel is 2560x1600 over an ~11.3" diagonal (~226 DPI) but
+    # X reports 96 DPI, so Chrome draws its UI (URL bar, tabs, menus) at the
+    # default ~12px — unreadable next to the terminal, which is Berkeley Mono
+    # pixelsize=28 (st/dwm). 12 * 2.25 = 27px, i.e. the same visual size.
+    # Override per-launch with CHROME_UI_SCALE=<factor>.
+    UI_SCALE="${CHROME_UI_SCALE:-2.25}"
     cat > /usr/local/bin/chrome << WRAPPER
 #!/bin/sh
 # chrome — entry point for w / wk / Mod+b. Google Chrome, because the Chromium
 # builds available to this installer cannot load the Widevine CDM.
-exec $CHROME_DIR/chrome "\$@"
+#
+# --force-device-scale-factor makes the UI text match the terminal font
+# (12px * 2.25 ≈ 27px ≈ Berkeley Mono pixelsize=28). Override with
+# CHROME_UI_SCALE=2.5 (etc) for a one-off larger/smaller window.
+exec $CHROME_DIR/chrome --force-device-scale-factor=\${CHROME_UI_SCALE:-$UI_SCALE} "\$@"
 WRAPPER
     chmod 755 /usr/local/bin/chrome
     ln -sf /usr/local/bin/chrome /usr/bin/browser 2>/dev/null || true
@@ -200,6 +210,17 @@ for d in /root/.mozilla /home/*/.mozilla /etc/skel/.mozilla; do
     [ -e "$d" ] || continue
     rm -rf "$d" && echo "  removed $d"
 done
+
+# GTK font. Chrome's menus/dialogs and every other GTK app read this; the old
+# 9pt was unreadable on this ~226 DPI panel (terminal is 28px).
+GTK_SRC="$REPO_DIR/dotfiles/gtk/settings.ini"
+if [ -f "$GTK_SRC" ]; then
+    for base in /root /etc/skel; do
+        mkdir -p "$base/.config/gtk-3.0"
+        cp "$GTK_SRC" "$base/.config/gtk-3.0/settings.ini" 2>/dev/null \
+            && echo "  gtk settings -> $base/.config/gtk-3.0/settings.ini"
+    done
+fi
 # -------------------------------------------------------------------
 # 7. Optional DRM-free secondary browser
 # -------------------------------------------------------------------
