@@ -118,18 +118,18 @@ fi
 if [ -x "$CHROME_DIR/chrome" ]; then
     # UI scale. This panel is 2560x1600 over an ~11.3" diagonal (~226 DPI) but
     # X reports 96 DPI, so Chrome draws its UI (URL bar, tabs, menus) at the
-    # default ~12px — unreadable next to the terminal, which is Berkeley Mono
-    # pixelsize=28 (st/dwm). 12 * 2.25 = 27px, i.e. the same visual size.
+    # default ~12px. 1.2 puts it at ~14.4px: comfortably larger than stock
+    # without dwarfing the page. (2.25 was tried first and was ~2x too big.)
     # Override per-launch with CHROME_UI_SCALE=<factor>.
-    UI_SCALE="${CHROME_UI_SCALE:-2.25}"
+    UI_SCALE="${CHROME_UI_SCALE:-1.2}"
     cat > /usr/local/bin/chrome << WRAPPER
 #!/bin/sh
 # chrome — entry point for w / wk / Mod+b. Google Chrome, because the Chromium
 # builds available to this installer cannot load the Widevine CDM.
 #
-# --force-device-scale-factor makes the UI text match the terminal font
-# (12px * 2.25 ≈ 27px ≈ Berkeley Mono pixelsize=28). Override with
-# CHROME_UI_SCALE=2.5 (etc) for a one-off larger/smaller window.
+# --force-device-scale-factor enlarges the UI text (URL bar, tabs, menus).
+# 1.2 => ~14.4px, i.e. clearly bigger than stock but not oversized.
+# Override per launch: CHROME_UI_SCALE=1.3 w y
 exec $CHROME_DIR/chrome --force-device-scale-factor=\${CHROME_UI_SCALE:-$UI_SCALE} "\$@"
 WRAPPER
     chmod 755 /usr/local/bin/chrome
