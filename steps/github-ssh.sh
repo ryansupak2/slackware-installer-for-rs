@@ -19,8 +19,10 @@ echo "*****************************************************"
 echo "GITHUB SSH (PAT + github-cli)"
 echo "*****************************************************"
 
-ok=true
-GH_AUTH=false
+ok=true          # overall step result (SSH push working is enough to succeed)
+GH_AUTH=false    # gh CLI authenticated (needs a valid PAT)
+PAT_OK=true      # PAT accepted by the API
+SSH_OK=false     # SSH to github.com authenticated (all that 'git push' needs)
 
 if [ -z "${GITHUB_INSTALLER_PAT:-}" ]; then
     echo "Missing GITHUB_INSTALLER_PAT in setup.keys.root."
@@ -52,7 +54,9 @@ else
             echo "  Fix: setup.keys.root GITHUB_INSTALLER_PAT must be a TOKEN, not a"
             echo "       password/passphrase: classic ghp_... with repo, admin:public_key,"
             echo "       gist, workflow scopes, or a fine-grained token."
-            ok=false
+            echo "  Note: a PAT is only needed for gh/API actions. Plain 'git push'"
+            echo "        uses SSH, which the section below configures independently."
+            PAT_OK=false
         fi
 
         if $GH_AUTH; then
@@ -117,9 +121,42 @@ done
 echo "Seeding github.com host key for root..."
 ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null || true
 
-# Informational SSH test (never fatal for this step)
+# ── SSH transport: this is all a plain 'git push' needs ──────────────
+# A PAT is only for gh/API actions. Pushing uses SSH, so make every GitHub
+# remote use SSH and keep it that way for future clones.
+mkdir -p /root/.ssh && chmod 700 /root/.ssh 2>/dev/null || true
+
+# 1. Global rewrite: any https://github.com/... URL (clone or existing remote)
+#    is transparently fetched/pushed over SSH — no token, no password prompt.
+if [ "$(git config --global --get url.git@github.com:.insteadOf 2>/dev/null)" = "https://github.com/" ]; then
+    echo "https->ssh rewrite: already configured"
+else
+    git config --global url."git@github.com:".insteadOf "https://github.com/"
+    echo "https->ssh rewrite: configured (https://github.com/ -> git@github.com:)"
+fi
+
+# 2. Convert existing checkouts that still have HTTPS GitHub remotes.
+for repo in /root/Development/*/ /home/*/Development/*/; do
+    [ -d "$repo/.git" ] || continue
+    for rname in $(git -C "$repo" remote 2>/dev/null); do
+        # Read the RAW configured value: `git remote get-url` applies the
+        # url.insteadOf rewrite above, so it would already look like SSH.
+        url=$(git -C "$repo" config --get "remote.$rname.url" 2>/dev/null) || continue
+        case "$url" in
+            https://github.com/*)
+                newurl="git@github.com:${url#https://github.com/}"
+                if git -C "$repo" remote set-url "$rname" "$newurl" 2>/dev/null; then
+                    echo "  ${repo%/}: $rname -> SSH"
+                fi
+                ;;
+        esac
+    done
+done
+
+# 3. Verify SSH auth (this is what push needs)
 echo "Testing GitHub SSH connectivity (ssh -T git@github.com)..."
 if timeout 12 ssh -T git@github.com 2>&1 | grep -qi "successfully authenticated"; then
+    SSH_OK=true
     echo "GitHub SSH authentication test passed."
 else
     echo "GitHub SSH test did not confirm: the public key is not registered on the"
@@ -143,11 +180,19 @@ if $GH_AUTH; then
     fi
 fi
 
-if $ok; then
-    echo "SUCCESS: GitHub SSH (gh auth + optional key upload) configured."
+# Result. SSH push access is the goal, so a dead PAT is only a warning: gh/API
+# actions need it, plain 'git push' does not.
+if $SSH_OK || $GH_AUTH; then
+    echo "SUCCESS: GitHub configured — 'git push' works over SSH (no token needed)."
+    if ! $PAT_OK; then
+        echo "WARNING: GITHUB_INSTALLER_PAT is invalid; gh and SSH-key upload stay"
+        echo "         disabled until setup.keys.root holds a valid token."
+    fi
     exit 0
 else
-    echo "ERROR: GitHub setup incomplete — fix GITHUB_INSTALLER_PAT in setup.keys.root"
-    echo "       (must be a token, not a passphrase) and re-run steps/github-ssh.sh."
+    echo "ERROR: GitHub setup incomplete — no working credential."
+    echo "       Either add the public key printed above at"
+    echo "       https://github.com/settings/keys, or put a valid token in"
+    echo "       setup.keys.root (GITHUB_INSTALLER_PAT) and re-run steps/github-ssh.sh."
     exit 1
 fi
