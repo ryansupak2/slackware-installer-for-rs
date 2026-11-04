@@ -128,10 +128,22 @@ if [ -x "$CHROME_DIR/chrome" ]; then
 # chrome — entry point for w / wk / Mod+b. Google Chrome, because the Chromium
 # builds available to this installer cannot load the Widevine CDM.
 #
-# --force-device-scale-factor enlarges the UI text (URL bar, tabs, menus).
-# 1.2 => ~14.4px, i.e. clearly bigger than stock but not oversized.
-# Override per launch: CHROME_UI_SCALE=1.3 w y
-exec $CHROME_DIR/chrome --force-device-scale-factor=\${CHROME_UI_SCALE:-$UI_SCALE} "\$@"
+# --force-device-scale-factor: sizes the URL bar (see UI_SCALE above).
+#   Override per launch: CHROME_UI_SCALE=1.3 w y
+#
+# --password-store=basic: this machine has no D-Bus secret service
+#   (gnome-keyring/kwallet), so Chrome's OS-crypt waits for the D-Bus lookup
+#   to time out on EVERY launch — measured 25.2s before the first request vs
+#   0.2s with the built-in store. That was the "pages take forever to load"
+#   bug; the network was never slow (curl TTFB 0.2s). Cookies/passwords are
+#   then encrypted with the profile-local key instead of the keyring. Use
+#   CHROME_PASSWORD_STORE=gnome-libsecret once a keyring is installed.
+# NOTE: this heredoc is unquoted, so anything that must be evaluated when the
+# wrapper RUNS has to be escaped (\$), otherwise it is expanded at write time
+# (that is how \$SANDBOX silently vanished and \$(id -u) became a literal 0).
+SANDBOX=""
+[ "\$(id -u)" = "0" ] && SANDBOX="--no-sandbox"
+exec $CHROME_DIR/chrome \$SANDBOX --force-device-scale-factor=\${CHROME_UI_SCALE:-$UI_SCALE} --password-store=\${CHROME_PASSWORD_STORE:-basic} "\$@"
 WRAPPER
     chmod 755 /usr/local/bin/chrome
     ln -sf /usr/local/bin/chrome /usr/bin/browser 2>/dev/null || true
@@ -171,7 +183,9 @@ probe_drm() {   # $1 = browser binary
 })();
 </script></body></html>
 HTMLEOF
-    OUT=$(timeout 60 "$1" --headless=new --no-sandbox --disable-gpu \
+    # --password-store=basic also keeps the probe fast; without it this call
+    # waits ~25s on the missing D-Bus secret service before starting.
+    OUT=$(timeout 60 "$1" --headless=new --no-sandbox --disable-gpu --password-store=basic \
             --user-data-dir="$P/ud" --virtual-time-budget=8000 \
             --dump-dom "file://$P/probe.html" 2>/dev/null \
           | grep -o 'EME_RESULT: [A-Z_]*[A-Za-z ]*' | head -1)
