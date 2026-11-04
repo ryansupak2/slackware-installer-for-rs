@@ -137,8 +137,8 @@ POWER / BATTERY POLICY
 steps/power.sh installs the `power` tool and an automatic AC/battery policy.
 
 Check it:
-  power                  status: source, watts, time left, CPU, backlight,
-                         sleep mode, wake sources, lid behaviour
+  power                  top line = power mode (battery/AC · profile); then
+                         battery %, watts, time left, CPU, backlight, sleep, lid
   power wake             wake sources + suspend mode (mem_sleep)
 
 Change it:
@@ -171,7 +171,7 @@ Your own brightness wins: pressing the brightness keys (they call
 BRIGHTNESS_MODE=manual in /var/lib/power/state, and the policy then never
 touches it again — not on unplug, replug, resume, reboot or X restart.
 Take control back with `power profile <name>` (that re-asserts the profile's
-backlight and sets BRIGHTNESS_MODE=auto). `power status` shows which it is.
+backlight and sets BRIGHTNESS_MODE=auto). `power` shows which it is on the first line.
 
 Panel is blanked after BLANK_MINUTES (default 5) with DPMS
 standby/suspend/off at 1x/2x/4x that timeout.

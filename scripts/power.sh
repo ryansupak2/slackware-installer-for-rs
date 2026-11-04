@@ -4,8 +4,8 @@
 # Installed as /usr/local/bin/power by steps/power.sh.
 #
 # Usage:
-#   power                       Show power status (same as: power status)
-#   power status                Source, battery, CPU, backlight, display, sleep, lid
+#   power                       Power mode + status: source, battery, CPU,
+#                               backlight, display, sleep, lid
 #   power profile NAME          Apply powersave|balanced|performance now and store
 #                               it as this power source's profile
 #   power set governor GOV      performance | powersave
@@ -381,22 +381,22 @@ wake_allow() {
 }
 
 cmd_wake() {
-    local sub=${1:-status}
+    local sub=${1:-}
     case "$sub" in
-        restrict|power-button-only|strict)
+        restrict)
             elevate wake restrict
             wake_restrict
             WAKE=power-button-only; save_state
             echo "SUCCESS: only the power button can wake this machine (mem_sleep=$(mem_sleep_cur))."
             echo "         Undo with: power wake allow"
             ;;
-        allow|all)
+        allow)
             elevate wake allow
             wake_allow
             WAKE=all; save_state
             echo "SUCCESS: all wake sources re-enabled."
             ;;
-        status|show|"")
+        "")
             echo "${BOLD}Wake sources${NC}"
             deep_note=$([ "$(mem_sleep_cur)" = deep ] && echo "(honours wake restrictions)" || echo "(s2idle ignores wake restrictions)")
             echo "  Suspend mode  : mem_sleep=$(mem_sleep_cur) ${DIM}${deep_note}${NC}"
@@ -407,7 +407,7 @@ cmd_wake() {
                 awk 'NR>1 && $3 ~ /\*enabled/ {printf "                  %s\n", $1}' /proc/acpi/wakeup 2>/dev/null
             fi
             ;;
-        *) die "unknown wake subcommand '$sub' (status|restrict|allow)" ;;
+        *) die "unknown wake subcommand '$sub' (restrict|allow)" ;;
     esac
 }
 
@@ -458,8 +458,8 @@ cmd_boot() {
 
 # ── Status ────────────────────────────────────────────────────────────
 cmd_status() {
-    local src b pct st watts left gov epp turbo brt blname msleep wenabled lid
-    if ac_online; then src="${GREEN}AC (plugged in)${NC}"; else src="${RED}battery (unplugged)${NC}"; fi
+    local b pct st watts left gov epp turbo brt blname msleep wenabled lid
+    local mode_src mode_prof mode_line
 
     b=$(battery_dir)
     if [ -n "$b" ]; then
@@ -479,8 +479,19 @@ cmd_status() {
     wenabled=$(wake_enabled_count)
     lid=$(sed -n 's/^action=//p' /etc/acpi/events/lid-close 2>/dev/null)
 
-    echo "${BOLD}Power status${NC}"
-    printf '  %-13s %s\n' "Source" "$src"
+    # Top line: the one thing you want at a glance.
+    if ac_online; then
+        mode_src="${GREEN}AC${NC}"; mode_prof=$AC_PROFILE
+    else
+        mode_src="${RED}battery${NC}"; mode_prof=$BATTERY_PROFILE
+    fi
+    if [ "$AUTO" = on ]; then
+        mode_line="${mode_src} · ${BOLD}${mode_prof}${NC}"
+    else
+        mode_line="${mode_src} · ${YELLOW}auto off${NC} (governor ${gov:-?})"
+    fi
+    echo "${BOLD}Power mode:${NC} ${mode_line}"
+    echo
     if [ -n "$pct" ]; then
         printf '  %-13s %s%% %s%s%s%s\n' "Battery" "$pct" "$st" \
             "${watts:+ · $watts}" "${left:+ · ~$left left}" ""
@@ -654,7 +665,7 @@ usage() {
 load_state
 
 case "${1:-}" in
-    ""|status|check|show)
+    "")
         setup_cli_log
         cmd_status
         ;;
@@ -663,7 +674,7 @@ case "${1:-}" in
         setup_cli_log
         cmd_set "${2:-}" "${3:-}"
         ;;
-    profile|prof)
+    profile)
         elevate profile "${2:-}"
         setup_cli_log
         cmd_profile "${2:-}"
@@ -674,11 +685,8 @@ case "${1:-}" in
         cmd_auto "${2:-}" "${3:-}"
         ;;
     wake)
-        case "${2:-status}" in
-            status|show|"") setup_cli_log ;;
-            *) elevate wake "${2:-}" ;;
-        esac
-        cmd_wake "${2:-status}"
+        if [ -n "${2:-}" ]; then elevate wake "$2"; else setup_cli_log; fi
+        cmd_wake "${2:-}"
         ;;
     apply)
         # hook mode: no per-run log file, append to one shared log

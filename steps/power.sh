@@ -139,7 +139,7 @@ fi
 if $ok; then
     echo ""
     echo "SUCCESS: power policy installed."
-    echo "  check :  power            (or: power status / power wake)"
+    echo "  check :  power            (mode on the top line; 'power wake' for wake sources)"
     echo "  change:  power profile powersave|balanced|performance"
     echo "           power auto on|off / power auto battery|ac <profile>"
     echo "           power set brightness 40 / power set blank 5 / power set turbo off"
