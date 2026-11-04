@@ -51,7 +51,7 @@
         { "type": "icons",   "key": "Icons" },
         { "type": "command", "key": "Terminal",      "text": "echo st" },
         { "type": "command", "key": "Font",          "text": "echo 'Berkeley Mono 28'" },
-        { "type": "command", "key": "Browser",       "text": "echo firefox" },
+        { "type": "command", "key": "Browser",       "text": "browser-name" },
         { "type": "cpu",     "key": "CPU" },
         { "type": "gpu",     "key": "GPU" },
         { "type": "command", "key": "Disk",          "text": "df -h / 2>/dev/null | awk 'NR==2{printf \"%s / %s (%s)\",$3,$2,$5}'" },

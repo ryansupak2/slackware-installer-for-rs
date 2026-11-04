@@ -102,14 +102,13 @@ cleanup() {
     echo "[dwm-start] X session ending — cleaning up..."
     /usr/local/bin/vpn disconnect 2>/dev/null || true
     pkill -USR1 voxd 2>/dev/null || true
-    pkill -x pipewire-pulse 2>/dev/null || true
-    pkill -x pipewire-media-session 2>/dev/null || true
-    pkill -x pipewire 2>/dev/null || true
-    rm -f "$XDG_RUNTIME_DIR/pipewire-0" "$XDG_RUNTIME_DIR/pipewire-0.lock" 2>/dev/null || true
-    rm -rf "$XDG_RUNTIME_DIR/pulse" 2>/dev/null || true
-    echo "[dwm-start] cleanup complete"
+    # Audio daemons are deliberately NOT killed and their sockets NOT removed.
+    # Doing that is what used to break sound: the supervisors respawn the
+    # daemons, but the rm -f left them listening on unlinked inodes, so every
+    # client got ECONNREFUSED after re-entering X. /usr/local/bin/pipewire-ensure
+    # at the next session start validates and repairs the session instead.
+    echo "[dwm-start] cleanup complete (audio left running)"
 }
-trap cleanup EXIT
 
 dwm
 XEOF

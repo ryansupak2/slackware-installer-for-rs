@@ -232,6 +232,30 @@ fi
 install -m 755 "$REPO_DIR/scripts/chrome-ui-font.sh" /usr/local/bin/chrome-ui-font 2>/dev/null \
     || { cp "$REPO_DIR/scripts/chrome-ui-font.sh" /usr/local/bin/chrome-ui-font && chmod 755 /usr/local/bin/chrome-ui-font; }
 echo "  /usr/local/bin/chrome-ui-font installed (usage: chrome-ui-font 16)"
+
+# Default page zoom helper (chrome-default-zoom 125). Chrome writes its
+# Preferences on exit, so this refuses to run while Chrome is open; the value
+# itself lives in the profile and therefore survives reboots.
+install -m 755 "$REPO_DIR/scripts/chrome-default-zoom.sh" /usr/local/bin/chrome-default-zoom 2>/dev/null \
+    || { cp "$REPO_DIR/scripts/chrome-default-zoom.sh" /usr/local/bin/chrome-default-zoom && chmod 755 /usr/local/bin/chrome-default-zoom; }
+echo "  /usr/local/bin/chrome-default-zoom installed (usage: chrome-default-zoom 125)"
+
+# Which browser fastfetch reports (the dotfiles used to hardcode 'firefox')
+install -m 755 "$REPO_DIR/scripts/browser-name.sh" /usr/local/bin/browser-name 2>/dev/null \
+    || { cp "$REPO_DIR/scripts/browser-name.sh" /usr/local/bin/browser-name && chmod 755 /usr/local/bin/browser-name; }
+echo "  /usr/local/bin/browser-name installed"
+
+# Keep the default zoom at 125% (content was tuned at 125%: DSF 1.44 * 1.25 =
+# 1.8, same physical size as the old DSF 1.2 * 150%). Skipped silently when
+# Chrome is running or the profile does not exist yet.
+if [ -x /usr/local/bin/chrome-default-zoom ] && [ -f /root/.config/google-chrome/Default/Preferences ]; then
+    if ! pgrep -f '/opt/google/chrome/chrome ' >/dev/null 2>&1; then
+        /usr/local/bin/chrome-default-zoom 125 >/dev/null 2>&1 \
+            && echo "  default page zoom: 125%"
+    else
+        echo "  default page zoom: left as is (Chrome is running)"
+    fi
+fi
 # -------------------------------------------------------------------
 # 7. Optional DRM-free secondary browser
 # -------------------------------------------------------------------
