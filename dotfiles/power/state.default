@@ -8,3 +8,5 @@ BATTERY_PROFILE=balanced
 AC_PROFILE=performance
 WAKE=power-button-only
 BLANK_MINUTES=5
+# auto = the policy may set the backlight; manual = your own value wins
+BRIGHTNESS_MODE=auto

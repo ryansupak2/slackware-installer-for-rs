@@ -1,15 +1,29 @@
 #!/bin/sh
+# brightness_up.sh — panel backlight up one step (bound to XF86MonBrightnessUp)
+#
+# Goes through `power set brightness`, which also marks brightness as a MANUAL
+# choice: the power policy (auto AC/battery mode) must never fight the user's
+# own setting afterwards. `power profile <name>` hands control back to the policy.
+# Falls back to writing sysfs directly if the power tool is unavailable.
 
-# Source temp-msg helper
 if [ -f /usr/local/bin/temp-msg.sh ]; then . /usr/local/bin/temp-msg.sh
 else set_temp_msg() { echo "$1" > "$XDG_RUNTIME_DIR/status_msg"; echo $(($(date +%s) + ${2:-4})) > "$XDG_RUNTIME_DIR/status_end"; }; fi
-device=$(ls /sys/class/backlight/ | head -1)
-if [ -n "$device" ]; then
-    max=$(cat /sys/class/backlight/$device/max_brightness)
-    current=$(cat /sys/class/backlight/$device/brightness)
-    new=$((current + max / 20))
-    if [ $new -gt $max ]; then new=$max; fi
-    echo $new > /sys/class/backlight/$device/brightness
-    percent=$((new * 100 / max))
-    set_temp_msg "Brightness: $percent%"
+
+DEV=$(ls /sys/class/backlight/ 2>/dev/null | head -1)
+[ -n "$DEV" ] || exit 0
+MAX=$(cat "/sys/class/backlight/$DEV/max_brightness" 2>/dev/null) || exit 0
+CUR=$(cat "/sys/class/backlight/$DEV/brightness" 2>/dev/null) || exit 0
+[ "$MAX" -gt 0 ] 2>/dev/null || exit 0
+
+NEW=$((CUR + MAX / 20))
+[ "$NEW" -gt "$MAX" ] && NEW=$MAX
+PCT=$((NEW * 100 / MAX))
+[ "$PCT" -gt 100 ] && PCT=100
+
+if [ -x /usr/local/bin/power ] && { [ "$(id -u)" -eq 0 ] || sudo -n -l /usr/local/bin/power >/dev/null 2>&1; }; then
+    /usr/local/bin/power set brightness "$PCT" >/dev/null 2>&1
+else
+    echo "$NEW" > "/sys/class/backlight/$DEV/brightness" 2>/dev/null || exit 0
 fi
+
+set_temp_msg "Brightness: $PCT%"

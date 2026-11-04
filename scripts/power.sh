@@ -493,7 +493,7 @@ cmd_status() {
     printf '  %-13s %s  governor=%s  epp=%s  turbo=%s\n' "CPU" \
         "$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver 2>/dev/null)" "$gov" "$epp" "$turbo"
     printf '  %-13s %s%%%s\n' "Backlight" "${brt:-?}" \
-        "${blname:+($blname) }$([ "${BRIGHTNESS_MODE:-auto}" = manual ] && echo 'manual — policy will not change it' || echo 'auto')"
+        "${blname:+ $blname · }$([ "${BRIGHTNESS_MODE:-auto}" = manual ] && echo 'manual — policy will not change it' || echo 'auto')"
     printf '  %-13s blank after %s min; DPMS %s/%s/%s min\n' "Display" \
         "$BLANK_MINUTES" "$BLANK_MINUTES" "$((BLANK_MINUTES * 2))" "$((BLANK_MINUTES * 4))"
     printf '  %-13s mem_sleep=%s; wake=%s (%s)\n' "Sleep" \

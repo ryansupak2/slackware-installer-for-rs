@@ -161,9 +161,20 @@ Profiles (governor / EPP / turbo / backlight cap on battery):
   powersave    powersave    power          no-turbo  25%
   balanced     powersave    balance_power  turbo     50%
   performance  performance  performance    turbo    100%
-Auto mode caps the backlight on unplug and restores it on replug (unless
-you changed brightness in between). Panel is blanked after BLANK_MINUTES
-(default 5) with DPMS standby/suspend/off at 1x/2x/4x that timeout.
+
+Auto mode runs only on events (AC plug/unplug via udev, boot, resume, X
+start) — never on a timer. It caps the backlight on unplug and restores the
+pre-cap value on replug, but ONLY while the backlight is in auto mode.
+
+Your own brightness wins: pressing the brightness keys (they call
+`power set brightness`) or setting the backlight by hand flips it to
+BRIGHTNESS_MODE=manual in /var/lib/power/state, and the policy then never
+touches it again — not on unplug, replug, resume, reboot or X restart.
+Take control back with `power profile <name>` (that re-asserts the profile's
+backlight and sets BRIGHTNESS_MODE=auto). `power status` shows which it is.
+
+Panel is blanked after BLANK_MINUTES (default 5) with DPMS
+standby/suspend/off at 1x/2x/4x that timeout.
 
 DWM + XLIBRE
 -------------
