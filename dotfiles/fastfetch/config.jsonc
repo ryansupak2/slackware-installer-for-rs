@@ -23,8 +23,8 @@
     "display": {
         "separator": ": ",
         "color": {
-            "keys": "yellow",
-            "title": "yellow",
+            "keys": "light_white",
+            "title": "light_white",
             "output": "white",
             "separator": "white"
         },
@@ -56,7 +56,12 @@
         { "type": "gpu",     "key": "GPU" },
         { "type": "command", "key": "Disk",          "text": "df -h / 2>/dev/null | awk 'NR==2{printf \"%s / %s (%s)\",$3,$2,$5}'" },
         { "type": "memory",  "key": "Memory" },
-        { "type": "break" },
+        // Battery life: percentage + time-left estimate from the same rolling
+        // discharge average `power` uses (upower history tail, live sysfs reading
+        // folded in). `power _battery` prints nothing when there is no battery,
+        // and fastfetch then drops the whole line — so this is harmless on a
+        // desktop. It replaces one of the two blank lines before the colour bar.
+        { "type": "command", "key": "Battery Life", "text": "power _battery 2>/dev/null" },
         { "type": "break" },
         { "type": "colors" }
     ]

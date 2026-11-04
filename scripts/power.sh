@@ -649,6 +649,32 @@ cmd_status() {
     echo "${DIM}  change: power profile powersave|balanced|performance  ·  power menu${NC}"
 }
 
+# ── One-line battery summary (fastfetch, status bars) ────────────────
+# Same numbers as `power status`: capacity, plus the time-left estimate from
+# the rolling discharge average (rolling average of upower history, with the
+# live sysfs reading folded in; instant power_now only as a fallback).
+# Prints nothing at all when there is no battery, so a caller can drop the
+# whole line instead of showing an empty key. No ANSI escapes — this is data.
+cmd_battery_line() {
+    local b pct st avg left out
+    b=$(battery_dir 2>/dev/null) || return 0
+    pct=$(cat "$b/capacity" 2>/dev/null)
+    st=$(cat "$b/status" 2>/dev/null)
+    [ -n "$pct" ] || return 0
+    case "$st" in
+        Charging) echo "${pct}% · charging"; return 0 ;;
+        Full)     echo "${pct}% · full";     return 0 ;;
+    esac
+    avg=$(bat_rate_avg_w 2>/dev/null)          # rolling average, may be empty
+    left=$(bat_time_left "$avg" 2>/dev/null)
+    out="${pct}%"
+    [ -n "$avg" ] && out="$out · avg ${avg} W/$(rate_window_label)"
+    [ -n "$left" ] && out="$out · ~${left} left"
+    # Plugged in but not charging (charge threshold, battery care mode, ...).
+    ac_online && out="$out · on AC"
+    echo "$out"
+}
+
 # ── Interactive menu ──────────────────────────────────────────────────
 cmd_menu() {
     local c
@@ -813,6 +839,11 @@ load_state
 case "${RATE_WINDOW:-120}" in ''|*[!0-9]*) RATE_WINDOW=120 ;; esac
 
 case "${1:-}" in
+    _battery)
+        # internal, called by fastfetch's command module: one compact line,
+        # read-only and unprivileged (no logging, no elevation, no sampling)
+        cmd_battery_line
+        ;;
     _rates)
         # internal, called through sudo by cmd_status: dump upower's rate history
         cat "$(rate_history_file)" 2>/dev/null
