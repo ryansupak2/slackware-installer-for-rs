@@ -1,7 +1,7 @@
 #!/bin/sh
-# w — open a URL / shortcut in Chromium (normal profile)
+# w — open a URL / shortcut in Chrome (normal profile)
 #
-# Shortcut file: ~/.web/shortcuts (installed from dotfiles/firefox/shortcuts.default
+# Shortcut file: ~/.web/shortcuts (installed from dotfiles/chromium/shortcuts.default
 # by steps/web-shortcuts.sh), fallback /etc/web/shortcuts.default.
 #
 # Usage:  w            -> about:blank
@@ -34,18 +34,23 @@ fi
 browser="/usr/local/bin/chrome"
 [ -x "$browser" ] || browser=$(command -v chromium || command -v ungoogled-chromium || command -v google-chrome-stable)
 
-# Chromium refuses to run as root without --no-sandbox (this box runs X as root).
+# Chrome refuses to run as root without --no-sandbox (this box runs X as root).
 SANDBOX_FLAG=""
 [ "$(id -u)" -eq 0 ] && SANDBOX_FLAG="--no-sandbox"
 
 # GTK dialogs (file chooser) should not be scaled twice.
 unset GDK_DPI_SCALE
 
-# Widevine (Netflix/YouTube DRM). Google Chrome bundles its own CDM, so the
-# external one is only needed by Chromium builds that can load it. Pointing
-# Chrome at a stale copy would be worse than useless, hence the case check.
+# Widevine (Netflix/YouTube DRM). Chrome bundles its own CDM, so the external
+# copy is only for Chromium builds that can load it — forcing Chrome onto a
+# stale .so would break DRM. /usr/local/bin/chrome may be a symlink OR a
+# wrapper script, so resolve both before deciding.
+REAL_BIN=$(readlink -f "$browser" 2>/dev/null || echo "$browser")
+if [ -f "$REAL_BIN" ] && grep -q '/opt/google/chrome' "$REAL_BIN" 2>/dev/null; then
+    REAL_BIN=/opt/google/chrome/chrome
+fi
 WIDEVINE_FLAG=""
-case "$browser" in
+case "$REAL_BIN" in
     */google/chrome*|*google-chrome*) : ;;   # bundles its own CDM
     *)
         if [ -d /usr/lib64/chromium/WidevineCdm ]; then

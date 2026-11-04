@@ -39,10 +39,14 @@ SANDBOX_FLAG=""
 
 unset GDK_DPI_SCALE
 
-# Widevine: Google Chrome bundles its own CDM, so only point a Chromium build
-# at the external copy the installer extracted.
+# Widevine: Chrome bundles its own CDM, so only point a Chromium build at the
+# external copy. /usr/local/bin/chrome may be a symlink OR a wrapper script.
+REAL_BIN=$(readlink -f "$browser" 2>/dev/null || echo "$browser")
+if [ -f "$REAL_BIN" ] && grep -q '/opt/google/chrome' "$REAL_BIN" 2>/dev/null; then
+    REAL_BIN=/opt/google/chrome/chrome
+fi
 WIDEVINE_FLAG=""
-case "$browser" in
+case "$REAL_BIN" in
     */google/chrome*|*google-chrome*) : ;;
     *)
         if [ -d /usr/lib64/chromium/WidevineCdm ]; then

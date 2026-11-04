@@ -1,10 +1,10 @@
 
 alias vi='vim'  #help:vi=vim
 alias draw='/usr/local/bin/draw & exit'  #help:draw=inkscape
-w() { /usr/local/bin/w "$@" & exit; }  #help:w=chromium (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
-wk() { /usr/local/bin/wk "$@" & exit; }  #help:wk=chromium PRIVATE, no URL history kept (wk y→yt, any shortcut/domain)
-alias chrome='/usr/local/bin/chrome & exit'  #help:chrome=launch chromium, close terminal
-alias chromium='/usr/local/bin/chrome & exit'  #help:chromium=launch chromium (same as chrome)
+w() { /usr/local/bin/w "$@" & exit; }  #help:w=chrome (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
+wk() { /usr/local/bin/wk "$@" & exit; }  #help:wk=chrome PRIVATE, no URL history kept (wk y→yt, any shortcut/domain)
+alias chrome='/usr/local/bin/chrome & exit'  #help:chrome=launch Chrome, close terminal
+alias chromium='/usr/local/bin/chrome & exit'  #help:chromium=alias -> chrome
 alias 'w?'='/usr/local/bin/w?'  #help:w?=list url shortcuts
 alias f='yad --file & exit'  #help:f=file chooser
 alias help='/usr/local/bin/help.sh'  #help:help=this screen
