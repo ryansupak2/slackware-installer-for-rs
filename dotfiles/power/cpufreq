@@ -1,0 +1,11 @@
+# /etc/default/cpufreq — sourced by /etc/rc.d/rc.cpufreq at boot.
+#
+# Slackware's rc.cpufreq forces "performance" on intel_pstate/amd-pstate-epp,
+# which is a laptop battery disaster on this machine. The power tool
+# (/usr/local/bin/power) owns the governor from here on:
+#   - boot:          powersave (this file) then `power boot` re-applies for the
+#                    current power source (performance on AC, profile on battery)
+#   - AC plug/unplug: udev rule 95-power-policy.rules runs `power apply`
+#
+# Managed by steps/power.sh — edit there, not here.
+SCALING_GOVERNOR=powersave

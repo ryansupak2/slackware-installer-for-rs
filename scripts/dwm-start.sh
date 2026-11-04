@@ -57,7 +57,8 @@ else
 fi
 
 # ── X11 / dwm ──
-/usr/local/bin/wakeup-power-only 2>/dev/null || true
+# Power policy for the current power source + wake restrictions (steps/power.sh)
+/usr/local/bin/power boot 2>/dev/null || true
 echo "── dwm + st ──"
 
 pkill -f dwm-status 2>/dev/null || true
@@ -81,6 +82,20 @@ xmodmap -e "add mod4 = Super_L" 2>/dev/null || true
 
 # Keyboard repeat rate
 xset r rate 250 34 2>/dev/null || true
+
+# Screen blanking / DPMS from the power policy (/var/lib/power/state).
+# Applied on every X start so an X exit/restart cannot lose it.
+power_blank=5
+[ -r /var/lib/power/state ] && . /var/lib/power/state 2>/dev/null
+[ -n "${BLANK_MINUTES:-}" ] && power_blank=$BLANK_MINUTES
+if [ "$power_blank" -gt 0 ] 2>/dev/null; then
+    xset s $((power_blank * 60)) $((power_blank * 60)) 2>/dev/null || true
+    xset +dpms 2>/dev/null || true
+    xset dpms $((power_blank * 60)) $((power_blank * 120)) $((power_blank * 240)) 2>/dev/null || true
+else
+    xset s 0 0 2>/dev/null || true
+    xset dpms 0 0 0 2>/dev/null || true
+fi
 
 # TrackPoint scroll sensitivity
 xinput set-prop "Elan TrackPoint" "libinput Scrolling Factor" 3.0 2>/dev/null || true

@@ -1,0 +1,4 @@
+%wheel ALL=(ALL) NOPASSWD: /usr/local/bin/power
+Defaults:%wheel !requiretty, lecture=never
+# Keep the power tool's context across the sudo re-exec (X display + log name)
+Defaults:%wheel env_keep += "POWER_ELEVATED POWER_INVOKER POWER_DISPLAY POWER_XAUTHORITY"

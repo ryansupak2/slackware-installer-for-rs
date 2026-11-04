@@ -1,0 +1,10 @@
+# power state defaults — installed to /var/lib/power/state by steps/power.sh
+# The live file is managed by /usr/local/bin/power; this copy is only the
+# template used on a fresh install. Change with:
+#   power auto on|off · power auto battery|ac <profile> · power wake restrict|allow
+#   power set blank <minutes> · power profile <name>
+AUTO=on
+BATTERY_PROFILE=balanced
+AC_PROFILE=performance
+WAKE=power-button-only
+BLANK_MINUTES=5

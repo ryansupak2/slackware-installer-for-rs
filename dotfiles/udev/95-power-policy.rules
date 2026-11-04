@@ -1,0 +1,4 @@
+# Re-apply the power policy (CPU governor/EPP/turbo + backlight) whenever AC is
+# plugged in or unplugged. The policy itself lives in /var/lib/power/state and
+# is managed by /usr/local/bin/power (steps/power.sh installs this rule).
+SUBSYSTEM=="power_supply", ACTION=="change", ATTR{type}=="Mains", RUN+="/usr/local/bin/power apply"

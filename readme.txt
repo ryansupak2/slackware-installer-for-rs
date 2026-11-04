@@ -132,6 +132,39 @@ rc.M runs executable scripts in /etc/rc.d/ at boot. rc.local is for
 custom startup commands.
 
 
+POWER / BATTERY POLICY
+----------------------
+steps/power.sh installs the `power` tool and an automatic AC/battery policy.
+
+Check it:
+  power                  status: source, watts, time left, CPU, backlight,
+                         sleep mode, wake sources, lid behaviour
+  power wake             wake sources + suspend mode (mem_sleep)
+
+Change it:
+  power profile powersave|balanced|performance    apply now
+  power auto on|off                               follow AC/battery
+  power auto battery balanced / power auto ac performance
+  power set brightness 40 | power set blank 5 | power set turbo off
+  power wake restrict|allow                       power button only / all
+  power menu                                      interactive
+
+How the auto mode sticks:
+  /var/lib/power/state                 policy state (profiles, blank, wake)
+  /etc/default/cpufreq                 governor=powersave at boot (rc.cpufreq)
+  /etc/udev/rules.d/95-power-policy.rules   power apply on AC plug/unplug
+  /etc/rc.d/rc.local (hook)            power boot at boot
+  /lib64/elogind/system-sleep/power.sh power boot after resume
+  scripts/dwm-start.sh                 power boot + blank/DPMS on every X start
+
+Profiles (governor / EPP / turbo / backlight cap on battery):
+  powersave    powersave    power          no-turbo  25%
+  balanced     powersave    balance_power  turbo     50%
+  performance  performance  performance    turbo    100%
+Auto mode caps the backlight on unplug and restores it on replug (unless
+you changed brightness in between). Panel is blanked after BLANK_MINUTES
+(default 5) with DPMS standby/suspend/off at 1x/2x/4x that timeout.
+
 DWM + XLIBRE
 -------------
 Uses dwm (X11 window manager, suckless) + st terminal.

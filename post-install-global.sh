@@ -73,7 +73,7 @@ browser_ran_marker=/tmp/browser-ran.marker
 # Category definitions (for Slackware: removed glibc-compat, renamed apk step)
 core_prereqs=("slackpkg-setup" "console-font" "timezone" "ca-certificates" "xlibre" "root-dotfiles" "log-permissions")
 networking=("wifi" "openvpn" "vnc")
-hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "acpi-wakeup" "audio-volume" "audio-mixer" "pipewire" "brightness")
+hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "acpi-wakeup" "audio-volume" "audio-mixer" "pipewire" "brightness" "power")
 security_access=("root-ssh-key" "keychain" "github-ssh")
 dev_tools=("vim" "git-lfs" "pi-path")
 ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm")
@@ -299,6 +299,14 @@ for section in "${selected[@]}"; do
             ;;
         "brightness")
             if ./steps/brightness.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        # Power/battery policy: `power` tool, auto AC/battery mode, wake sources
+        "power")
+            if ./steps/power.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))
