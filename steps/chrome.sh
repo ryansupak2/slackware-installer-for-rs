@@ -116,12 +116,13 @@ fi
 # 3. /usr/local/bin/chrome — single entry point for w / wk / Mod+b
 # -------------------------------------------------------------------
 if [ -x "$CHROME_DIR/chrome" ]; then
-    # UI scale. This panel is 2560x1600 over an ~11.3" diagonal (~226 DPI) but
-    # X reports 96 DPI, so Chrome draws its UI (URL bar, tabs, menus) at the
-    # default ~12px. 1.2 puts it at ~14.4px: comfortably larger than stock
-    # without dwarfing the page. (2.25 was tried first and was ~2x too big.)
+    # UI scale. The URL bar text is sized by this factor alone; tab labels are
+    # this factor x the GTK UI font, and page content is this factor x page
+    # zoom. 1.44 with gtk-font-name=12 (dotfiles/gtk/settings.ini) gives a URL
+    # bar ~20% larger while leaving tab labels where they were (1.2*14 = 1.44*12);
+    # per-site zoom comes down one step (150% -> 125%) to keep HTML identical.
     # Override per-launch with CHROME_UI_SCALE=<factor>.
-    UI_SCALE="${CHROME_UI_SCALE:-1.2}"
+    UI_SCALE="${CHROME_UI_SCALE:-1.44}"
     cat > /usr/local/bin/chrome << WRAPPER
 #!/bin/sh
 # chrome — entry point for w / wk / Mod+b. Google Chrome, because the Chromium
