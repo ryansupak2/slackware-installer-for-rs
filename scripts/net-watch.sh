@@ -33,13 +33,22 @@ net_status_file="/tmp/net_status_$(id -u)"
  # and-suspenders inside the watcher itself makes it robust even if net-watch
  # is started manually or from other places.)
 myuid=$(id -u 2>/dev/null || echo 0)
-for opid in $(pgrep -f 'net-watch' 2>/dev/null || true); do
-    if [ "$opid" != "$$" ]; then
-        ouid=$(ps -o uid= -p "$opid" 2>/dev/null | tr -d ' ' || echo 0)
-        if [ "$ouid" = "$myuid" ]; then
-            kill "$opid" 2>/dev/null || true
-        fi
-    fi
+# Match ONLY real watcher processes: the cmdline of a running watcher ENDS with
+# .../net-watch (or net-watch.sh). A plain `pgrep -f 'net-watch'` also matched
+# the shell/daemon/pager/editor that merely mentioned the name and killed them
+# (that is why starting the watcher from a shell could take the shell down with
+# it), so the pattern is anchored and obvious non-writers are skipped.
+for opid in $(pgrep -f 'net-watch(\.sh)?$' 2>/dev/null || true); do
+    [ "$opid" = "$$" ] && continue
+    [ "$opid" = "$PPID" ] && continue
+    ouid=$(ps -o uid= -p "$opid" 2>/dev/null | tr -d ' ' || echo 0)
+    [ "$ouid" = "$myuid" ] || continue
+    oargs=$(ps -o args= -p "$opid" 2>/dev/null)
+    case "$oargs" in
+        daemon\ *) continue ;;        # the respawning supervisor, not a writer
+        *pgrep*|*grep*) continue ;;
+    esac
+    kill "$opid" 2>/dev/null || true
 done
 sleep 0.4   # let any previous writers exit and stop touching the status file
 
@@ -48,7 +57,14 @@ sleep 0.4   # let any previous writers exit and stop touching the status file
 target="1.1.1.1"          # reliable public target (Cloudflare)
 ping_count=1
 ping_timeout=2            # seconds
-interval=5                # seconds between pings (cheap & responsive)
+interval=2                # seconds between pings (cheap & responsive)
+
+# Debounce: a single dropped packet or a brief WiFi roam used to flip the bar
+# to [No Internet] almost instantly. DOWN is now published only after
+# down_debounce consecutive failed probes (~20s at interval=2); the badge
+# clears again on the first good probe so recovery still looks immediate.
+down_debounce=10          # consecutive failed probes before showing DOWN
+up_debounce=1             # consecutive good probes before showing UP
 
 # Prevent multiple instances for this user/session.
 PIDFILE="/tmp/netwatch-$(id -u).pid"
@@ -68,27 +84,48 @@ cleanup() {
 }
 trap cleanup INT TERM EXIT HUP
 
-# Safe initial state (bar will show this until first ping completes)
-echo "DOWN" > "$net_status_file" 2>/dev/null || true
+# Initial state. Only seed DOWN when there is no previous state: blindly
+# writing DOWN here flashed [No Internet] at every login until the first ping
+# came back. The last known state deliberately survives logout/login.
+if [ ! -f "$net_status_file" ]; then
+    echo "DOWN" > "$net_status_file" 2>/dev/null || true
+fi
+last_state=$(cat "$net_status_file" 2>/dev/null || echo "")
 
 echo "Watcher active. Pinging $target every ${interval}s. Writing to $net_status_file"
+echo "Debounce: DOWN after $down_debounce failed probes, UP after $up_debounce good probe(s)"
 
-last_state=""
+fail_streak=0   # consecutive failed probes
+up_streak=0     # consecutive good probes
 
 while true; do
     # Pure ping result only. No ip route, no carrier, no /sys checks here.
     if ping -c"$ping_count" -W"$ping_timeout" "$target" >/dev/null 2>&1; then
-        current="UP"
+        up_streak=$((up_streak+1))
+        fail_streak=0
     else
+        fail_streak=$((fail_streak+1))
+        up_streak=0
+    fi
+
+    # Publish a state only once the debounce counters confirm it; otherwise
+    # leave the previously published value untouched (no strobing).
+    current=""
+    if [ "$up_streak" -ge "$up_debounce" ]; then
+        current="UP"
+    elif [ "$fail_streak" -ge "$down_debounce" ]; then
         current="DOWN"
+    elif [ -z "$last_state" ]; then
+        current="DOWN"   # nothing known yet
     fi
 
     # Always (re)write so readers see fresh value even if file was removed.
-    echo "$current" > "$net_status_file" 2>/dev/null || true
-
-    if [ "$current" != "$last_state" ]; then
-        echo "[$(date +'%T')] reachability changed: $current"
-        last_state="$current"
+    if [ -n "$current" ]; then
+        echo "$current" > "$net_status_file" 2>/dev/null || true
+        if [ "$current" != "$last_state" ]; then
+            echo "[$(date +'%T')] reachability changed: $current (ups=$up_streak fails=$fail_streak)"
+            last_state="$current"
+        fi
     fi
 
     sleep "$interval"

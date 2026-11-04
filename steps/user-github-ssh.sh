@@ -50,16 +50,30 @@ if ! command -v gh >/dev/null 2>&1; then
 fi
 
 if command -v gh >/dev/null 2>&1; then
-    echo "Authenticating $TARGET_USER with GitHub PAT..."
-    if ! su - "$TARGET_USER" -c "printf '%s' \"$GITHUB_INSTALLER_PAT\" | gh auth login --with-token" >/dev/null 2>&1; then
-        echo "gh auth login failed for $TARGET_USER (check PAT scopes: repo + admin:public_key + gist)."
-        ok=false
-    else
-        echo "Authenticated gh for $TARGET_USER."
-        echo "Configuring git credential helper for $TARGET_USER..."
-        if su - "$TARGET_USER" -c "gh auth setup-git" >/dev/null 2>&1; then
-            echo "Git credential helper configured (gh)."
+    echo "Validating GitHub PAT for $TARGET_USER..."
+    # Validate FAST and bounded: `gh auth login --with-token` can block on a bad
+    # token, while an authenticated API call fails in about a second.
+    # Token is passed on stdin, never in argv (no exposure via ps).
+    if GH_LOGIN=$(printf '%s\n' "$GITHUB_INSTALLER_PAT" | \
+                  su - "$TARGET_USER" -c 'IFS= read -r GH_TOKEN; export GH_TOKEN; timeout 15 gh api user --jq .login' 2>/dev/null) \
+       && [ -n "$GH_LOGIN" ]; then
+        if printf '%s' "$GITHUB_INSTALLER_PAT" | \
+           su - "$TARGET_USER" -c 'IFS= read -r t; printf "%s" "$t" | timeout 30 gh auth login --with-token' >/dev/null 2>&1; then
+            echo "Authenticated gh for $TARGET_USER as: $GH_LOGIN"
+            echo "Configuring git credential helper for $TARGET_USER..."
+            if su - "$TARGET_USER" -c "gh auth setup-git" >/dev/null 2>&1; then
+                echo "Git credential helper configured (gh)."
+            fi
+        else
+            echo "Token is valid but 'gh auth login --with-token' did not complete for $TARGET_USER."
+            ok=false
         fi
+    else
+        echo "PAT rejected by GitHub for $TARGET_USER (401 Bad credentials or no network)."
+        echo "  Fix: GITHUB_INSTALLER_PAT in setup.keys.rs must be a TOKEN, not a"
+        echo "       password/passphrase: classic ghp_... with repo, admin:public_key,"
+        echo "       gist, workflow scopes, or a fine-grained token."
+        ok=false
     fi
 
     if $ok; then

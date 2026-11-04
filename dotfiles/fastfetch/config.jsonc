@@ -1,12 +1,18 @@
 // fastfetch config — Slackware edition
 //
-// Splash logo: bobdobbs.txt rendered as ASCII art.
+// Splash logo: bobdobbs.txt (plain-text ASCII art, painted bright white).
+// The art file carries ANSI escapes (\e[97m ... \e[0m per line) because
+// fastfetch 2.x ignores logo.color for file logos — colouring the art itself is
+// the only way to force white regardless of the terminal's default foreground.
+// logo.type must be "file" ("file-raw" also works but the ANSI escapes shift the
+// aligned layout, and "ascii" is not a valid enum in fastfetch 2.x — it aborts
+// the whole config).
 // Mirrors the FreeBSD installer's fastfetch layout (colors, key width,
 // separator, module ordering) with Slackware-specific values.
 
 {
     "logo": {
-        "type": "ascii",
+        "type": "file",
         "source": "~/.config/fastfetch/bobdobbs.txt",
         "padding": {
             "top": 0,
@@ -44,12 +50,13 @@
         { "type": "theme",   "key": "Theme" },
         { "type": "icons",   "key": "Icons" },
         { "type": "command", "key": "Terminal",      "text": "echo st" },
-        { "type": "command", "key": "Font",          "text": "echo 'Berkeley Mono 24'" },
+        { "type": "command", "key": "Font",          "text": "echo 'Berkeley Mono 28'" },
         { "type": "command", "key": "Browser",       "text": "echo firefox" },
         { "type": "cpu",     "key": "CPU" },
         { "type": "gpu",     "key": "GPU" },
         { "type": "command", "key": "Disk",          "text": "df -h / 2>/dev/null | awk 'NR==2{printf \"%s / %s (%s)\",$3,$2,$5}'" },
         { "type": "memory",  "key": "Memory" },
+        { "type": "break" },
         { "type": "break" },
         { "type": "colors" }
     ]

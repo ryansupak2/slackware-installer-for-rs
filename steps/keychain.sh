@@ -15,7 +15,11 @@ echo "*****************************************************"
 ok=true
 
 echo "Installing keychain..."
-install_sbo "keychain"
+# sbopkg used to exit 0 on a failed build, silently leaving keychain absent.
+if ! install_sbo "keychain"; then
+    echo "ERROR: keychain install failed."
+    exit 1
+fi
 
 # Determine which key to manage (prefer the configured root SSH key)
 KEY_TYPE="${ROOT_SSH_KEY_TYPE:-ed25519}"
@@ -25,29 +29,18 @@ KEY_FILE="/root/.ssh/${KEY_BASENAME}"
 if [ ! -f "$KEY_FILE" ]; then
     echo "No SSH key found at $KEY_FILE."
     echo "Generate one first (Root SSH Key step) or ensure a key exists before wiring keychain."
-    echo "Keychain installed, but no eval line added yet."
+    echo "Keychain installed, but the agent will not start until the key exists."
     # Still count as success for the tool install itself
 else
-    # Append keychain eval line to root's .bashrc (idempotent)
+    # The keychain eval line is part of the canonical dotfiles/shell/bashrc
+    # (deployed by steps/root-dotfiles.sh) — never appended here, so that
+    # re-deploying bashrc cannot lose it and repeated runs cannot duplicate it.
     BASHRC="/root/.bashrc"
-
-    if [ -f "$BASHRC" ]; then
-        if ! grep -q "keychain --eval" "$BASHRC" 2>/dev/null; then
-            {
-                echo ""
-                echo "# Root SSH keychain agent (added by post-install-global.sh)"
-                echo "eval \`keychain --eval --quiet $KEY_FILE\`"
-            } >> "$BASHRC"
-            echo "Added keychain initialization line to $BASHRC"
-        else
-            echo "Keychain line already present in $BASHRC"
-        fi
+    if [ -f "$BASHRC" ] && grep -q "keychain --eval" "$BASHRC" 2>/dev/null; then
+        echo "Keychain eval line present in $BASHRC (from dotfiles/shell/bashrc)."
     else
-        {
-            echo "# Root SSH keychain agent (added by post-install-global.sh)"
-            echo "eval \`keychain --eval --quiet $KEY_FILE\`"
-        } > "$BASHRC"
-        echo "Created $BASHRC with keychain line"
+        echo "WARNING: no keychain eval line in $BASHRC."
+        echo "         Re-deploy shell dotfiles: REPO_DIR=$REPO_DIR bash steps/root-dotfiles.sh"
     fi
 
     # Initialize keychain for the current (root) session right now (so it is active immediately)

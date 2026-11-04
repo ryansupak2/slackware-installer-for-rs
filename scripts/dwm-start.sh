@@ -25,43 +25,52 @@ export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
 
 # ── Audio ──
 echo "── audio ──"
-sudo pkill -x pulseaudio 2>/dev/null || true
-sudo pkill -x pipewire 2>/dev/null || true
-sudo pkill -x pipewire-media-session 2>/dev/null || true
-sudo pkill -x wireplumber 2>/dev/null || true
-sudo pkill -x pipewire-pulse 2>/dev/null || true
-sleep 0.5
-rm -f "$XDG_RUNTIME_DIR/pipewire-0" "$XDG_RUNTIME_DIR/pipewire-0.lock" 2>/dev/null || true
-rm -rf "$XDG_RUNTIME_DIR/pulse" 2>/dev/null || true
+# NEVER kill or unlink a live PipeWire session.
+# If pipewire is already running (e.g. supervised by `daemon -r`), killing it
+# makes the supervisor respawn it; deleting pipewire-0 afterwards then leaves the
+# daemon listening on an unlinked socket and every client fails with
+# "Connection refused" — that is exactly how sound goes missing after a login.
+if pgrep -x pipewire >/dev/null 2>&1; then
+    echo "  pipewire: already running"
+else
+    echo "  pipewire..."
+    pipewire &
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        sleep 0.1
+        [ -S "$XDG_RUNTIME_DIR/pipewire-0" ] && break
+    done
+fi
 
-echo "  pipewire..."
-pipewire &
-for i in 1 2 3 4 5 6 7 8 9 10; do
-    sleep 0.1
-    [ -S "$XDG_RUNTIME_DIR/pipewire-0" ] && break
-done
+if pgrep -x wireplumber >/dev/null 2>&1; then
+    echo "  wireplumber: already running"
+else
+    echo "  wireplumber..."
+    wireplumber &
+    sleep 0.3
+fi
 
-echo "  pipewire-media-session..."
-pipewire-media-session &
-sleep 0.2
+if pgrep -x pipewire-pulse >/dev/null 2>&1; then
+    echo "  pipewire-pulse: already running"
+else
+    echo "  pipewire-pulse..."
+    pipewire-pulse &
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        sleep 0.1
+        [ -S "$XDG_RUNTIME_DIR/pulse/native" ] && break
+    done
+fi
 
-echo "  pipewire-pulse..."
-pipewire-pulse &
-for i in 1 2 3 4 5 6 7 8 9 10; do
-    sleep 0.1
-    [ -S "$XDG_RUNTIME_DIR/pulse/native" ] && break
-done
-
-# Unmute hardware
-amixer -c0 cset numid=9  87           >/dev/null 2>&1 || true
-amixer -c0 cset numid=10 on           >/dev/null 2>&1 || true
-amixer -c0 cset numid=3  87,87        >/dev/null 2>&1 || true
-amixer -c0 cset numid=4  on,on        >/dev/null 2>&1 || true
-amixer -c0 cset numid=1  0,0          >/dev/null 2>&1 || true
-amixer -c0 cset numid=2  off,off      >/dev/null 2>&1 || true
-for nid in 35 38 39 40 46 47; do
-    amixer -c0 cset numid=$nid 32,32 >/dev/null 2>&1 || true
-done
+# Unmute hardware via /usr/local/bin/audio-mixer-fix (NAMED controls only).
+# On SOF/SoundWire machines (Dell XPS 13: cs42l43 codec + CS35L56 amps) numids
+# are assigned per card/driver and are nothing like the legacy HDA numids —
+# the old 'numid=1 0,0 / numid=2 off,off' pair was really muting the internal
+# speaker's Playback Switch/Volume at every session start.
+if [ -x /usr/local/bin/audio-mixer-fix ]; then
+    AUDIO_MIXER_QUIET=0 /usr/local/bin/audio-mixer-fix || true
+else
+    amixer -c0 sset 'Speaker' 76% unmute         >/dev/null 2>&1 || true
+    amixer -c0 sset 'cs42l43 Speaker Digital' on >/dev/null 2>&1 || true
+fi
 
 # ── X11 / dwm ──
 /usr/local/bin/wakeup-power-only 2>/dev/null || true

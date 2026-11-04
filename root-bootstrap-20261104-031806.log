@@ -1,0 +1,89 @@
+==================================================
+Bootstrap log started: Wed Nov  4 03:18:06 CST 2026
+Log file: /root/slackware-installer-for-rs/root-bootstrap-20261104-031806.log (also duplicated to screen)
+==================================================
+*****************************************************
+BOOTSTRAP INITIALIZATION (Slackware Linux + pi)
+*****************************************************
+Reading Keys from setup.keys.root...
+  Keys loaded.
+*****************************************************
+CONNECTING TO WIFI: "iPC’s iPhone"
+*****************************************************
+Starting NetworkManager daemon:  /usr/sbin/NetworkManager
+Running: nmcli device wifi connect ""iPC’s iPhone"" ...
+Error: No network with SSID '"iPC’s iPhone"' found.
+WARNING: nmcli connection attempt returned non-zero.
+  If you are already online via Ethernet, this is harmless.
+WARNING: Internet not reachable. pi install may fail.
+
+Timezone set to America/Chicago
+*****************************************************
+SBOPKG + BASE PACKAGES + NODE.JS
+*****************************************************
+Downloading and installing sbopkg...
+--2026-11-04 03:18:10--  https://github.com/sbopkg/sbopkg/releases/download/0.38.3/sbopkg-0.38.3-noarch-1_wsr.tgz
+Resolving github.com (github.com)... failed: Name or service not known.
+wget: unable to resolve host address ‘github.com’
+ERROR: could not download sbopkg.
+Installing base packages (curl, sudo)...
+[2026-11-04 03:18:10] [INFO] Installing: curl sudo
+[2026-11-04 03:18:10] [INFO] Installing: curl sudo
+[2026-11-04 03:18:10] [INFO]   curl already installed
+[2026-11-04 03:18:10] [INFO]   curl already installed
+[2026-11-04 03:18:10] [INFO]   sudo already installed
+[2026-11-04 03:18:10] [INFO]   sudo already installed
+Installing Node.js 22 LTS...
+--2026-11-04 03:18:10--  https://nodejs.org/dist/v22.19.0/node-v22.19.0-linux-x64.tar.xz
+Resolving nodejs.org (nodejs.org)... failed: Name or service not known.
+wget: unable to resolve host address ‘nodejs.org’
+ERROR: Node.js download failed.
+ERROR: Node.js not found after install.
+*****************************************************
+CONSOLE FONT
+*****************************************************
+Enabling console font and keyboard repeat via /etc/rc.d/rc.font...
+old delay 250, period 33
+SUCCESS: Console font configured (ter-v32b, keyboard repeat 250ms/30cps, permanent via rc.font).
+*****************************************************
+PI INSTALLER
+*****************************************************
+Downloading and running pi installer...
+curl: (6) Could not resolve host: pi.dev (Could not contact DNS servers)
+SUCCESS: pi installed.
+WARNING: pi installed but not found in PATH — extension installs may fail.
+Installing pi-hashline-edit...
+(This may take a few minutes — downloading npm package...)
+./bootstrap.sh: line 196: pi: command not found
+ERROR: pi install npm:pi-hashline-edit failed.
+*****************************************************
+PI CONFIGURATION (root)
+*****************************************************
+Deploying settings.json...
+SUCCESS: settings.json deployed.
+Deploying trust.json...
+SUCCESS: trust.json deployed.
+Deploying auth.json...
+SUCCESS: auth.json deployed (DEEPSEEK_API_KEY injected).
+Deploying readonly-mode extension...
+  readonly-mode.ts copied.
+./bootstrap.sh: line 261: pi: command not found
+ERROR: pi install readonly-mode.ts failed.
+*****************************************************
+ROOT DOTFILES (bashrc, bash_profile, bash_logout)
+*****************************************************
+  bashrc deployed to /root.
+  bashrc deployed to /etc/skel.
+  bash_profile deployed.
+  bash_logout deployed.
+SUCCESS: Root dotfiles configured.
+
+Full bootstrap output has been captured to: /root/slackware-installer-for-rs/root-bootstrap-20261104-031806.log
+(View with: less /root/slackware-installer-for-rs/root-bootstrap-20261104-031806.log  or  tail -n 200 /root/slackware-installer-for-rs/root-bootstrap-20261104-031806.log)
+
+*****************************************************
+FINAL SUMMARY
+*****************************************************
+
+SUCCESS: 6
+ERROR:   4

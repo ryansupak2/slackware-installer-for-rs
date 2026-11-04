@@ -37,19 +37,27 @@ log_msg() {
     fi
 }
 
+# Helper: is a package actually recorded as installed?
+# sbopkg/slackpkg can exit 0 while installing nothing (e.g. an SBo GPG-check
+# abort), so every install helper re-checks the package database.
+pkg_installed() {
+    local pkg="$1"
+    ls /var/log/packages/"$pkg"-* >/dev/null 2>&1
+}
+
 # Helper: install official Slackware packages via slackpkg (no fallbacks)
 install_pkg() {
     local pkgs="$1"
     log_msg INFO "Installing: $pkgs"
     for pkg in $pkgs; do
-        if ls /var/log/packages/${pkg}-* >/dev/null 2>&1; then
+        if pkg_installed "$pkg"; then
             log_msg INFO "  $pkg already installed"
             continue
         fi
         log_msg INFO "  slackpkg install $pkg"
         slackpkg -batch=on -default_answer=y install "$pkg" 2>&1 | tee -a "$LOG_FILE"
-        if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-            log_msg ERROR "Failed to install: $pkg"
+        if [ "${PIPESTATUS[0]}" -ne 0 ] || ! pkg_installed "$pkg"; then
+            log_msg ERROR "  $pkg is NOT installed after slackpkg run"
             return 1
         fi
     done
@@ -61,14 +69,16 @@ install_sbo() {
     local pkgs="$1"
     log_msg INFO "Installing via sbopkg: $pkgs"
     for pkg in $pkgs; do
-        if ls /var/log/packages/${pkg}-* >/dev/null 2>&1; then
+        if pkg_installed "$pkg"; then
             log_msg INFO "  $pkg already installed"
             continue
         fi
         log_msg INFO "  sbopkg -B -i $pkg"
         sbopkg -B -e stop -i "$pkg" 2>&1 | tee -a "$LOG_FILE"
-        if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-            log_msg ERROR "Failed to install via sbopkg: $pkg"
+        # sbopkg returns 0 even when a build is aborted (e.g. GPG check failed),
+        # so the package database is the source of truth, not the exit code.
+        if [ "${PIPESTATUS[0]}" -ne 0 ] || ! pkg_installed "$pkg"; then
+            log_msg ERROR "  $pkg is NOT installed after sbopkg run (build/verify failed)"
             return 1
         fi
     done
@@ -99,6 +109,14 @@ read_setup_keys() {
     if [ -f "$key_file" ]; then
         while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^# ]] && continue
+            # Strip ONE layer of matching surrounding quotes. Without this, a
+            # value written as WIFI_SSID="My Net" is exported *with* the quote
+            # characters and nmcli then searches for a network literally named
+            # '"My Net"' (values with spaces/UTF-8 are the ones that get quoted).
+            case "$value" in
+                \"*\") value="${value#\"}"; value="${value%\"}" ;;
+                \'*\') value="${value#\'}"; value="${value%\'}" ;;
+            esac
             export "$key"="$value"
         done < "$key_file"
         echo "  Keys loaded."

@@ -11,12 +11,12 @@ fi
 # LOG_DIR and LOG are set by .bashrc (sourced above); fall back if not set
 LOG="${LOG:-/var/log/${USER:-root}/shellinit-$(date +%Y%m%d-%H%M%S).log}"
 
-# Login-only: bare TTY console → flush stale VPN + neofetch
+# Login-only: bare TTY console → flush stale VPN + fastfetch
 # (DWL_FIRST_TERMINAL and hide_mode newline are handled by .bashrc)
 case "$(tty 2>/dev/null)" in
     /dev/tty*)
-        echo "[$(date '+%H:%M:%S')] tty-login: flushing VPN + neofetch" >> "$LOG"
+        echo "[$(date '+%H:%M:%S')] tty-login: flushing VPN + fastfetch" >> "$LOG"
         sudo /usr/bin/pkill openvpn 2>/dev/null || true
-        neofetch
+        fastfetch
         ;;
 esac

@@ -77,13 +77,11 @@ WRAPPER
     hash -r 2>/dev/null || true
     echo "SUCCESS: /usr/bin/firefox is now the dark-chrome + Widevine wrapper."
 
-    # Quick-launch wrappers
-    cp "$REPO_DIR/dotfiles/firefox/w" /usr/local/bin/w
-    chmod +x /usr/local/bin/w
-    cp "$REPO_DIR/dotfiles/firefox/w_q" '/usr/local/bin/w?'
-    chmod +x '/usr/local/bin/w?'
-    echo "SUCCESS: /usr/local/bin/w and /usr/local/bin/w? installed."
-    echo "         'w y' -> youtube.com, 'w g' -> google.com, 'w?' -> list shortcuts"
+    # Quick-launch wrappers (w / w? / wk) live in their own idempotent step
+    bash "$REPO_DIR/steps/web-shortcuts.sh" || echo "  WARNING: web launcher setup failed"
+    echo "         'w y'  -> youtube.com (normal profile)"
+    echo "         'wk y' -> youtube.com (private profile, no URL history kept)"
+    echo "         'w?'   -> list shortcuts"
 fi
 
 # -------------------------------------------------------------------

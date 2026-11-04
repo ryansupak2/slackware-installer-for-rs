@@ -176,7 +176,8 @@ else
     if curl -fsSL https://pi.dev/install.sh | sh; then
         echo "SUCCESS: pi installed."
         success_count=$((success_count + 1))
-        ln -sf "$NODE_DIR/bin/pi" /usr/local/bin/pi
+        # pi installs into its managed dir ($HOME/.pi/agent/bin) and does not
+        # add it to PATH — steps/pi-path.sh owns the symlink + PATH wiring.
         hash -r  # clear bash command cache so pi is found immediately
         if ! command -v pi >/dev/null 2>&1; then
             echo "WARNING: pi installed but not found in PATH — extension installs may fail."
@@ -185,6 +186,14 @@ else
         echo "ERROR: pi installation failed."
         error_count=$((error_count + 1))
     fi
+fi
+
+# --- pi on PATH (idempotent: repairs /usr/local/bin/pi + /etc/profile.d/pi.sh) ---
+if "$REPO_DIR/steps/pi-path.sh"; then
+    success_count=$((success_count + 1))
+else
+    echo "ERROR: pi-path step failed — pi may not be on PATH."
+    error_count=$((error_count + 1))
 fi
 
 echo "Installing pi-hashline-edit..."

@@ -8,8 +8,10 @@ static const unsigned int borderpx  = 1;        /* border pixel of windows */
 static const unsigned int snap      = 32;       /* snap pixel */
 static const int showbar            = 1;        /* 0 means no bar */
 static const int topbar             = 1;        /* 0 means bottom bar */
-static const char *fonts[]          = { "Berkeley Mono:size=16", "DejaVu Sans Mono:size=16", "Noto Sans CJK JP:size=16", "Noto Color Emoji:size=16" };
-static const char dmenufont[]       = "Berkeley Mono:size=16";
+/* pixelsize (not "size") keeps the bar DPI-independent and in the same units as st's
+ * font, so the bar text never shrinks relative to the terminal on hidpi panels. */
+static const char *fonts[]          = { "Berkeley Mono:pixelsize=28", "DejaVu Sans Mono:pixelsize=28", "Noto Sans CJK JP:pixelsize=28", "Noto Color Emoji:pixelsize=24" };
+static const char dmenufont[]       = "Berkeley Mono:pixelsize=28";
 static const char col_gray1[]       = "#000000";
 static const char col_gray2[]       = "#444444";
 static const char col_gray3[]       = "#bbbbbb";

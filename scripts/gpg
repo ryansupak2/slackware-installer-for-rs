@@ -1,0 +1,46 @@
+#!/bin/sh
+# scripts/gpg — `gpg` for sbopkg on Slackware 15.0+.
+#
+# Slackware 15.0 split GnuPG into two packages:
+#   gnupg  (1.4) -> /usr/bin/gpg1
+#   gnupg2 (2.x) -> /usr/bin/gpg2
+# Neither installs a plain `gpg`. sbopkg, however, verifies every
+# SlackBuilds.org tarball with `gpg --verify`, so without this shim each SBo
+# build dies with "GPG check FAILED!" and the package is never installed
+# (which is what broke github-cli and git-lfs).
+#
+# Deployed to /usr/local/bin/gpg by steps/slackpkg-setup.sh.
+#
+# Preference: gpg2 (modern keyring, --fetch-key support), then gpg1 (fine for
+# --verify/--import). A binary whose shared libs are broken is skipped — e.g.
+# a gpg2 built against libassuan 2 on a system that now has libassuan 3.
+
+set -u
+
+for cand in /usr/bin/gpg2 /usr/bin/gpg1 /usr/bin/gpg; do
+    [ -x "$cand" ] || continue
+    "$cand" --version >/dev/null 2>&1 || continue
+
+    # gnupg1 has no --fetch-key (sbopkg's "Import GPG key" menu uses it);
+    # emulate it as wget | gpg1 --import.
+    if [ "$cand" = /usr/bin/gpg1 ]; then
+        for arg in "$@"; do
+            case "$arg" in
+                --fetch-key) fetch=1 ;;
+                http*)
+                    if [ "${fetch:-0}" = 1 ]; then
+                        url=$arg
+                        wget -qO- --timeout=30 "$url" | "$cand" --import
+                        exit $?
+                    fi
+                    ;;
+            esac
+        done
+    fi
+
+    exec "$cand" "$@"
+done
+
+echo "gpg: no working GnuPG found (gpg1/gpg2 both missing or broken)" >&2
+echo "gpg: install the 'gnupg' or 'gnupg2' package" >&2
+exit 2

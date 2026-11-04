@@ -131,7 +131,7 @@ fi
 
 if $ok; then
     echo "SUCCESS: pi-coding-agent configured for $TARGET_USER."
-    echo "  Provider: deepseek  |  Model: deepseek-v4-pro  |  Thinking: high"
+    echo "  Provider: deepseek  |  Model: deepseek-flash  |  Thinking: high"
     echo "  Keys source: $KEYS_FILE"
     echo "  Config:      $PI_DIR/"
     exit 0

@@ -1,0 +1,16 @@
+# 99-touchscreen-off.rules — make touchscreen hardware completely inert.
+#
+# Deployed by steps/touchscreen-off.sh.
+#
+# ID_INPUT_TOUCHSCREEN=1 is set by udev's input_id builtin from the evdev
+# INPUT_PROP_DIRECT bit. Touchpads are INPUT_PROP_POINTER and are therefore
+# never matched — they keep working normally.
+#
+# Layer 1 (belt): hide any touchscreen from libinput and every X client, even
+# if the unbind below is ever refused by the kernel.
+SUBSYSTEM=="input", ENV{ID_INPUT_TOUCHSCREEN}=="1", ENV{LIBINPUT_IGNORE_DEVICE}="1"
+
+# Layer 2 (braces): unbind the owning kernel device (HID instance, i2c client
+# or USB interface) so the /dev/input node never comes into existence. This is
+# what makes the disable complete for the text console as well as X/dwm.
+ACTION=="add", SUBSYSTEM=="input", ENV{ID_INPUT_TOUCHSCREEN}=="1", RUN+="/usr/local/bin/touchscreen-off --quiet"

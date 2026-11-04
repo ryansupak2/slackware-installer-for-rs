@@ -106,61 +106,82 @@ else
 
     cd "$XLIBRE_SRC"
     rm -rf build
-    meson setup build \
-        --prefix="$PREFIX" \
-        --libdir=lib64 \
-        --buildtype=release \
-        -Dxephyr=false \
-        -Dxnest=false \
-        -Dxfbdev=false \
-        -Dxquartz=false \
-        -Dxwin=false \
-        -Dxvfb=true \
-        -Dxorg=true \
-        -Dglamor=true \
-        -Dglx=true \
-        -Dglx_dri=true \
-        -Ddri1=auto \
-        -Ddri2=true \
-        -Ddri3=true \
-        -Ddrm=true \
-        -Dgbm=true \
-        -Dpciaccess=true \
-        -Dudev=true \
-        -Dudev_kms=true \
-        -Dsystemd_logind=true \
-        -Dsystemd_notify=false \
-        -Dseatd_libseat=false \
-        -Dipv6=true \
-        -Dxdmcp=true \
-        -Dxcsecurity=false \
-        -Dxselinux=auto \
-        -Dnamespace=true \
-        -Dxinerama=true \
-        -Dxv=true \
-        -Dxvmc=true \
-        -Dscreensaver=true \
-        -Dxres=true \
-        -Ddpms=true \
-        -Ddga=auto \
-        -Dxf86bigfont=false \
-        -Dint10=auto \
-        -Dsuid_wrapper=false \
-        -Ddocs=false \
-        -Ddevel-docs=false \
-        -Dtests=false \
-        -Dmodule_dir=/usr/lib64/xorg/modules \
-        -Dlog_dir=/var/log \
-        -Ddefault_font_path=/usr/share/fonts \
-        -Dfontrootdir=/usr/share/fonts \
-        -Dxkb_dir=/usr/share/X11/xkb \
-        -Dxkb_output_dir=/var/lib/xkb \
-        -Dxkb_bin_dir=/usr/bin \
-        -Dlisten_tcp=false \
-        -Dlisten_unix=true \
-        -Dlisten_local=true \
-        -Dsha1=auto \
-        -Dinput_thread=auto \
+    # Option list kept in an array so it can be validated before use.
+    meson_opts=(
+        --prefix="$PREFIX"
+        --libdir=lib64
+        --buildtype=release
+        -Dxephyr=false
+        -Dxnest=false
+        -Dxfbdev=false
+        -Dxquartz=false
+        -Dxwin=false
+        -Dxvfb=true
+        -Dxorg=true
+        -Dglamor=true
+        -Dglx=true
+        -Dglx_dri=true
+        -Ddri1=auto
+        -Ddri2=true
+        -Ddri3=true
+        -Ddrm=true
+        -Dgbm=true
+        -Dpciaccess=true
+        -Dudev=true
+        -Dudev_kms=true
+        -Dsystemd_logind=true
+        -Dsystemd_notify=false
+        -Dseatd_libseat=false
+        -Dipv6=true
+        -Dxdmcp=true
+        -Dxcsecurity=false
+        -Dxselinux=auto
+        -Dnamespace=true
+        -Dxinerama=true
+        -Dxv=true
+        -Dxvmc=true
+        -Dscreensaver=true
+        -Dxres=true
+        -Ddpms=true
+        -Ddga=auto
+        -Dint10=auto
+        -Dsuid_wrapper=false
+        -Ddocs=false
+        -Ddevel-docs=false
+        -Dtests=false
+        -Dmodule_dir=/usr/lib64/xorg/modules
+        -Dlog_dir=/var/log
+        -Ddefault_font_path=/usr/share/fonts
+        -Dfontrootdir=/usr/share/fonts
+        -Dxkb_dir=/usr/share/X11/xkb
+        -Dxkb_output_dir=/var/lib/xkb
+        -Dxkb_bin_dir=/usr/bin
+        -Dlisten_tcp=false
+        -Dlisten_unix=true
+        -Dlisten_local=true
+        -Dsha1=auto
+        -Dinput_thread=auto
+    )
+
+    # Guard: meson hard-fails on an unknown -D option (that is how the dropped
+    # `-Dxf86bigfont` broke this build). Validate against meson_options.txt so
+    # a future XLibre rename fails with the offending option named.
+    if [ -f meson_options.txt ]; then
+        declare -A _declared=()
+        while IFS= read -r _opt; do
+            [ -n "$_opt" ] && _declared["$_opt"]=1
+        done < <(grep -oE "option\('[^']+'" meson_options.txt | sed -e "s/^option('//" -e "s/'$//" | tr '-' '_')
+        for _arg in "${meson_opts[@]}"; do
+            [[ $_arg =~ ^-D([A-Za-z0-9_]+)= ]] || continue
+            if [ -z "${_declared[${BASH_REMATCH[1]}]:-}" ]; then
+                echo "ERROR: XLibre has no meson option -D${BASH_REMATCH[1]}"
+                echo "       Declared options: $XLIBRE_SRC/meson_options.txt"
+                exit 1
+            fi
+        done
+    fi
+
+    meson setup build "${meson_opts[@]}" \
         || { echo "ERROR: meson setup failed"; exit 1; }
 
     ninja -C build -j"$(nproc)" || { echo "ERROR: build failed"; exit 1; }

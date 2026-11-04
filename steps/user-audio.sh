@@ -24,42 +24,66 @@ groups "$TARGET_USER" 2>/dev/null | grep -q '\baudio\b' || {
     usermod -aG audio "$TARGET_USER" 2>/dev/null || true
 }
 
-# Verify packages exist
-for bin in pipewire pipewire-media-session pipewire-pulse pactl arecord aplay; do
+# Verify packages exist. NOTE: Slackware ships wireplumber, not the deprecated
+# pipewire-media-session — requiring the latter made this step abort every run.
+for bin in pipewire wireplumber pipewire-pulse pactl parecord arecord aplay; do
     command -v "$bin" >/dev/null 2>&1 || { echo "ERROR: $bin not found — run audio-volume.sh first"; exit 1; }
 done
 
-# ── Use root's PipeWire session (ALSA hw:0,0 is exclusive to one session) ──
+# ── Use the running PipeWire session (the ALSA device is exclusive to one) ──
 ROOT_RT="/run/user/0"
-if [ ! -S "$ROOT_RT/pipewire-0" ]; then
-    echo "  No PipeWire session found — starting one..."
-    export XDG_RUNTIME_DIR="$ROOT_RT"
-    mkdir -p "$ROOT_RT"
-    chmod 700 "$ROOT_RT" 2>/dev/null || true
-    rm -f "$ROOT_RT"/pipewire-0 "$ROOT_RT"/pipewire-0.lock "$ROOT_RT"/pulse/native 2>/dev/null || true
+ROOT_HOME=$(eval echo ~root)
+export XDG_RUNTIME_DIR="$ROOT_RT"
+mkdir -p "$ROOT_RT/pulse" 2>/dev/null || true
+chmod 700 "$ROOT_RT" 2>/dev/null || true
 
-    pipewire &
-    PW_PID=$!
-    PW_STARTED=true
-    for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.1; [ -S "$ROOT_RT/pipewire-0" ] && break; done
-    if [ ! -S "$ROOT_RT/pipewire-0" ]; then echo "ERROR: pipewire failed to start"; kill $PW_PID 2>/dev/null; exit 1; fi
-    pipewire-media-session &
-    PM_PID=$!
-    for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.2; pactl info >/dev/null 2>&1 && break; done
-    if ! pactl info >/dev/null 2>&1; then echo "ERROR: pipewire-media-session failed to start"; kill $PM_PID 2>/dev/null; exit 1; fi
-    pipewire-pulse &
-    PP_PID=$!
-    for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.1; [ -S "$ROOT_RT/pulse/native" ] && break; done
-    if [ ! -S "$ROOT_RT/pulse/native" ]; then echo "ERROR: pipewire-pulse failed to start"; kill $PP_PID 2>/dev/null; exit 1; fi
-else
-    echo "  Using root's PipeWire session"
-    PW_STARTED=false
+wait_for_sock() {   # $1 = socket path, $2 = seconds (default 3)
+    i=0
+    limit=$(( ${2:-3} * 10 ))
+    while [ $i -lt $limit ]; do
+        [ -S "$1" ] && return 0
+        sleep 0.1
+        i=$((i+1))
+    done
+    return 1
+}
+
+# A pipewire whose control socket was unlinked from the filesystem still shows
+# up in `ps` and in `ss`, but EVERY client gets ECONNREFUSED — that is the
+# classic "sound stopped working after login" state. Only in that provably
+# broken case do we ask the respawning supervisor (`daemon -r`) to restart the
+# child, which recreates the socket. A healthy session is never touched and a
+# socket held by a live process is never `rm`'d — deleting it is precisely
+# what produced this breakage in the first place.
+if pgrep -x pipewire >/dev/null 2>&1 && [ ! -S "$ROOT_RT/pipewire-0" ]; then
+    echo "  Broken PipeWire session (control socket unlinked) — restarting..."
+    [ -f "$ROOT_HOME/.run/pipewire.pid" ] && kill "$(cat "$ROOT_HOME/.run/pipewire.pid")" 2>/dev/null || true
+    wait_for_sock "$ROOT_RT/pipewire-0" 4 || true
 fi
 
-# Give the target user access to root's pipewire sockets
-chmod 755 "$ROOT_RT" 2>/dev/null || true
-chmod a+rw "$ROOT_RT"/pipewire-0 2>/dev/null || true
-chmod -R a+rwX "$ROOT_RT"/pulse 2>/dev/null || true
+PW_STARTED=false
+if ! pgrep -x pipewire >/dev/null 2>&1; then
+    echo "  No PipeWire session found — starting one..."
+    pipewire &
+    PW_STARTED=true
+    if ! wait_for_sock "$ROOT_RT/pipewire-0" 3; then
+        echo "ERROR: pipewire control socket never appeared"; exit 1
+    fi
+else
+    echo "  Using the running PipeWire session"
+fi
+
+# wireplumber (session/policy manager) and pipewire-pulse (PulseAudio compat)
+if ! pgrep -x wireplumber >/dev/null 2>&1; then
+    wireplumber &
+    sleep 0.5
+fi
+if ! pgrep -x pipewire-pulse >/dev/null 2>&1; then
+    pipewire-pulse &
+    wait_for_sock "$ROOT_RT/pulse/native" 3 || echo "  WARNING: pipewire-pulse socket not up"
+fi
+
+pactl info >/dev/null 2>&1 || echo "  WARNING: pactl cannot talk to the session"
 
 # ── Test mic capture as the target user ────────────────────────────────
 echo "  Ensuring capture profile is active..."
@@ -94,12 +118,11 @@ else
 fi
 rm -f "$CAP_FILE" 2>/dev/null
 
-# ── Teardown (only if we started it) ──────────────────────────────────
+# ── No teardown: the PipeWire session is shared with the desktop session ──
+# Killing the daemons here (the old behaviour) left the desktop without audio
+# until the next login, so we deliberately leave them running.
 if $PW_STARTED; then
-    pkill -x pipewire-pulse 2>/dev/null || true
-    pkill -x wireplumber   2>/dev/null || true
-    pkill -x pipewire      2>/dev/null || true
-    rm -f "$ROOT_RT"/pipewire-0 "$ROOT_RT"/pipewire-0.lock "$ROOT_RT"/pulse/native 2>/dev/null || true
+    echo "  PipeWire left running for subsequent sessions"
 fi
 
 # ── Result ───────────────────────────────────────────────────────────

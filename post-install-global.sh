@@ -73,12 +73,12 @@ firefox_ran_marker=/tmp/firefox-ran.marker
 # Category definitions (for Slackware: removed glibc-compat, renamed apk step)
 core_prereqs=("slackpkg-setup" "console-font" "timezone" "ca-certificates" "xlibre" "root-dotfiles" "log-permissions")
 networking=("wifi" "openvpn" "vnc")
-hardware_config=("input-hardware" "screen-locking" "acpi-wakeup" "audio-volume" "brightness")
+hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "acpi-wakeup" "audio-volume" "audio-mixer" "pipewire" "brightness")
 security_access=("root-ssh-key" "keychain" "github-ssh")
-dev_tools=("vim" "git-lfs")
-ui_appearance=("fastfetch" "additional-fonts" "suckless-dwm")
-applications=("firefox" "inkscape" "yad" "root-web-shortcuts" "slskd")
-utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux")
+dev_tools=("vim" "git-lfs" "pi-path")
+ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm")
+applications=("firefox" "web-shortcuts" "inkscape" "yad" "root-web-shortcuts" "slskd")
+utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux" "xclick")
 audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox" "vox-sherpa")
 
 categories=("Core" "Networking" "Hardware Configuration" "Security & Access" "Development Tools" "User Interface & Appearance" "Applications" "Utilities" "Audio/DSP")
@@ -260,6 +260,13 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
+        "touchscreen-off")
+            if ./steps/touchscreen-off.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
         "screen-locking")
             if ./steps/screen-locking.sh; then
                 success_count=$((success_count + 1))
@@ -269,6 +276,22 @@ for section in "${selected[@]}"; do
             ;;
         "audio-volume")
             if ./steps/audio-volume.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        # Mixer unmute + boot persistence (named ALSA controls, never numids)
+        "audio-mixer")
+            if ./steps/audio-mixer.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        # PipeWire session ensure/repair (config sanity, sockets, supervisors)
+        "pipewire")
+            if ./steps/pipewire.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))
@@ -303,6 +326,13 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
+        "pi-path")
+            if ./steps/pi-path.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
         "fastfetch")
             if ./steps/fastfetch.sh; then
                 success_count=$((success_count + 1))
@@ -312,6 +342,20 @@ for section in "${selected[@]}"; do
             ;;
         "additional-fonts")
             if ./steps/additional-fonts.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        "symbola-font")
+            if ./steps/symbola-font.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        "xclick")
+            if ./steps/xclick.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))
@@ -340,6 +384,14 @@ for section in "${selected[@]}"; do
             ;;
         "firefox")
             if ./steps/firefox.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        # w / w? / wk launchers (wk = private profile, no URL history kept)
+        "web-shortcuts")
+            if ./steps/web-shortcuts.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))

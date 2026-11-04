@@ -32,20 +32,21 @@ fi
 addgroup audio 2>/dev/null || true
 usermod -aG audio root 2>/dev/null || true
 
-# Hardware unmute
-amixer -c0 cset numid=9  87           2>/dev/null || true  # Master Playback Volume
-amixer -c0 cset numid=10 on           2>/dev/null || true  # Master Playback Switch
-amixer -c0 cset numid=3  87,87        2>/dev/null || true  # Speaker Playback Volume
-amixer -c0 cset numid=4  on,on        2>/dev/null || true  # Speaker Playback Switch
-for nid in 35 38 39 40 46 47; do
-    amixer -c0 cset numid=$nid 32,32 2>/dev/null || true   # PGA gains
-done
-
-# Mic capture: max boost + max volume for VOX voice dictation
-amixer -c0 cset numid=6  63,63       2>/dev/null || true  # Capture Volume
-amixer -c0 cset numid=7  on,on       2>/dev/null || true  # Capture Switch
-amixer -c0 cset numid=8  3,3         2>/dev/null || true  # Mic Boost Volume
-alsactl store 2>/dev/null || true
+# Hardware unmute + boot persistence lives in its own idempotent step:
+#   steps/audio-mixer.sh  ->  /usr/local/bin/audio-mixer-fix
+# It uses NAMED controls (never numids) because numids differ per card/driver
+# on SOF/SoundWire hardware: the legacy HDA ids that used to be here
+# (9/10/3/4) matched nothing on the cs42l43/CS35L56 card, and dwm-start's
+# 'numid=1 0,0 / numid=2 off,off' accidentally muted the internal speaker.
+# It also makes /etc/rc.d/rc.alsa executable — rc.M only restores the saved
+# mixer state when that file is executable, and it ships 0644 on a fresh
+# Slackware install, so the card used to boot at driver defaults (silent).
+if [ -x "$REPO_DIR/steps/audio-mixer.sh" ] || [ -f "$REPO_DIR/steps/audio-mixer.sh" ]; then
+    bash "$REPO_DIR/steps/audio-mixer.sh" || ok=false
+else
+    echo "  WARNING: steps/audio-mixer.sh missing — mixer left untouched"
+    ok=false
+fi
 
 # Disable PulseAudio autospawn (PipeWire handles audio instead)
 if [ -f /etc/pulse/client.conf ]; then
@@ -54,16 +55,36 @@ if [ -f /etc/pulse/client.conf ]; then
     echo "  PulseAudio autospawn disabled"
 fi
 
-# Enable PipeWire ALSA backend (commented out by default on Slackware)
-if [ -f /usr/share/pipewire/pipewire.conf ]; then
+# PipeWire configuration — NEVER edit it by line number.
+# The old code here did `sed -i '177s/^    #//'` to "enable the ALSA backend".
+# Line 178 of pipewire.conf is prose inside context.modules, so that sed
+# turned a comment into the bare line `     The portal module monitors the PID
+# of the portal process`, which SPA-JSON cannot parse. PipeWire then reported
+#   pw.conf | malformed object array in '[ ...
+# and loaded ZERO modules — the daemons all appeared to run, sockets existed,
+# yet every client either hung or got ECONNREFUSED. That is a second, separate
+# cause of "no sound".
+#
+# Nothing needs enabling: since PipeWire 0.3.6x, ALSA devices are created by
+# the session manager (wireplumber), not by a spa-device-factory object in
+# pipewire.conf. So keep the packaged default and just make sure it parses.
+PW_STOCK=/usr/share/pipewire/pipewire.conf
+PW_LOCAL=/etc/pipewire/pipewire.conf
+if [ -f "$PW_STOCK" ]; then
     mkdir -p /etc/pipewire
-    if ! grep -q '^    { factory = spa-device-factory.*api.alsa.enum.udev' /etc/pipewire/pipewire.conf 2>/dev/null; then
-        cp /usr/share/pipewire/pipewire.conf /etc/pipewire/pipewire.conf
-        sed -i '177s/^    #/    /' /etc/pipewire/pipewire.conf
-        sed -i '178s/^    #/    /' /etc/pipewire/pipewire.conf
-        echo "  PipeWire ALSA backend enabled"
+    if [ ! -f "$PW_LOCAL" ] || ! cmp -s "$PW_STOCK" "$PW_LOCAL"; then
+        cp "$PW_STOCK" "$PW_LOCAL"
+        echo "  pipewire.conf restored from the packaged default"
     else
-        echo "  PipeWire ALSA backend already enabled"
+        echo "  pipewire.conf already matches the packaged default"
+    fi
+    if command -v pw-config >/dev/null 2>&1; then
+        if timeout 15 pw-config -n pipewire.conf list 2>/dev/null | grep -q '"context.modules"'; then
+            echo "  pipewire.conf parses (context.modules present)"
+        else
+            echo "  ERROR: pipewire.conf does not parse — clients cannot connect"
+            ok=false
+        fi
     fi
 fi
 

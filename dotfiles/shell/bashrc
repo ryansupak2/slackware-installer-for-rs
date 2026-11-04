@@ -2,11 +2,13 @@
 alias vi='vim'  #help:vi=vim
 alias draw='/usr/local/bin/draw & exit'  #help:draw=inkscape
 w() { /usr/local/bin/w "$@" & exit; }  #help:w=firefox (w y→yt, w g→google, w gr→grok, w gm→gmail, w?→list)
+wk() { /usr/local/bin/wk "$@" & exit; }  #help:wk=firefox PRIVATE, no URL history kept (wk y→yt, any shortcut/domain)
 alias firefox='/usr/local/bin/firefox & exit'  #help:firefox=launch firefox, close terminal
 alias 'w?'='/usr/local/bin/w?'  #help:w?=list url shortcuts
 alias f='yad --file & exit'  #help:f=file chooser
 alias help='/usr/local/bin/help.sh'  #help:help=this screen
-alias neofetch='neofetch && echo -e "\nNeed Help? Try the Following: help"'  #help:neofetch=system info
+alias fastfetch='fastfetch && echo -e "\nNeed Help? Try the Following: help"'  #help:fastfetch=system info (fastfetch, NOT neofetch)
+alias neofetch='fastfetch'  #help:neofetch=deprecated alias -> fastfetch
 #help:pi=AI coding assistant (auto-loads ./SYSTEM.MD via @ if present)
 pi() {
     if [ -f "./SYSTEM.MD" ]; then
@@ -76,17 +78,23 @@ export GDK_DPI_SCALE=1.5
 
 # Node.js + pi runtime (matches pi installer location)
 export PATH=/usr/local/node-v22.19.0-linux-x64/bin:$PATH
+# pi coding agent (managed install: the launcher lives in ~/.pi/agent/bin)
+# Keep this before /usr/local/bin so a per-user pi wins over the shared symlink.
+case ":$PATH:" in
+    *":$HOME/.pi/agent/bin:"*) ;;
+    *) export PATH="$HOME/.pi/agent/bin:$PATH" ;;
+esac
 # screen locking: physlock works identically for X11 (dwm) and TTY
 alias lock='/usr/local/bin/lock-screen.sh'  #help:lock=lock screen (physlock)
 LOG_DIR="/var/log/${USER:-root}"
 LOG="$LOG_DIR/shellinit-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOG_DIR" 2>/dev/null
-# First X terminal: neofetch + audio device log (once per session)
+# First X terminal: fastfetch + audio device log (once per session)
 if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
-    echo "[$(date '+%H:%M:%S')] first-terminal: running neofetch" >> "$LOG"
+    echo "[$(date '+%H:%M:%S')] first-terminal: running fastfetch" >> "$LOG"
     echo
-    neofetch
-    # "Need Help?" message is appended by the neofetch alias (line 9)
+    fastfetch
+    # "Need Help?" message is appended by the fastfetch alias (line 9)
     # Log audio capture devices for post-boot diagnosis
     AUDIO_LOG="$LOG_DIR/audioboot-$(date +%Y%m%d-%H%M%S).log"
     echo "=== $(date) ===" >> "$AUDIO_LOG"
@@ -100,4 +108,11 @@ elif [ -f "$XDG_RUNTIME_DIR/hide_mode" ]; then
     echo
 else
     echo "[$(date '+%H:%M:%S')] normal start (no newline)" >> "$LOG"
+fi
+
+# SSH agent via keychain (installed by steps/keychain.sh).
+# Lives here (not appended by the step) so re-deploying bashrc cannot lose it.
+# Guarded: silently skipped when keychain or the user's key is absent.
+if command -v keychain >/dev/null 2>&1 && [ -f "$HOME/.ssh/id_ed25519" ]; then
+    eval `keychain --eval --quiet "$HOME/.ssh/id_ed25519"`
 fi
