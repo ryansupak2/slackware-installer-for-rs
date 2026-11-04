@@ -109,12 +109,12 @@ for step in $WAYLAND_STEPS; do
     else
         pass "archived: $step.sh removed from active"
     fi
-    if grep -E '^[a-z_]+=\("' "$GLOBAL" | grep -q "\"$step\""; then
+    if awk -F'"' -v s="$step" '/^[a-z_]+=/ {for(i=2;i<=NF;i+=2) if($i==s) f=1} END{exit !f}' "$GLOBAL"; then
         fail "archived: $step still in category array"
     else
         pass "archived: $step not in category arrays"
     fi
-    if awk '/case \$section in/,/^esac/' "$GLOBAL" | grep -q "\"$step\""; then
+    if awk -F'"' -v s="$step" '/case .*section in/,/^[[:space:]]*esac/ {for(i=2;i<=NF;i+=2) if($i==s) f=1} END{exit !f}' "$GLOBAL"; then
         fail "archived: $step still in case statement"
     else
         pass "archived: $step not in case statement"
@@ -129,12 +129,12 @@ for step in xlibre suckless-dwm; do
     else
         fail "X11: $step.sh MISSING"
     fi
-    if grep -E '^[a-z_]+=\("' "$GLOBAL" | grep -q "\"$step\""; then
+    if awk -F'"' -v s="$step" '/^[a-z_]+=/ {for(i=2;i<=NF;i+=2) if($i==s) f=1} END{exit !f}' "$GLOBAL"; then
         pass "X11: $step in category array"
     else
         fail "X11: $step NOT in category array"
     fi
-    if awk '/case \$section in/,/^esac/' "$GLOBAL" | grep -q "\"$step\""; then
+    if awk -F'"' -v s="$step" '/case .*section in/,/^[[:space:]]*esac/ {for(i=2;i<=NF;i+=2) if($i==s) f=1} END{exit !f}' "$GLOBAL"; then
         pass "X11: $step in case statement"
     else
         fail "X11: $step NOT in case statement"

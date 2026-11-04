@@ -71,7 +71,7 @@ firefox_ran_marker=/tmp/firefox-ran.marker
 #
 # (lib/common.sh already sourced above — provides install_pkg, install_sbo, log_msg)
 # Category definitions (for Slackware: removed glibc-compat, renamed apk step)
-core_prereqs=("slackpkg-setup" "console-font" "timezone" "ca-certificates" "xlibre" "root-dotfiles" "log-consistency")
+core_prereqs=("slackpkg-setup" "console-font" "timezone" "ca-certificates" "xlibre" "root-dotfiles" "log-permissions")
 networking=("wifi" "openvpn" "vnc")
 hardware_config=("input-hardware" "screen-locking" "acpi-wakeup" "audio-volume" "brightness")
 security_access=("root-ssh-key" "keychain" "github-ssh")
@@ -444,8 +444,8 @@ for section in "${selected[@]}"; do
             fi
             ;;
 
-        "log-consistency")
-            if ./steps/log-consistency.sh; then
+        "log-permissions")
+            if ./steps/log-permissions.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))

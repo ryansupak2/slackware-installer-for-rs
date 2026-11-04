@@ -28,7 +28,10 @@
 
 set -uo pipefail
 
-REPO_DIR=${REPO_DIR:-/root/Development/slackware-installer-for-rs}
+REPO_DIR=${REPO_DIR:-/root/slackware-installer-for-rs}
+# NOTE: the canonical default above matches every other step in this repo
+# (and tests/installer-simulation.sh Test 2). Always invoke with REPO_DIR
+# set explicitly, per AGENTS.md.
 # leaseweb measured ~4.0MB/s; mirrors.slackware.com redirected to ~150KB/s
 MIRROR=${MIRROR:-https://mirror.us.leaseweb.net/slackware/slackware64-current}
 STAGE=${STAGE:-/var/tmp/slack16-stage}
@@ -45,10 +48,22 @@ LOG_FILE=${LOG_FILE:-/var/log/${USER:-root}-usb-slackware-$(date +%Y%m%d-%H%M%S)
 SECTIONS=${SECTIONS:-a ap d l n x xap}
 
 mkdir -p "$STAGE"
+
+# House convention: source the shared helpers when present (Test 3), and track
+# overall success in $ok (Test 5). This step runs on the FreeBSD build host,
+# so it installs no packages itself -- it only writes an image to a USB key.
+if [ -f "$REPO_DIR/lib/common.sh" ]; then
+  . "$REPO_DIR/lib/common.sh"
+fi
+ok=true
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 log()  { echo "[$(date +%H:%M:%S)] $*"; }
-die()  { echo "[$(date +%H:%M:%S)] FATAL: $*" >&2; exit 1; }
+die()  { echo "[$(date +%H:%M:%S)] FATAL: $*" >&2; ok=false; exit 1; }
+
+echo "*****************************************************"
+echo "USB SLACKWARE INSTALLER BUILDER"
+echo "*****************************************************"
 
 # ---------------------------------------------------------------- safety gate
 check_device() {
