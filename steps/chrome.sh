@@ -193,11 +193,13 @@ fi
 for f in /usr/local/bin/firefox /usr/bin/firefox; do
     [ -e "$f" ] && rm -f "$f" && echo "  removed $f"
 done
-for profdir in /root/.mozilla/firefox/*/ /etc/skel/.mozilla/firefox/*/; do
-    [ -d "$profdir" ] || continue
-    rm -f "$profdir/user.js" "$profdir/chrome/userChrome.css" 2>/dev/null || true
+# Firefox profile data is dead weight once the program is gone (bookmarks,
+# logins, history), so drop the whole profile tree — not just the prefs files
+# the old step used to seed.
+for d in /root/.mozilla /home/*/.mozilla /etc/skel/.mozilla; do
+    [ -e "$d" ] || continue
+    rm -rf "$d" && echo "  removed $d"
 done
-
 # -------------------------------------------------------------------
 # 7. Optional DRM-free secondary browser
 # -------------------------------------------------------------------
