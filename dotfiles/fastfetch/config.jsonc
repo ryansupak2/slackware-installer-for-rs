@@ -28,6 +28,18 @@
             "output": "white",
             "separator": "white"
         },
+        // Percentages (Memory's "(13%)" and friends) and temperature values
+        // default to green/yellow/red state colours. Pin every state to white so
+        // no number on screen can ever come out green.
+        "percent": {
+            "color": { "green": "white", "yellow": "white", "red": "white" }
+        },
+        "temp": {
+            "color": { "green": "white", "yellow": "white", "red": "white" }
+        },
+        "bar": {
+            "color": { "elapsed": "white", "total": "white", "border": "white" }
+        },
         "brightColor": true,
         "key": {
             "width": 20
@@ -35,7 +47,10 @@
     },
 
     "modules": [
-        { "type": "title", "fqdn": true },
+        // user@host in bold italics: the title module has no bold/italic setting,
+        // so format overrides the output with indexed placeholders ({1} = user,
+        // {2} = host; {user}/{hostname} are NOT substituted here) plus ANSI 1;3.
+        { "type": "title", "fqdn": true, "format": "\u001b[1;3m{1}\u001b[0m@\u001b[1;3m{2}\u001b[0m" },
         { "type": "break" },
         { "type": "command", "key": "OS",            "text": "grep '^PRETTY_NAME=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"'" },
         { "type": "host",    "key": "Host" },
