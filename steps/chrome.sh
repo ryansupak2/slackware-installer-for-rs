@@ -211,16 +211,26 @@ for d in /root/.mozilla /home/*/.mozilla /etc/skel/.mozilla; do
     rm -rf "$d" && echo "  removed $d"
 done
 
-# GTK font. Chrome's menus/dialogs and every other GTK app read this; the old
-# 9pt was unreadable on this ~226 DPI panel (terminal is 28px).
+# GTK font — this is what sizes Chrome's URL bar text, tab labels and dialogs.
+# Dotfiles carry the installer default; the deployed copy is authoritative so
+# a locally tuned value (chrome-ui-font 16) is not clobbered on every re-run.
 GTK_SRC="$REPO_DIR/dotfiles/gtk/settings.ini"
 if [ -f "$GTK_SRC" ]; then
     for base in /root /etc/skel; do
         mkdir -p "$base/.config/gtk-3.0"
-        cp "$GTK_SRC" "$base/.config/gtk-3.0/settings.ini" 2>/dev/null \
-            && echo "  gtk settings -> $base/.config/gtk-3.0/settings.ini"
+        if [ ! -f "$base/.config/gtk-3.0/settings.ini" ]; then
+            cp "$GTK_SRC" "$base/.config/gtk-3.0/settings.ini" 2>/dev/null \
+                && echo "  gtk settings -> $base/.config/gtk-3.0/settings.ini"
+        else
+            echo "  gtk settings already deployed ($base) — left as is"
+        fi
     done
 fi
+
+# Tuning helper: one command to grow/shrink the UI text without a reinstall.
+install -m 755 "$REPO_DIR/scripts/chrome-ui-font.sh" /usr/local/bin/chrome-ui-font 2>/dev/null \
+    || { cp "$REPO_DIR/scripts/chrome-ui-font.sh" /usr/local/bin/chrome-ui-font && chmod 755 /usr/local/bin/chrome-ui-font; }
+echo "  /usr/local/bin/chrome-ui-font installed (usage: chrome-ui-font 16)"
 # -------------------------------------------------------------------
 # 7. Optional DRM-free secondary browser
 # -------------------------------------------------------------------
