@@ -131,7 +131,6 @@ step_list=(
     "user-vim:./steps/user-vim.sh"
     "user-ssh:./steps/user-ssh.sh"
     "user-fastfetch:./steps/user-fastfetch.sh"
-    "user-firefox:./steps/user-firefox.sh"
     "user-github-ssh:./steps/user-github-ssh.sh"
     "user-pi-agent:./steps/user-pi-agent.sh"
     "user-firefox-shortcuts:./steps/user-web-shortcuts.sh"

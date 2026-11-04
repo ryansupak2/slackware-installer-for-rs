@@ -63,7 +63,7 @@ success_count=0
 error_count=0
 
 
-firefox_ran_marker=/tmp/firefox-ran.marker
+browser_ran_marker=/tmp/browser-ran.marker
 
 # (All individual setup steps have been moved to ./steps/*.sh)
 # They are now standalone scripts that exit 0 on success / 1 on error.
@@ -77,7 +77,7 @@ hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "acpi-wakeu
 security_access=("root-ssh-key" "keychain" "github-ssh")
 dev_tools=("vim" "git-lfs" "pi-path")
 ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm")
-applications=("firefox" "web-shortcuts" "inkscape" "yad" "root-web-shortcuts" "slskd")
+applications=("chromium" "web-shortcuts" "inkscape" "yad" "root-web-shortcuts" "slskd")
 utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux" "xclick")
 audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox" "vox-sherpa")
 
@@ -382,8 +382,8 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
-        "firefox")
-            if ./steps/firefox.sh; then
+        "chromium")
+            if ./steps/chromium.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))
@@ -514,31 +514,28 @@ for section in "${selected[@]}"; do
     esac
 done
 
-# FireFox DRM notes (shown if firefox step ran and wrote marker)
-if [ -f "$firefox_ran_marker" ]; then
+# Chromium + DRM notes (shown if the chromium step ran and wrote the marker)
+if [ -f "$browser_ran_marker" ]; then
 echo ""
 echo "*****************************************************"
-echo "NEXT STEPS FOR FIREFOX + DRM"
+echo "NEXT STEPS FOR CHROMIUM + DRM"
 echo "*****************************************************"
 echo ""
 echo "The installer has:"
-echo "  - Installed firefox + Widevine CDM"
-echo "  - Pre-provisioned Widevine CDM at /usr/lib64/firefox/gmp-widevinecdm/"
-echo "  - Installed dark GTK theme + userChrome.css"
-echo "  - Injected Widevine prefs into existing Firefox profiles"
+echo "  - Installed Chromium (ungoogled-chromium-bin from SBo)"
+echo "  - Installed the Widevine CDM where Chromium probes for it"
+echo "  - Verified com.widevine.alpha with an EME probe"
+echo "  - Removed Firefox and its wrappers"
 echo ""
-echo "STEP 1: Launch Firefox:"
-echo "   firefox"
+echo "STEP 1: Launch Chromium:"
+echo "   w        (normal profile)"
+echo "   wk       (private, no URL history kept)"
 echo ""
-echo "STEP 2: Verify prefs in about:config:"
-echo "   media.gmp-widevinecdm.enabled   = true"
-echo "   media.gmp-widevinecdm.visible   = true"
-echo "   media.eme.enabled               = true"
-echo "   media.gmp-manager.updateEnabled = false"
+echo "STEP 2: Verify DRM in the browser:"
+echo "   chrome://components  -> Widevine Content Decryption Module"
+echo "   (if the probe fell back to Google Chrome, the CDM ships with it)"
 echo ""
-echo "STEP 3: Test DRM at https://www.netflix.com"
-echo ""
-echo "STEP 4: Check about:support for Widevine CDM"
+echo "STEP 3: Test playback at https://www.netflix.com or a YouTube movie"
 echo ""
 fi
 

@@ -1,11 +1,11 @@
 #!/bin/bash
 # steps/web-shortcuts.sh - BROWSER LAUNCHERS (w, w?, wk)
 #
-# w    : open a URL / shortcut in the normal Firefox profile
+# w    : open a URL / shortcut in Chromium (normal profile)
 # w?   : list the available shortcuts
-# wk   : open a URL / shortcut in a throwaway, always-private Firefox profile
-#        that keeps NO URL history (profile lives in tmpfs, is wiped on exit,
-#        and --no-remote stops the URL leaking into the normal profile)
+# wk   : open a URL / shortcut in Chromium, private only, keeping NO URL
+#        history (--incognito + throwaway --user-data-dir in tmpfs that is
+#        deleted on exit; never hands the URL to a running instance)
 #
 # Idempotent: only copies files, never touches a running browser.
 
@@ -24,7 +24,7 @@ ok=0
 mkdir -p /usr/local/bin
 
 deploy() {  # $1 = source basename, $2 = installed name
-    src="$REPO_DIR/dotfiles/firefox/$1"
+    src="$REPO_DIR/dotfiles/chromium/$1"
     dst="$2"
     if [ ! -f "$src" ]; then
         echo "  WARNING: $src missing"

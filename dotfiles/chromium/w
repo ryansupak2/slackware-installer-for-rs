@@ -1,0 +1,60 @@
+#!/bin/sh
+# w — open a URL / shortcut in Chromium (normal profile)
+#
+# Shortcut file: ~/.web/shortcuts (installed from dotfiles/firefox/shortcuts.default
+# by steps/web-shortcuts.sh), fallback /etc/web/shortcuts.default.
+#
+# Usage:  w            -> about:blank
+#         w y          -> shortcut lookup
+#         w example.com
+#         w https://example.com/whatever
+
+uri="about:blank"
+if [ $# -gt 0 ]; then
+    raw="$1"
+    case "$raw" in
+        *://*) uri="$raw" ;;
+        *)
+            f="${HOME}/.web/shortcuts"
+            [ -f "$f" ] || f="/etc/web/shortcuts.default"
+            if [ -f "$f" ]; then
+                resolved=$(awk -v key="$raw" '$1 == key {print $2; exit}' "$f")
+                [ -n "$resolved" ] && uri="$resolved"
+            fi
+            # If no shortcut matched and input looks like a domain/URL, add https://
+            if [ "$uri" = "about:blank" ]; then
+                case "$raw" in
+                    *.*) uri="https://$raw" ;;
+                esac
+            fi
+            ;;
+    esac
+fi
+
+browser="/usr/local/bin/chrome"
+[ -x "$browser" ] || browser=$(command -v chromium || command -v ungoogled-chromium || command -v google-chrome-stable)
+
+# Chromium refuses to run as root without --no-sandbox (this box runs X as root).
+SANDBOX_FLAG=""
+[ "$(id -u)" -eq 0 ] && SANDBOX_FLAG="--no-sandbox"
+
+# GTK dialogs (file chooser) should not be scaled twice.
+unset GDK_DPI_SCALE
+
+# Widevine (Netflix/YouTube DRM). Google Chrome bundles its own CDM, so the
+# external one is only needed by Chromium builds that can load it. Pointing
+# Chrome at a stale copy would be worse than useless, hence the case check.
+WIDEVINE_FLAG=""
+case "$browser" in
+    */google/chrome*|*google-chrome*) : ;;   # bundles its own CDM
+    *)
+        if [ -d /usr/lib64/chromium/WidevineCdm ]; then
+            WV_VER=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' /usr/lib64/chromium/WidevineCdm/manifest.json 2>/dev/null)
+            WIDEVINE_FLAG="--widevine-cdm-path=/usr/lib64/chromium/WidevineCdm/_platform_specific/linux_x64/libwidevinecdm.so --widevine-cdm-version=$WV_VER"
+        fi
+        ;;
+esac
+
+exec "$browser" $SANDBOX_FLAG $WIDEVINE_FLAG \
+    --force-dark-mode --enable-features=WebUIDarkMode,WebContentsDarkMode \
+    "$uri"

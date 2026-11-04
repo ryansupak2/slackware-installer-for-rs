@@ -1,0 +1,64 @@
+#!/bin/sh
+# wk — Chromium, private only, no URL history preserved.
+#
+# Differences from 'w':
+#   * --incognito: nothing is written to the normal profile's history;
+#   * a throwaway --user-data-dir under $XDG_RUNTIME_DIR (tmpfs) that is deleted
+#     when the browser exits, so not even the incognito session survives;
+#   * no URL is handed to an already-running Chromium, so nothing can leak into
+#     the normal profile's session restore.
+#
+# Usage:  wk / wk y / wk example.com / wk https://example.com/x
+
+uri="about:blank"
+if [ $# -gt 0 ]; then
+    raw="$1"
+    case "$raw" in
+        *://*) uri="$raw" ;;
+        *)
+            f="${HOME}/.web/shortcuts"
+            [ -f "$f" ] || f="/etc/web/shortcuts.default"
+            if [ -f "$f" ]; then
+                resolved=$(awk -v key="$raw" '$1 == key {print $2; exit}' "$f")
+                [ -n "$resolved" ] && uri="$resolved"
+            fi
+            if [ "$uri" = "about:blank" ]; then
+                case "$raw" in
+                    *.*) uri="https://$raw" ;;
+                esac
+            fi
+            ;;
+    esac
+fi
+
+browser="/usr/local/bin/chrome"
+[ -x "$browser" ] || browser=$(command -v chromium || command -v ungoogled-chromium || command -v google-chrome-stable)
+
+SANDBOX_FLAG=""
+[ "$(id -u)" -eq 0 ] && SANDBOX_FLAG="--no-sandbox"
+
+unset GDK_DPI_SCALE
+
+# Widevine: Google Chrome bundles its own CDM, so only point a Chromium build
+# at the external copy the installer extracted.
+WIDEVINE_FLAG=""
+case "$browser" in
+    */google/chrome*|*google-chrome*) : ;;
+    *)
+        if [ -d /usr/lib64/chromium/WidevineCdm ]; then
+            WV_VER=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' /usr/lib64/chromium/WidevineCdm/manifest.json 2>/dev/null)
+            WIDEVINE_FLAG="--widevine-cdm-path=/usr/lib64/chromium/WidevineCdm/_platform_specific/linux_x64/libwidevinecdm.so --widevine-cdm-version=$WV_VER"
+        fi
+        ;;
+esac
+
+udd="${XDG_RUNTIME_DIR:-/tmp}/chromium-wk.$$"
+mkdir -p "$udd" || exit 1
+chmod 700 "$udd" 2>/dev/null || true
+cleanup() { rm -rf "$udd"; }
+trap cleanup EXIT INT TERM HUP
+
+"$browser" $SANDBOX_FLAG $WIDEVINE_FLAG \
+    --incognito --user-data-dir="$udd" --no-first-run \
+    --force-dark-mode --enable-features=WebUIDarkMode,WebContentsDarkMode \
+    "$uri"
