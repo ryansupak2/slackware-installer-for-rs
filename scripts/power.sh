@@ -16,6 +16,8 @@
 #                               the policy will not override it until you run
 #                               'power profile ...' again)
 #   power set blank MIN         X screen blank timeout in minutes (0 = never)
+#   power set avg SECONDS       Window for the time-left estimate (default 120,
+#                               60-1800; smaller = more responsive, noisier)
 #   power auto                  Show auto mode
 #   power auto on|off           Follow AC/battery automatically (udev hook)
 #   power auto battery NAME     Profile applied while unplugged
@@ -33,6 +35,13 @@
 #   powersave    governor=powersave epp=power          turbo off  backlight 25%
 #   balanced     governor=powersave epp=balance_power  turbo on   backlight 50%
 #   performance  governor=performance epp=performance  turbo on   backlight 100%
+#
+# Time left = energy_now / average draw over the last RATE_WINDOW seconds.
+# The average comes from upowerd's own history file (it already samples the
+# battery every ~30 s): /var/lib/upower/history-rate-*.dat. Reading the tail of
+# that file is instant, so `power` never sits and samples the battery itself.
+# If upower history is unavailable the estimate falls back to the instantaneous
+# power_now value (and says so).
 
 export PATH="/usr/sbin:/sbin:$PATH"
 
@@ -67,6 +76,7 @@ AC_PROFILE=performance
 WAKE=power-button-only
 BLANK_MINUTES=5
 BRIGHTNESS_MODE=auto
+RATE_WINDOW=120     # seconds of battery-draw history averaged for time-left
 
 load_state() {
     # shellcheck disable=SC1090
@@ -84,6 +94,7 @@ AC_PROFILE=$AC_PROFILE
 WAKE=$WAKE
 BLANK_MINUTES=$BLANK_MINUTES
 BRIGHTNESS_MODE=${BRIGHTNESS_MODE:-auto}
+RATE_WINDOW=${RATE_WINDOW:-120}
 EOF
 }
 
@@ -160,13 +171,129 @@ bat_watts() {   # current draw in watts (positive number), or nothing
     return 1
 }
 
-bat_time_left() {   # "4h12m" while discharging
-    local b p e
+# ── Battery draw history (rolling average) ────────────────────────────
+# upowerd samples the battery about every 30 s and appends each reading to
+#   /var/lib/upower/history-rate-<model>-<serial>.dat
+# as "<epoch>\t<watts>\t<charging|discharging|unknown>". Reading the tail of
+# that file costs nothing, so the estimate is an average of the recent past
+# without `power` itself waiting for samples to accumulate. The current sysfs
+# reading is folded in as the newest sample, so the average never goes stale
+# even when upowerd pauses between history writes.
+RATE_HISTORY_DIR=/var/lib/upower
+
+rate_history_file() {   # newest upower rate-history file belonging to our battery
+    local b serial f t best="" best_t=0
+    local cands=()
+    b=$(battery_dir 2>/dev/null) || return 1
+    serial=$(cat "$b/serial_number" 2>/dev/null)
+
+    if [ -n "$serial" ]; then       # upower names the file after model + serial
+        for f in "$RATE_HISTORY_DIR"/history-rate-*-"$serial".dat; do
+            [ -f "$f" ] && cands+=("$f")
+        done
+    fi
+    if [ "${#cands[@]}" -eq 0 ]; then
+        for f in "$RATE_HISTORY_DIR"/history-rate-*.dat; do
+            [ -f "$f" ] || continue
+            case "$f" in *generic_id.dat) continue ;; esac
+            cands+=("$f")
+        done
+    fi
+    [ "${#cands[@]}" -gt 0 ] || return 1
+
+    for f in "${cands[@]}"; do      # the one with the freshest sample wins
+        t=$(stat -c %Y "$f" 2>/dev/null) || continue
+        [ "$t" -ge "$best_t" ] && { best_t=$t; best=$f; }
+    done
+    [ -n "$best" ] || return 1
+    echo "$best"
+}
+
+rate_cache_file() {   # dwm-status's own sample cache (it reads the battery every tick)
+    local f t best="" best_t=0
+    f="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/battery-rate.tsv"
+    if [ -f "$f" ]; then echo "$f"; return 0; fi
+    # root, or a status run outside its own session: use the newest cache we
+    # can see (the session user's runtime dir).
+    for f in /run/user/*/battery-rate.tsv; do
+        [ -f "$f" ] || continue
+        t=$(stat -c %Y "$f" 2>/dev/null) || continue
+        [ "$t" -ge "$best_t" ] && { best_t=$t; best=$f; }
+    done
+    [ -n "$best" ] || return 1
+    echo "$best"
+}
+
+rate_history_dump() {   # every rate sample we can see (dwm-status cache + upower)
+    local cf uf self have_cache=0
+    if cf=$(rate_cache_file); then      # written every ~20 s by the status bar
+        have_cache=1
+        cat "$cf" 2>/dev/null
+    fi
+    uf=$(rate_history_file) || return 0
+    if [ -r "$uf" ]; then
+        cat "$uf" 2>/dev/null
+        return 0
+    fi
+    # upowerd writes history 0640 root:root. The cache above is enough on its
+    # own, so only pay for the sudo round-trip when there is nothing else.
+    [ "$have_cache" = 1 ] && return 0
+    [ "$(id -u)" -eq 0 ] && return 0
+    command -v sudo >/dev/null 2>&1 || return 0
+    self=$(command -v /usr/local/bin/power 2>/dev/null || echo "$0")
+    sudo -n "$self" _rates 2>/dev/null
+}
+
+rate_window_label() {   # 120 -> "2m", 90 -> "90s"
+    local w=${RATE_WINDOW:-120}
+    case "$w" in ''|*[!0-9]*) echo "${w}s"; return 0 ;; esac
+    if [ "$w" -ge 60 ] && [ $((w % 60)) -eq 0 ]; then echo "$((w / 60))m"; else echo "${w}s"; fi
+}
+
+bat_rate_stats() {   # "<avg_watts> <samples>" over the last RATE_WINDOW seconds, or fail
+    local w=${RATE_WINDOW:-120} inst hist
+    case "$w" in ''|*[!0-9]*) w=120 ;; esac
+    # upower samples every ~30 s: under a minute there is nothing to average.
+    [ "$w" -lt 60 ] && w=60
+    [ "$(cat "$(battery_dir 2>/dev/null)/status" 2>/dev/null)" = Discharging ] || return 1
+    inst=$(bat_watts 2>/dev/null) || inst=0
+    hist=$(rate_history_dump 2>/dev/null) || return 1
+    [ -n "$hist" ] || return 1
+    printf '%s\n' "$hist" | awk -v now="$(date +%s)" -v win="$w" -v inst="$inst" '
+        BEGIN { FS = "\t"; n = 0; sum = 0
+                # the live sysfs reading counts as the freshest sample
+                if (inst > 0) { n = 1; sum = inst } }
+        {
+            t = $1 + 0; r = $2 + 0
+            if ($3 != "discharging" || t <= 0 || r <= 0) next
+            if (t > now || now - t > win) next
+            n++; sum += r
+        }
+        END {
+            if (n < 2) exit 1                 # only the live reading: no average yet
+            printf "%.2f %d", sum / n, n
+        }'
+}
+
+bat_rate_avg_w() {   # discharge watts averaged over the last RATE_WINDOW seconds
+    local out
+    out=$(bat_rate_stats) || return 1
+    echo "${out%% *}"
+}
+
+bat_time_left() {   # "4h12m" while discharging (arg 1: watts, optional)
+    local b e rate=${1:-}
     b=$(battery_dir) || return 1
-    p=$(cat "$b/power_now" 2>/dev/null); e=$(cat "$b/energy_now" 2>/dev/null)
-    [ -n "$p" ] && [ -n "$e" ] || return 1
-    [ "$p" -gt 0 ] 2>/dev/null || return 1
-    awk -v e="$e" -v p="$p" 'BEGIN{h=e/p; hh=int(h); mm=int((h-hh)*60); printf "%dh%02dm", hh, mm}'
+    e=$(cat "$b/energy_now" 2>/dev/null)
+    [ "${e:-0}" -gt 0 ] 2>/dev/null || return 1
+    # Rolling average first; instantaneous power_now only as a fallback.
+    [ -n "$rate" ] || { rate=$(bat_rate_avg_w) || rate=$(bat_watts 2>/dev/null); }
+    [ -n "$rate" ] || return 1
+    awk -v e="$e" -v r="$rate" 'BEGIN{
+        if (r <= 0) exit 1
+        h = (e / 1e6) / r
+        hh = int(h); mm = int((h - hh) * 60)
+        printf "%dh%02dm", hh, mm }'
 }
 
 backlight_dir() {
@@ -458,7 +585,7 @@ cmd_boot() {
 
 # ── Status ────────────────────────────────────────────────────────────
 cmd_status() {
-    local b pct st watts left gov epp turbo brt blname msleep wenabled lid
+    local b pct st watts avg left leftnote draw gov epp turbo brt blname msleep wenabled lid
     local mode_src mode_prof mode_line
 
     b=$(battery_dir)
@@ -466,8 +593,8 @@ cmd_status() {
         pct=$(cat "$b/capacity" 2>/dev/null)
         st=$(cat "$b/status" 2>/dev/null)
         watts=$(bat_watts 2>/dev/null)
-        left=$(bat_time_left 2>/dev/null)
-        [ -n "$watts" ] && watts="${watts} W"
+        avg=$(bat_rate_avg_w 2>/dev/null)          # rolling average, may be empty
+        left=$(bat_time_left "$avg" 2>/dev/null)
     fi
 
     gov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)
@@ -493,8 +620,14 @@ cmd_status() {
     echo "${BOLD}Power mode:${NC} ${mode_line}"
     echo
     if [ -n "$pct" ]; then
+        [ -n "$watts" ] && draw="${watts} W now"
+        if [ -n "$avg" ]; then
+            draw="${draw:+$draw · }avg ${avg} W/$(rate_window_label)"
+        elif [ -n "$left" ]; then
+            leftnote=" (instant)"
+        fi
         printf '  %-13s %s%% %s%s%s%s\n' "Battery" "$pct" "$st" \
-            "${watts:+ · $watts}" "${left:+ · ~$left left}" ""
+            "${draw:+ · $draw}" "${left:+ · ~$left left}" "$leftnote"
     else
         printf '  %-13s %s\n' "Battery" "(none detected)"
     fi
@@ -535,6 +668,7 @@ cmd_menu() {
         echo "  7) set backlight % (now)"
         echo "  8) set screen blank minutes (currently: $BLANK_MINUTES)"
         echo "  9) wake sources: $WAKE (restrict to power button / allow all)"
+        echo " 10) time-left averaging window (currently: $(rate_window_label))"
         echo "  r) re-apply policy for current power source"
         echo "  q) quit"
         read -r -p "Choice: " c || return 0
@@ -565,6 +699,10 @@ cmd_menu() {
             9)
                 if [ "$WAKE" = power-button-only ]; then cmd_wake allow; else cmd_wake restrict; fi
                 ;;
+            10)
+                read -r -p "Average battery draw over N seconds (60-1800): " p
+                cmd_set avg "$p"
+                ;;
             r) cmd_apply ;;
             q|Q|x|X) return 0 ;;
             *) echo "Invalid choice." ;;
@@ -591,7 +729,7 @@ cmd_profile() {
 
 cmd_set() {
     local what=${1:-} val=${2:-}
-    [ -n "$what" ] && [ -n "$val" ] || die "usage: power set governor|epp|turbo|brightness|blank <value>"
+    [ -n "$what" ] && [ -n "$val" ] || die "usage: power set governor|epp|turbo|brightness|blank|avg <value>"
     elevate set "$what" "$val"
     case "$what" in
         governor)
@@ -623,8 +761,14 @@ cmd_set() {
             apply_xset_blank
             echo "SUCCESS: screen blank after ${BLANK_MINUTES} min (persists across X restarts)."
             ;;
+        avg)
+            case "$val" in *[!0-9]*|'') die "avg must be a number of seconds (60-1800)" ;; esac
+            [ "$val" -ge 60 ] && [ "$val" -le 1800 ] || die "avg must be 60-1800 seconds"
+            RATE_WINDOW=$val; save_state
+            echo "SUCCESS: time-left estimate averages the last $(rate_window_label) of battery draw."
+            ;;
         *)
-            die "unknown setting '$what' (governor|epp|turbo|brightness|blank)"
+            die "unknown setting '$what' (governor|epp|turbo|brightness|blank|avg)"
             ;;
     esac
 }
@@ -658,13 +802,21 @@ cmd_auto() {
 }
 
 usage() {
-    sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
+    # header comment block only (stops at the first non-comment line)
+    awk 'NR>1 { if ($0 !~ /^#/) exit; sub(/^# ?/, ""); print }' "$0"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────
 load_state
+# POWER_AVG_WINDOW=SECONDS overrides the stored averaging window for one run
+[ -n "${POWER_AVG_WINDOW:-}" ] && RATE_WINDOW=$POWER_AVG_WINDOW
+case "${RATE_WINDOW:-120}" in ''|*[!0-9]*) RATE_WINDOW=120 ;; esac
 
 case "${1:-}" in
+    _rates)
+        # internal, called through sudo by cmd_status: dump upower's rate history
+        cat "$(rate_history_file)" 2>/dev/null
+        ;;
     "")
         setup_cli_log
         cmd_status

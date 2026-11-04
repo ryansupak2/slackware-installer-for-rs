@@ -308,9 +308,10 @@ static const SherpaOnnxOnlineRecognizer *recognizer_create(void) {
 /* ======================================================================
  * ALSA
  * ====================================================================== */
-static snd_pcm_t *alsa_open(void) {
+/* Open one capture device name with the parameters we need. */
+static snd_pcm_t *alsa_try(const char *dev) {
     snd_pcm_t *handle;
-    if (snd_pcm_open(&handle, ALSA_DEVICE, SND_PCM_STREAM_CAPTURE, 0) < 0) return NULL;
+    if (snd_pcm_open(&handle, dev, SND_PCM_STREAM_CAPTURE, 0) < 0) return NULL;
     snd_pcm_hw_params_t *params; snd_pcm_hw_params_alloca(&params);
     snd_pcm_hw_params_any(handle, params);
     snd_pcm_hw_params_set_access(handle, params, SND_PCM_ACCESS_RW_INTERLEAVED);
@@ -321,8 +322,58 @@ static snd_pcm_t *alsa_open(void) {
     snd_pcm_hw_params_set_period_size_near(handle, params, &period, NULL);
     snd_pcm_hw_params_set_buffer_size_near(handle, params, &buffer);
     if (snd_pcm_hw_params(handle, params) < 0) { snd_pcm_close(handle); return NULL; }
-    log_msg("ALSA opened: %s, rate=%u, ch=%d, period=%lu", ALSA_DEVICE, rate, CHANNELS, period);
+    log_msg("ALSA opened: %s, rate=%u, ch=%d, period=%lu", dev, rate, CHANNELS, period);
     return handle;
+}
+
+/* First capture-capable hardware device, as "plughw:CARD,DEV".
+ * sof-soundwire renumbers its PCM devices between boots (the mic has been
+ * device 7, 6 and 4 on this laptop), so the compiled-in index is only a
+ * hint — ask ALSA what actually captures. */
+static const char *alsa_detect_device(void) {
+    static char buf[64];
+    int card = -1;
+    while (snd_card_next(&card) == 0 && card >= 0) {
+        char name[32];
+        snd_ctl_t *ctl = NULL;
+        int dev = -1, found = -1;
+        snprintf(name, sizeof(name), "hw:%d", card);
+        if (snd_ctl_open(&ctl, name, 0) < 0) continue;
+        while (snd_ctl_pcm_next_device(ctl, &dev) == 0 && dev >= 0) {
+            snd_pcm_info_t *info; snd_pcm_info_alloca(&info);
+            snd_pcm_info_set_device(info, (unsigned)dev);
+            snd_pcm_info_set_subdevice(info, 0);
+            snd_pcm_info_set_stream(info, SND_PCM_STREAM_CAPTURE);
+            if (snd_ctl_pcm_info(ctl, info) == 0) { found = dev; break; }
+        }
+        snd_ctl_close(ctl);
+        if (found >= 0) {
+            snprintf(buf, sizeof(buf), "plughw:%d,%d", card, found);
+            return buf;
+        }
+    }
+    return NULL;
+}
+
+static snd_pcm_t *alsa_open(void) {
+    const char *cands[5];
+    const char *env = getenv("VOXD_ALSA_DEVICE"), *det;
+    int n = 0, i;
+    if (env && *env) cands[n++] = env;          /* explicit override */
+    cands[n++] = ALSA_DEVICE;                   /* compiled-in hint */
+    det = alsa_detect_device();                 /* what ALSA can capture now */
+    if (det && strcmp(det, ALSA_DEVICE) != 0) cands[n++] = det;
+    cands[n++] = "default";                     /* pipewire/pulse path */
+    for (i = 0; i < n; i++) {
+        snd_pcm_t *h = alsa_try(cands[i]);
+        if (h) {
+            if (strcmp(cands[i], ALSA_DEVICE) != 0)
+                log_msg("ALSA: %s unusable — using %s instead", ALSA_DEVICE, cands[i]);
+            return h;
+        }
+        log_msg("ALSA: cannot open %s", cands[i]);
+    }
+    return NULL;
 }
 
 /* ======================================================================
@@ -444,10 +495,10 @@ static void run_alsa_mode(void) {
 
                 /* Lazy ALSA open on first use */
                 if (!alsa) {
-                    log_msg("Opening ALSA device %s...", ALSA_DEVICE);
+                    log_msg("Opening ALSA capture device...");
                     alsa = alsa_open();
                     if (!alsa) {
-                        log_msg("FATAL: cannot open ALSA device %s", ALSA_DEVICE);
+                        log_msg("FATAL: no usable ALSA capture device (tried %s, auto-detect, default)", ALSA_DEVICE);
                         state_clear();
                         if (g_dump_audio) dump_close();
                         return;

@@ -91,6 +91,27 @@ else
     ok=false
 fi
 
+# --- 5b. upower history readable by wheel (time-left average) ---------
+# `power` averages upowerd's own battery-rate history instead of sampling the
+# battery itself. upowerd writes /var/lib/upower/history-*.dat as 0640
+# root:root, so grant wheel read access — the default ACL covers files upowerd
+# creates later. Optional: without it `power` still gets the same numbers by
+# re-reading through the passwordless sudo rule, just with one extra round-trip.
+echo "Granting read access to upower history (wheel)..."
+HIST_DIR="/var/lib/upower"
+if [ -d "$HIST_DIR" ]; then
+    if command -v setfacl >/dev/null 2>&1; then
+        setfacl -m g:wheel:rx "$HIST_DIR" 2>/dev/null || true
+        setfacl -d -m g:wheel:r "$HIST_DIR" 2>/dev/null || true
+        setfacl -m g:wheel:r "$HIST_DIR"/history-*.dat 2>/dev/null || true
+        echo "  wheel can read $HIST_DIR/history-*.dat (existing + future)"
+    else
+        echo "  WARNING: setfacl not found — power will use its sudo fallback"
+    fi
+else
+    echo "  Skipped (no $HIST_DIR — upowerd not installed)"
+fi
+
 # --- 6. elogind post-resume hook ---------------------------------------
 echo "Installing elogind post-resume hook..."
 SLEEP_DIR="/lib64/elogind/system-sleep"

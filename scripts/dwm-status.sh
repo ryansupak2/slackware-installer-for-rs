@@ -83,10 +83,38 @@ vnc_part() {
 # ── Battery ─────────────────────────────────────────────────
 prev_capacity=""
 prev_bat_status=""
+
+# ── Battery draw history (feeds `power`'s time-left estimate) ──
+# `power` reports an average of the recent past instead of one noisy
+# power_now reading. This loop already reads the battery every tick, so drop
+# a sample into a small runtime file every ~20 s; `power` only reads it, so it
+# never has to sit and sample the battery itself.
+BAT_RATE_FILE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/battery-rate.tsv"
+BAT_RATE_INTERVAL=20      # seconds between samples
+last_bat_rate_sample=0
+bat_rate_sample() {   # $1 = battery status
+    local now p lines
+    [ $((SECONDS - last_bat_rate_sample)) -ge "$BAT_RATE_INTERVAL" ] || return 0
+    last_bat_rate_sample=$SECONDS
+    [ "$1" = "Discharging" ] || return 0
+    p=$(cat /sys/class/power_supply/BAT0/power_now 2>/dev/null) || return 0
+    now=$(date +%s)
+    awk -v now="$now" -v p="$p" 'BEGIN{
+        if (p <= 0) exit 1
+        printf "%d\t%.3f\tdischarging\n", now, p / 1e6
+    }' >>"$BAT_RATE_FILE" 2>/dev/null || return 0
+    # keep it small: ~400 samples is over 2 h of history
+    lines=$(wc -l <"$BAT_RATE_FILE" 2>/dev/null)
+    if [ "${lines:-0}" -gt 400 ] 2>/dev/null; then
+        tail -200 "$BAT_RATE_FILE" >"$BAT_RATE_FILE.tmp" 2>/dev/null &&
+            mv "$BAT_RATE_FILE.tmp" "$BAT_RATE_FILE" 2>/dev/null
+    fi
+}
 bat_part() {
     local status capacity on_ac
     status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown')
     capacity=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo '0')
+    bat_rate_sample "$status"
     on_ac=0
     if grep -q '^1$' /sys/class/power_supply/*/online 2>/dev/null; then on_ac=1; fi
     if [ "$on_ac" = 0 ]; then

@@ -2,7 +2,7 @@
 # The live file is managed by /usr/local/bin/power; this copy is only the
 # template used on a fresh install. Change with:
 #   power auto on|off · power auto battery|ac <profile> · power wake restrict|allow
-#   power set blank <minutes> · power profile <name>
+#   power set blank <minutes> · power set avg <seconds> · power profile <name>
 AUTO=on
 BATTERY_PROFILE=balanced
 AC_PROFILE=performance
@@ -10,3 +10,5 @@ WAKE=power-button-only
 BLANK_MINUTES=5
 # auto = the policy may set the backlight; manual = your own value wins
 BRIGHTNESS_MODE=auto
+# seconds of battery-draw history averaged for the time-left estimate
+RATE_WINDOW=120

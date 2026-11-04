@@ -14,7 +14,8 @@ Streaming speech-to-text using sherpa-onnx (Zipformer EN 20M).
 ```
 Mod+V → toggle-vox.sh → SIGUSR1 → voxd daemon
                                       │
-                          ALSA plughw:0,7 @ 16kHz mono
+              ALSA capture @ 16kHz mono (auto-detected:
+                          plughw:0,4 here — index moves between boots)
                                       │
                           Zipformer EN 20M (streaming transducer)
                                       │

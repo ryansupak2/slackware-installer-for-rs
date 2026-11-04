@@ -26,8 +26,9 @@ BASE_MODEL="$MODEL_DIR/ggml-base.en.bin"
 # Already installed?
 if [ -x "$CLI_BIN" ] && [ -x "$STREAM_BIN" ] && [ -f "$TINY_MODEL" ] && [ -f "$BASE_MODEL" ]; then
     echo "whisper-cli, whisper-stream, tiny + base models already installed."
-    # Always deploy the toggle script (idempotent)
-    cp "$REPO_DIR/scripts/toggle-vox.sh" /usr/local/bin/toggle-vox.sh && chmod +x /usr/local/bin/toggle-vox.sh
+    # toggle-vox.sh/toggle-vox-record.sh belong to steps/vox-sherpa.sh —
+    # this step only provides the whisper binaries/models for `voxd --file`
+    # experiments. Do not overwrite the Mod+V handlers from here.
     echo "SUCCESS: VOX dictation (already present)."
     exit 0
 fi
@@ -81,10 +82,7 @@ if $ok; then
         echo "  tiny.en → $TINY_MODEL"
         echo "  base.en → $BASE_MODEL"
     fi
-    # Deploy toggle-vox.sh manager script
-    cp "$REPO_DIR/scripts/toggle-vox.sh" /usr/local/bin/toggle-vox.sh 2>/dev/null || true
-    chmod +x /usr/local/bin/toggle-vox.sh 2>/dev/null || true
-    echo "  toggle-vox.sh → /usr/local/bin/toggle-vox.sh"
+    # (toggle-vox.sh is installed by steps/vox-sherpa.sh — not here)
 fi
 
 if $ok; then
