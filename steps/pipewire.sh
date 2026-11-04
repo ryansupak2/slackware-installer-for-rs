@@ -52,7 +52,7 @@ wait_sock() {   # $1 socket, $2 seconds (default 4)
     return 1
 }
 
-supervisor_pid() { pgrep -f "daemon -rB .*--name=$1 " 2>/dev/null | head -1; }
+supervisor_pid() { pgrep -f "daemon .*--name=$1 " 2>/dev/null | head -1; }
 
 ensure_supervised() {   # $1 name, $2.. command
     name="$1"; shift
@@ -72,7 +72,10 @@ ensure_supervised() {   # $1 name, $2.. command
         sleep 0.6
     fi
     echo "  $name: starting supervised..."
-    daemon -rB --pidfiles="$PWRUN" --name="$name" "$@" >/dev/null 2>&1 < /dev/null || true
+    # No -B (logind session binding): it did not reliably stop the daemons when X
+    # exited, it just left them holding unlinked sockets in an emptied
+    # /run/user/<uid>. Liveness is checked above instead.
+    daemon -r --pidfiles="$PWRUN" --name="$name" "$@" >/dev/null 2>&1 < /dev/null || true
     return 0
 }
 
@@ -95,72 +98,65 @@ if [ -f "$PW_STOCK" ] && [ -f "$PW_LOCAL" ] && ! cmp -s "$PW_STOCK" "$PW_LOCAL";
     echo "  restored $PW_LOCAL from $PW_STOCK"
 fi
 
-# ── Already healthy? Nothing to do. ─────────────────────────────────
-if session_ok; then
+# ── Probe: is the session actually serving clients? ─────────────────
+core_ok()  { timeout 4 pw-cli info 0 >/dev/null 2>&1; }
+pulse_ok() { timeout 4 pactl info  >/dev/null 2>&1; }
+
+if core_ok && pulse_ok; then
     echo "  PipeWire session already healthy — nothing to do."
     exit 0
 fi
 
-mkdir -p "$RT/pulse" "$PWRUN" 2>/dev/null || true
+mkdir -p "$PWRUN" 2>/dev/null || true
 chmod 700 "$RT" 2>/dev/null || true
 
-# ── 1. Remove stale sockets (only when no process owns them) ────────
-if ! pgrep -x pipewire >/dev/null 2>&1; then
-    for s in pipewire-0 pipewire-0.lock pipewire-0-manager pipewire-0-manager.lock; do
-        [ -e "$RT/$s" ] && rm -f "$RT/$s" && echo "  removed stale $s (no owner)"
+# ── Reset ───────────────────────────────────────────────────────────
+# Needed because /run/user/0 is emptied when the logind session ends (exit X,
+# re-enter X) while the audio daemons can survive: the daemon keeps listening
+# on an inode whose path no longer exists, so the sockets are unowned and every
+# client fails with ECONNREFUSED. Nothing short of a restart fixes that.
+# Supervisors are stopped BEFORE their children, otherwise `daemon -r`
+# respawns exactly what we are killing.
+echo "  audio session is not serving clients — resetting"
+for name in pipewire-pulse wireplumber pipewire; do
+    for sp in $(pgrep -f "daemon .*--name=$name " 2>/dev/null); do
+        kill "$sp" 2>/dev/null || true
     done
-fi
-if ! pgrep -x pipewire-pulse >/dev/null 2>&1; then
-    for s in pulse/native pulse/pid; do
-        [ -e "$RT/$s" ] && rm -f "$RT/$s" && echo "  removed stale $s (no owner)"
-    done
-fi
+    pkill -x "$name" 2>/dev/null || true
+done
+sleep 1
+mkdir -p "$RT/pulse" 2>/dev/null || true
+chmod 700 "$RT" 2>/dev/null || true
+rm -f "$RT/pipewire-0" "$RT/pipewire-0.lock" "$RT/pipewire-0-manager" \
+      "$RT/pipewire-0-manager.lock" "$RT/pulse/native" "$RT/pulse/pid" 2>/dev/null || true
 
-# ── 2. Alive but socket unlinked → let the supervisor respawn it ────
-if pgrep -x pipewire >/dev/null 2>&1 && [ ! -S "$RT/pipewire-0" ]; then
-    echo "  broken session: pipewire alive but control socket is gone"
-    if [ -f "$PWRUN/pipewire.pid" ]; then
-        kill "$(cat "$PWRUN/pipewire.pid")" 2>/dev/null || true
-    else
-        pkill -x pipewire 2>/dev/null || true
-    fi
-    sleep 1
-fi
-
-# ── 3. Core ─────────────────────────────────────────────────────────
+# ── Core ────────────────────────────────────────────────────────────
 ensure_supervised pipewire /usr/bin/pipewire
-if ! wait_sock "$RT/pipewire-0" 5; then
+if ! wait_sock "$RT/pipewire-0" 6; then
     echo "ERROR: pipewire control socket never appeared"
     exit 1
 fi
 
-# ── 4. Session/policy manager ───────────────────────────────────────
+# ── Session/policy manager ──────────────────────────────────────────
 ensure_supervised wireplumber /usr/bin/wireplumber
 for i in 1 2 3 4 5 6 7 8 9 10; do
     pgrep -x wireplumber >/dev/null 2>&1 && break
     sleep 0.1
 done
 
-# ── 5. PulseAudio compatibility layer ───────────────────────────────
-# Bounce instances left over from a core-less session: they accept the
-# connection and never answer, so pactl hangs.
-if pgrep -x pipewire-pulse >/dev/null 2>&1 && ! session_ok; then
-    echo "  wedged pipewire-pulse detected — restarting it"
-    pkill -x pipewire-pulse 2>/dev/null || true
-    sleep 1
-fi
+# ── PulseAudio compatibility layer ──────────────────────────────────
 ensure_supervised pipewire-pulse /usr/bin/pipewire-pulse
-if ! wait_sock "$RT/pulse/native" 5; then
+if ! wait_sock "$RT/pulse/native" 6; then
     echo "ERROR: pulse/native socket never appeared"
     exit 1
 fi
 
-# ── 6. Verify the session answers ───────────────────────────────────
-for i in $(seq 1 15); do
-    session_ok && break
+# ── Verify the session answers ──────────────────────────────────────
+for i in $(seq 1 25); do
+    pulse_ok && break
     sleep 0.2
 done
-if ! session_ok; then
+if ! pulse_ok; then
     echo "ERROR: pactl still cannot talk to the session"
     exit 1
 fi
@@ -180,5 +176,12 @@ fi
 
 echo "  sinks:   $(timeout 4 pactl list sinks short 2>/dev/null | awk '{print $2}' | tr '\n' ' ')"
 echo "  sources: $(timeout 4 pactl list sources short 2>/dev/null | grep -v monitor | awk '{print $2}' | tr '\n' ' ')"
+# Deploy itself as the session-time helper: dwm-start calls this on every X
+# start, so a session that logind half-tore-down heals before audio is needed.
+install -m 755 "$0" /usr/local/bin/pipewire-ensure 2>/dev/null || {
+    cp "$0" /usr/local/bin/pipewire-ensure && chmod 755 /usr/local/bin/pipewire-ensure
+}
+echo "  /usr/local/bin/pipewire-ensure updated"
+
 echo "SUCCESS: PipeWire session is serving clients."
 exit 0

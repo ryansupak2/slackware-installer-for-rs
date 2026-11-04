@@ -25,39 +25,23 @@ export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
 
 # ── Audio ──
 echo "── audio ──"
-# NEVER kill or unlink a live PipeWire session.
-# If pipewire is already running (e.g. supervised by `daemon -r`), killing it
-# makes the supervisor respawn it; deleting pipewire-0 afterwards then leaves the
-# daemon listening on an unlinked socket and every client fails with
-# "Connection refused" — that is exactly how sound goes missing after a login.
-if pgrep -x pipewire >/dev/null 2>&1; then
-    echo "  pipewire: already running"
+# Audio is owned by /usr/local/bin/pipewire-ensure (steps/pipewire.sh).
+# It probes the session and, if clients cannot connect (which happens after
+# exit/re-enter X: /run/user/<uid> is emptied when the logind session ends,
+# so the daemons keep listening on inodes whose paths are gone), it resets
+# the stack and verifies pactl again. Never start the daemons here directly:
+# half-started stacks are what produced the stale-socket breakage.
+if [ -x /usr/local/bin/pipewire-ensure ]; then
+    /usr/local/bin/pipewire-ensure
 else
-    echo "  pipewire..."
-    pipewire &
-    for i in 1 2 3 4 5 6 7 8 9 10; do
-        sleep 0.1
-        [ -S "$XDG_RUNTIME_DIR/pipewire-0" ] && break
-    done
-fi
-
-if pgrep -x wireplumber >/dev/null 2>&1; then
-    echo "  wireplumber: already running"
-else
-    echo "  wireplumber..."
-    wireplumber &
-    sleep 0.3
-fi
-
-if pgrep -x pipewire-pulse >/dev/null 2>&1; then
-    echo "  pipewire-pulse: already running"
-else
-    echo "  pipewire-pulse..."
-    pipewire-pulse &
-    for i in 1 2 3 4 5 6 7 8 9 10; do
-        sleep 0.1
-        [ -S "$XDG_RUNTIME_DIR/pulse/native" ] && break
-    done
+    echo "  WARNING: pipewire-ensure missing — run steps/pipewire.sh"
+    if ! pgrep -x pipewire >/dev/null 2>&1; then
+        pipewire &
+        wireplumber &
+        sleep 0.5
+        pipewire-pulse &
+        sleep 0.5
+    fi
 fi
 
 # Unmute hardware via /usr/local/bin/audio-mixer-fix (NAMED controls only).
