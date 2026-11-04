@@ -77,7 +77,7 @@ hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "acpi-wakeu
 security_access=("root-ssh-key" "keychain" "github-ssh")
 dev_tools=("vim" "git-lfs" "pi-path")
 ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm")
-applications=("chromium" "web-shortcuts" "inkscape" "yad" "root-web-shortcuts" "slskd")
+applications=("chrome" "web-shortcuts" "inkscape" "yad" "root-web-shortcuts" "slskd")
 utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux" "xclick")
 audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox" "vox-sherpa")
 
@@ -382,8 +382,8 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
-        "chromium")
-            if ./steps/chromium.sh; then
+        "chrome")
+            if ./steps/chrome.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))
@@ -514,26 +514,26 @@ for section in "${selected[@]}"; do
     esac
 done
 
-# Chromium + DRM notes (shown if the chromium step ran and wrote the marker)
+# Chrome + DRM notes (shown if the chrome step ran and wrote the marker)
 if [ -f "$browser_ran_marker" ]; then
 echo ""
 echo "*****************************************************"
-echo "NEXT STEPS FOR CHROMIUM + DRM"
+echo "NEXT STEPS FOR GOOGLE CHROME + DRM"
 echo "*****************************************************"
 echo ""
 echo "The installer has:"
-echo "  - Installed Chromium (ungoogled-chromium-bin from SBo)"
-echo "  - Installed the Widevine CDM where Chromium probes for it"
-echo "  - Verified com.widevine.alpha with an EME probe"
+echo "  - Installed Google Chrome (official .deb, repacked to /opt/google/chrome)"
+echo "  - Verified com.widevine.alpha with a headless EME probe"
 echo "  - Removed Firefox and its wrappers"
 echo ""
-echo "STEP 1: Launch Chromium:"
+echo "STEP 1: Launch Chrome:"
 echo "   w        (normal profile)"
 echo "   wk       (private, no URL history kept)"
 echo ""
 echo "STEP 2: Verify DRM in the browser:"
 echo "   chrome://components  -> Widevine Content Decryption Module"
-echo "   (if the probe fell back to Google Chrome, the CDM ships with it)"
+echo ""
+echo "STEP 3: Test playback at https://www.netflix.com or a YouTube movie"
 echo ""
 echo "STEP 3: Test playback at https://www.netflix.com or a YouTube movie"
 echo ""
