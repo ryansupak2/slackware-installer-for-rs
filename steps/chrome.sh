@@ -43,6 +43,15 @@ DEB="$CACHE_DIR/google-chrome-stable_current_amd64.deb"
 CHROME_DIR="/opt/google/chrome"
 DEB_URL="https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
 
+# Is a Chromium binary actually present/requested? Determines whether the
+# Widevine copy and the chromium package are wanted at all.
+need_chromium_cdm() {
+    [ "${BROWSER_CHROMIUM:-0}" = "1" ] && return 0
+    [ -x /usr/bin/ungoogled-chromium ] && return 0
+    [ -x /usr/bin/chromium ] && return 0
+    return 1
+}
+
 # -------------------------------------------------------------------
 # 1. Fetch the official .deb (cached; refresh with BROWSER_REFRESH=1)
 # -------------------------------------------------------------------
@@ -119,15 +128,17 @@ WRAPPER
     echo "  /usr/local/bin/chrome -> $CHROME_DIR/chrome"
 fi
 
-# -------------------------------------------------------------------
-# 4. Widevine CDM also available to any Chromium build (harmless, and the
-#    only way a future DRM-capable Chromium would ever work)
+# 4. Widevine CDM for a Chromium build — only when Chromium is actually here.
+#    Copying it for a browser that is not installed just leaves 42 MB of orphan
+#    files behind (Chrome carries its own CDM).
 # -------------------------------------------------------------------
 WV_SO="/usr/lib64/chromium/WidevineCdm/_platform_specific/linux_x64/libwidevinecdm.so"
-if [ ! -f "$WV_SO" ] && [ -d "$CHROME_DIR/WidevineCdm" ]; then
-    mkdir -p /usr/lib64/chromium
-    cp -a "$CHROME_DIR/WidevineCdm" /usr/lib64/chromium/ 2>/dev/null || true
-    echo "  WidevineCdm -> /usr/lib64/chromium/WidevineCdm"
+if need_chromium_cdm; then
+    if [ ! -f "$WV_SO" ] && [ -d "$CHROME_DIR/WidevineCdm" ]; then
+        mkdir -p /usr/lib64/chromium
+        cp -a "$CHROME_DIR/WidevineCdm" /usr/lib64/chromium/ 2>/dev/null || true
+        echo "  WidevineCdm -> /usr/lib64/chromium/WidevineCdm"
+    fi
 fi
 
 # -------------------------------------------------------------------
@@ -192,9 +203,27 @@ done
 # -------------------------------------------------------------------
 if [ "${BROWSER_CHROMIUM:-0}" = "1" ]; then
     echo "Installing Chromium (DRM-free secondary browser)..."
-    install_sbo "ungoogled-chromium-bin" || echo "  WARNING: chromium install failed (Chrome still works)"
+    if install_sbo "ungoogled-chromium-bin"; then
+        # now present: give it the CDM too (harmless when unusable)
+        if [ -d "$CHROME_DIR/WidevineCdm" ] && [ ! -f "$WV_SO" ]; then
+            mkdir -p /usr/lib64/chromium
+            cp -a "$CHROME_DIR/WidevineCdm" /usr/lib64/chromium/ 2>/dev/null || true
+            echo "  WidevineCdm -> /usr/lib64/chromium/WidevineCdm"
+        fi
+    else
+        echo "  WARNING: chromium install failed (Chrome still works)"
+    fi
 else
-    echo "Skipping Chromium (BROWSER_CHROMIUM=1 to install it as a DRM-free extra)."
+    # Not wanted: remove it and its orphan files, so the machine only carries
+    # what it actually runs (~777 MB package + ~42 MB of CDM copies).
+    echo "Removing unused Chromium..."
+    if pkg_installed "ungoogled-chromium-bin" 2>/dev/null; then
+        slackpkg -batch=on -default_answer=y remove ungoogled-chromium-bin 2>&1 | tail -1
+    fi
+    for d in /opt/ungoogled-chromium-bin /usr/lib64/chromium /usr/lib/chromium; do
+        [ -e "$d" ] && rm -rf "$d" && echo "  removed $d"
+    done
+    echo "Skipping Chromium (BROWSER_CHROMIUM=1 to add it as a DRM-free extra)."
 fi
 
 # -------------------------------------------------------------------
