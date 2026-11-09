@@ -1,0 +1,41 @@
+#!/bin/sh
+# /usr/bin/chromium — launcher for the locally built Chromium
+# (installed Debian-style: binary + resources in /usr/lib/chromium).
+#
+# Canonical source: dotfiles/chromium/chromium-wrapper, installed by
+# steps/chromium.sh. Edit the repo copy, never /usr/bin/chromium.
+#
+# Debian's chromium wrapper reads /etc/chromium.d/*.conf and lets file:// and
+# dir source them for CHROMIUM_FLAGS. Kept here because it means future
+# switches (extra flags, a different UI font config) have a home that no
+# rebuild touches.
+#
+# NOTE: this is NOT the same browser as /usr/local/bin/chrome (Google Chrome,
+# the DRM-verified default for w / wk / Mod+b). This one exists because it can
+# be built with Widevine support and the independently adjustable UI fonts in
+# patches/chromium/. See doc/chromium-build.md.
+
+CHROMIUM_DIR="/usr/lib/chromium"
+CHROMIUM_FLAGS=""
+
+if [ -d /etc/chromium.d ]; then
+    for conf in /etc/chromium.d/*.conf; do
+        [ -r "$conf" ] || continue
+        . "$conf"
+    done
+fi
+
+export CHROME_WRAPPER="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+
+# This box runs X as root and the sandbox helper is not installed setuid here,
+# so Chromium refuses to start without this (same reason as w / wk).
+if [ "$(id -u)" = "0" ]; then
+    CHROMIUM_FLAGS="$CHROMIUM_FLAGS --no-sandbox"
+fi
+
+# No D-Bus secret service (gnome-keyring/kwallet) on this machine: without
+# --password-store=basic every launch waits ~25s for the D-Bus lookup to time
+# out before the first request. Measured on this box; see steps/chrome.sh.
+CHROMIUM_FLAGS="$CHROMIUM_FLAGS --password-store=${CHROMIUM_PASSWORD_STORE:-basic}"
+
+exec "$CHROMIUM_DIR/chromium" $CHROMIUM_FLAGS "$@"

@@ -2,10 +2,18 @@
 # vpn - NordVPN (OpenVPN) connect/disconnect/status by country code
 #
 # Usage:
-#   vpn us              Connect to US (tries up to 3 servers, exits after)
-#   vpn list            List available country codes
-#   vpn stop            Disconnect
-#   vpn status          Show connection status
+#   vpn                 status summary + interactive menu (X to exit)
+#   vpn status          detailed status: country, server, endpoint, egress IP
+#   vpn us              connect to US (tries up to 5 servers)
+#   vpn list            list available country codes
+#   vpn stop            disconnect
+#
+# Status output follows the same visual language as wifi-manager.sh:
+#   * colors only when stdout is a TTY (logs and pipes stay plain text),
+#   * aligned "Label:   value" lines, lowercase state words,
+#   * bold values, YELLOW tags for the thing that needs attention,
+#   * banner-wrapped sections, "----- Device: X -----" detail blocks.
+# Keep it that way: `wifi-manager` and `vpn` are read side by side.
 
 export PATH="/usr/sbin:/sbin:$PATH"
 
@@ -19,14 +27,25 @@ CONNECT_TIMEOUT=15
 LOG_DIR="/var/log/${USER:-root}"
 LOG_FILE="$LOG_DIR/vpn-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
+
+# Terminal formatting (colors only when stdout is a TTY, so logs stay clean).
+# MUST be computed before the tee redirect below — after it, stdout is a pipe
+# and every status line would lose its color.
+BOLD=''
+GREEN=''
+RED=''
+YELLOW=''
+NC=''
+if [ -t 1 ]; then
+    BOLD=$(printf '\033[1m')
+    GREEN=$(printf '\033[32m')
+    RED=$(printf '\033[31m')
+    YELLOW=$(printf '\033[33m')
+    NC=$(printf '\033[0m')
+fi
+
 # Redirect all output to both screen and log (matching wifi-manager pattern)
 exec > >(tee -a "$LOG_FILE") 2>&1
-
-# Terminal formatting (matching wifi-manager)
-BOLD='\033[1m'
-GREEN='\033[32m'
-RED='\033[31m'
-NC='\033[0m'
 
 # ── Logging ────────────────────────────────────────────────────────────
 log_msg() {
@@ -73,6 +92,103 @@ has_configs() {
     [ -d "$CONFIG_DIR" ] && find "$CONFIG_DIR" -maxdepth 1 -name '*.ovpn' -print -quit | grep -q .
 }
 
+# ── Tunnel introspection ───────────────────────────────────────────────
+# Everything below reads state; nothing here changes the connection.
+ovpn_pid() { pgrep -x openvpn | head -1; }
+
+# The config the daemon actually runs: connect_country writes a temp copy
+# (so the original server filename is not in the process arguments).
+ovpn_config_path() {
+    local pid cfg
+    pid=$(ovpn_pid)
+    [ -n "$pid" ] || return 1
+    cfg=$(tr '\0' '\n' < "/proc/$pid/cmdline" 2>/dev/null | awk '/^--config$/{getline; print; exit}')
+    [ -n "$cfg" ] || return 1
+    echo "$cfg"
+}
+
+# "ip port" of the far end, from the running config
+ovpn_remote() {
+    local cfg
+    cfg=$(ovpn_config_path) || return 1
+    awk '/^remote[ \t]/{print $2, $3; exit}' "$cfg" 2>/dev/null
+}
+
+ovpn_proto() {
+    local cfg
+    cfg=$(ovpn_config_path) || return 1
+    awk '/^proto[ \t]/{print $2; exit}' "$cfg" 2>/dev/null
+}
+
+ovpn_uptime() {
+    local pid
+    pid=$(ovpn_pid)
+    [ -n "$pid" ] || return 1
+    ps -o etime= -p "$pid" 2>/dev/null | tr -d ' '
+}
+
+ovpn_started() {
+    local pid
+    pid=$(ovpn_pid)
+    [ -n "$pid" ] || return 1
+    ps -o lstart= -p "$pid" 2>/dev/null | sed 's/^ *//'
+}
+
+tun0_ip() {
+    /usr/sbin/ip -4 -o addr show tun0 2>/dev/null | awk '{print $4; exit}'
+}
+
+tun0_mtu() {
+    /usr/sbin/ip -o link show tun0 2>/dev/null | sed -n 's/.*mtu \([0-9]*\).*/\1/p' | head -1
+}
+
+# Map the daemon's remote IP back to the config file that produced it, so the
+# status can name the server even for a tunnel this shell did not start.
+server_for_remote() {
+    local ip="$1" hit
+    [ -n "$ip" ] || return 1
+    hit=$(grep -lE "^remote[[:space:]]+${ip//./\\.}([[:space:]]|$)" "$CONFIG_DIR"/*.ovpn 2>/dev/null | head -1)
+    [ -n "$hit" ] || return 1
+    basename "$hit" .ovpn
+}
+
+# State file: key=value lines written by connect_country. Older files hold a
+# bare country code; state_value keeps reading both.
+state_value() {   # $1 = key
+    [ -f "$STATE_FILE" ] || return 1
+    case "$(head -1 "$STATE_FILE")" in
+        *=*) sed -n "s/^$1=//p" "$STATE_FILE" | head -1 ;;
+        *) [ "$1" = "cc" ] && head -1 "$STATE_FILE" ;;
+    esac
+}
+
+write_state() {   # $1=cc $2=server $3=config $4=remote
+    {
+        echo "cc=$1"
+        echo "server=$2"
+        echo "config=$3"
+        echo "remote=$4"
+        echo "started=$(date +%s)"
+    } > "$STATE_FILE" 2>/dev/null || true
+}
+
+# Best-effort geo lookup of the egress IP — i.e. where the internet thinks you
+# are right now. 3s timeout, silent on failure, VPN_NO_GEO=1 to skip entirely.
+egress_geo() {
+    [ "${VPN_NO_GEO:-0}" = "1" ] && return 1
+    command -v curl >/dev/null 2>&1 || return 1
+    local json
+    json=$(timeout 3 curl -s https://ipinfo.io/json 2>/dev/null) || return 1
+    [ -n "$json" ] || return 1
+    local ip city region country
+    ip=$(printf '%s\n' "$json" | sed -n 's/.*"ip": *"\([^"]*\)".*/\1/p' | head -1)
+    city=$(printf '%s\n' "$json" | sed -n 's/.*"city": *"\([^"]*\)".*/\1/p' | head -1)
+    region=$(printf '%s\n' "$json" | sed -n 's/.*"region": *"\([^"]*\)".*/\1/p' | head -1)
+    country=$(printf '%s\n' "$json" | sed -n 's/.*"country": *"\([^"]*\)".*/\1/p' | head -1)
+    [ -n "$ip" ] || return 1
+    printf '%s\t%s\t%s\t%s' "$ip" "$city" "$region" "$country"
+}
+
 # ── Country name mapping ───────────────────────────────────────────────
 declare -A COUNTRY_NAMES=(
     [al]="Albania" [dz]="Algeria" [ar]="Argentina" [au]="Australia"
@@ -98,13 +214,145 @@ country_name() {
     echo "${COUNTRY_NAMES[$cc]:-$cc}"
 }
 
+# ── Status presentation (mirrors wifi-manager.sh) ──────────────────────
+# Where the tunnel exits, in words: "Mexico (mx)". Falls back to the server
+# hostname, then to the egress country, then to a plain "unknown location".
+vpn_where() {
+    local cc server ip geo country
+    cc=$(state_value cc 2>/dev/null)
+    server=$(state_value server 2>/dev/null)
+    [ -n "$server" ] || server=$(server_for_remote "$(ovpn_remote 2>/dev/null | awk '{print $1}')" 2>/dev/null)
+    if [ -z "$cc" ] && [ -n "$server" ]; then
+        cc=$(printf '%s' "$server" | sed -n 's/^\([a-z][a-z]\)[0-9].*/\1/p')
+    fi
+    if [ -z "$cc" ] && geo=$(egress_geo); then
+        country=$(printf '%s' "$geo" | cut -f4)
+        cc=$(printf '%s' "$country" | tr '[:upper:]' '[:lower:]')
+    fi
+    if [ -n "$cc" ] && [ -n "$(country_name "$cc")" ]; then
+        printf '%s (%s)' "$(country_name "$cc")" "$cc"
+    else
+        printf 'unknown location'
+    fi
+}
+
+vpn_server() {
+    local server rip
+    server=$(state_value server 2>/dev/null)
+    if [ -z "$server" ]; then
+        rip=$(ovpn_remote 2>/dev/null | awk '{print $1}')
+        server=$(server_for_remote "$rip" 2>/dev/null)
+    fi
+    printf '%s' "${server:-unknown server}"
+}
+
+# Compact summary — the equivalent of wifi-manager's quick_wifi_summary().
+# Shown at the top of the menu and after connect/disconnect.
+quick_vpn_summary() {
+    if ! is_connected; then
+        echo -e "VPN:     ${RED}not connected${NC}  (traffic goes out directly)"
+        return
+    fi
+
+    local tag="" remote rip rport proto geo gip gcity gregion gcc geo_line tip
+    tip=$(tun0_ip)
+    remote=$(ovpn_remote 2>/dev/null)
+    rip=${remote%% *}
+    rport=${remote##* }
+    proto=$(ovpn_proto 2>/dev/null)
+
+    if is_vpn_alive; then
+        tag=" ${BOLD}${YELLOW}[Internet]${NC}"
+    else
+        tag=" ${BOLD}${YELLOW}[STALE]${NC}"
+    fi
+    local srv srv_tag=""
+    srv=$(vpn_server)
+    # The server name is only known for tunnels this script started (it is
+    # recorded in the state file). Otherwise it is matched from the config's
+    # remote IP, which can name a different box in the same pool — say so
+    # instead of pretending to know.
+    [ -n "$(state_value server 2>/dev/null)" ] || srv_tag=" ${YELLOW}[inferred]${NC}"
+
+    echo -e "VPN:     ${GREEN}connected${NC}  to ${BOLD}$(vpn_where)${NC}${tag}"
+    echo -e "Server:  ${BOLD}${srv}${NC}${srv_tag}${remote:+  (remote ${rip}:${rport}${proto:+, ${proto}})}"
+    echo "Tunnel:  tun0 ${tip:-no address}"
+    echo "Uptime:  $(ovpn_uptime 2>/dev/null || echo unknown)"
+
+    if geo=$(egress_geo); then
+        gip=$(printf '%s' "$geo" | cut -f1)
+        gcity=$(printf '%s' "$geo" | cut -f2)
+        gregion=$(printf '%s' "$geo" | cut -f3)
+        gcc=$(printf '%s' "$geo" | cut -f4)
+        geo_line="$gip"
+        [ -n "$gcity" ] && geo_line="$geo_line — $gcity"
+        [ -n "$gregion" ] && geo_line="$geo_line, $gregion"
+        [ -n "$gcc" ] && geo_line="$geo_line, $gcc"
+        echo "Egress:  ${geo_line}"
+    fi
+}
+
+# Detailed status — the equivalent of wifi-manager's show_status().
+show_status() {
+    echo "*****************************************************"
+    echo "VPN STATUS (NordVPN / OpenVPN)"
+    echo "*****************************************************"
+    echo ""
+
+    quick_vpn_summary
+    echo ""
+
+    if ! is_connected; then
+        echo "No tunnel is up: every connection leaves from this machine's own IP."
+        echo "Connect with: vpn <country>   (e.g. vpn us, vpn mx — 'vpn list' shows codes)"
+        return 0
+    fi
+
+    local remote rip rport proto ip mtu cfg pid
+    remote=$(ovpn_remote 2>/dev/null)
+    rip=${remote%% *}
+    rport=${remote##* }
+    proto=$(ovpn_proto 2>/dev/null)
+    ip=$(tun0_ip)
+    mtu=$(tun0_mtu)
+    cfg=$(state_value config 2>/dev/null)
+    pid=$(ovpn_pid 2>/dev/null)
+
+    echo "----- Tunnel: tun0 -----"
+    if is_vpn_alive; then
+        echo -e "  State:   ${GREEN}UP${NC} (carries traffic)"
+    else
+        echo -e "  State:   ${YELLOW}UP but no traffic${NC} — recover with: vpn stop"
+    fi
+    echo "  IPv4:    ${ip:-no address}"
+    [ -n "$mtu" ] && echo "  MTU:     $mtu"
+    [ -n "$remote" ] && echo "  Remote:  ${rip}:${rport}${proto:+ ($proto)}"
+    [ -n "$pid" ] && echo "  PID:     $pid"
+    echo "  Uptime:  $(ovpn_uptime 2>/dev/null || echo unknown)  (since $(ovpn_started 2>/dev/null || echo unknown))"
+    if [ -n "$cfg" ]; then
+        echo "  Config:  $cfg"
+    else
+        echo "  Config:  $(ovpn_config_path 2>/dev/null || echo unknown) (temp copy; server matched by remote IP)"
+    fi
+    echo ""
+
+    echo "Internet reachability check (ping 1.1.1.1)..."
+    if is_vpn_alive; then
+        echo -e "  Internet: ${GREEN}YES${NC} (reachable through the tunnel)"
+    else
+        echo -e "  Internet: ${YELLOW}NO${NC} (tunnel is up but nothing passes)"
+    fi
+}
+
 # ── List ───────────────────────────────────────────────────────────────
 list_countries() {
     if [ ! -f "$DNS_FILE" ]; then
         log_msg ERROR "country file not found: $DNS_FILE"
         return 1
     fi
-    echo "Available country codes (abbreviation: country):"
+    echo "*****************************************************"
+    echo "AVAILABLE VPN COUNTRIES"
+    echo "*****************************************************"
     echo ""
     while IFS=: read -r cc _; do
         cc=$(echo "$cc" | tr '[:upper:]' '[:lower:]')
@@ -113,11 +361,11 @@ list_countries() {
 }
 
 print_usage() {
-    echo "Usage: vpn <country>     connect to country (e.g. us, uk, mx, jp)"
-    echo "       vpn list          list available country codes"
-    echo "       vpn stop          disconnect"
-    echo "       vpn status        show connection status"
-    echo "       vpn               interactive menu"
+    echo "Usage: vpn                 status summary + interactive menu (X = exit)"
+    echo "       vpn status          detailed status: country, server, endpoint, egress"
+    echo "       vpn <country>       connect to country (e.g. us, uk, mx, jp)"
+    echo "       vpn list            list available country codes"
+    echo "       vpn stop            disconnect"
 }
 
 # ── IPv6 leak prevention ───────────────────────────────────────────────
@@ -162,7 +410,7 @@ connect_country() {
         local server
         server=$(basename "$config" .ovpn)
 
-        echo -n "Connecting to ${server}... "
+        echo -n "Connecting to ${BOLD}${server}${NC} ($(country_name "$cc"))... "
 
         # Build temp config
         local tmpcfg
@@ -191,7 +439,11 @@ connect_country() {
             if is_connected; then
                 echo -e "${GREEN}done${NC} (${waited}s)"
                 block_ipv6
-                echo "$cc" > "$STATE_FILE"
+                write_state "$cc" "$server" "$config" "$(ovpn_remote)"
+                echo ""
+                echo -e "SUCCESS: ${GREEN}Connected${NC} to ${BOLD}$(country_name "$cc") (${cc})${NC} via ${server}."
+                echo ""
+                quick_vpn_summary
                 return 0
             fi
         done
@@ -216,7 +468,7 @@ disconnect_vpn() {
     sleep 1
 
     if ! is_connected; then
-        echo -e "${RED}DISCONNECTED${NC}"
+        echo -e "SUCCESS: ${RED}Disconnected${NC}. Traffic now goes out directly."
         return 0
     else
         log_msg ERROR "tun0 still up after kill — run: sudo pkill -9 openvpn"
@@ -224,48 +476,47 @@ disconnect_vpn() {
     fi
 }
 
-# ── Interactive menu ───────────────────────────────────────────────────
+# ── Interactive menu (same flow as wifi-manager) ───────────────────────
 interactive_menu() {
     while true; do
         echo ""
-        echo "NordVPN (OpenVPN)"
-        echo "=================="
-        echo ""
-
+        quick_vpn_summary
+        echo "*****************************************************"
+        echo "VPN MANAGER (NORDVPN) - MAIN MENU"
+        echo "*****************************************************"
         if is_connected; then
-            if is_vpn_alive; then
-                echo -e "Status: ${GREEN}CONNECTED${NC}"
-            else
-                echo -e "Status: ${RED}STALE${NC} (tun0 UP, no internet — press 1 to disconnect)"
-            fi
-            echo ""
-            echo "1. Disconnect"
-            echo "2. Exit"
-            echo ""
-            read -p "Choice [1-2]: " choice
-            case $choice in
-                1) echo ""; disconnect_vpn ;;
-                2) echo ""; return 0 ;;
+            echo "1. Show VPN status (country, server, endpoint, egress)"
+            echo "2. Disconnect VPN"
+            echo "X. Exit"
+            echo "*****************************************************"
+            read -p "Enter choice [1-2 or X]: " choice
+            case "$choice" in
+                1) show_status ;;
+                2) echo ""; disconnect_vpn ;;
+                x|X|exit|Exit|EXIT|q|Q|quit|2) echo ""; echo "Exiting VPN Manager."; return 0 ;;
+                *) echo "Invalid choice. Please enter 1, 2 or X." ;;
             esac
         else
-            echo -e "Status: ${RED}DISCONNECTED${NC}"
-            echo ""
             echo "1. Connect by country code"
-            echo "2. Exit"
-            echo ""
-            read -p "Choice [1-2]: " choice
-            case $choice in
+            echo "2. List available countries"
+            echo "X. Exit"
+            echo "*****************************************************"
+            read -p "Enter choice [1-2 or X]: " choice
+            case "$choice" in
                 1)
                     echo ""
                     read -p "Enter 2-letter country code (e.g. us, uk, mx, jp): " cc
+                    cc=$(echo "$cc" | tr '[:upper:]' '[:lower:]')
                     if [ ${#cc} -eq 2 ]; then
+                        echo ""
                         connect_country "$cc"
                     else
                         echo "Invalid country code."
                     fi
                     ;;
-                2) echo ""; return 0 ;;
-                *) echo "Invalid choice" ;;
+                2) echo ""; list_countries ;;
+                x|X|exit|Exit|EXIT|q|Q|quit|2) echo ""; echo "Exiting VPN Manager."; return 0 ;;
+                *) echo "Invalid choice. Please enter 1, 2 or X." ;;
             esac
         fi
     done
@@ -280,21 +531,13 @@ run_cli() {
         list)
             list_countries
             ;;
-        --help)
+        --help|-h)
             print_usage
             exit 0
             ;;
         status|st|s)
-            if is_connected; then
-                if is_vpn_alive; then
-                    echo -e "VPN: ${GREEN}CONNECTED${NC} (tun0 is UP)"
-                else
-                    echo -e "VPN: ${RED}STALE${NC} (tun0 is UP, but no internet — run 'vpn disconnect' to recover)"
-                fi
-                ip addr show tun0 2>/dev/null | grep inet
-            else
-                echo -e "VPN: ${RED}DISCONNECTED${NC}"
-            fi
+            show_status
+            exit 0
             ;;
         *)
             # Assume it's a country code
@@ -309,13 +552,13 @@ run_cli() {
                     sleep 1
                 else
                     log_msg ERROR "VPN is active under another user — refusing to disconnect"
-                    echo "VPN is connected by another user. Run 'vpn disconnect' as that user first."
+                    echo "VPN is connected by another user. Run 'vpn stop' as that user first."
                     exit 1
                 fi
             fi
             if connect_country "$1"; then
-                echo "$1" > "$STATE_FILE"
-                echo "Run 'vpn disconnect' to stop."
+                echo ""
+                echo "Run 'vpn stop' to disconnect."
             else
                 exit 1
             fi
@@ -335,5 +578,3 @@ if [ $# -eq 0 ]; then
 else
     run_cli "$1"
 fi
-
-

@@ -1,0 +1,226 @@
+# LOCAL PATCH — slackware-installer-for-rs
+#
+# Independently adjustable UI font sizes for the URL bar and the tab strip.
+#
+# Upstream ties both to one source font: the omnibox asks for a 14pt target
+# (CONTEXT_OMNIBOX_PRIMARY, height-clamped by LocationBarView), while tab
+# titles are plain views::Label text (CONTEXT_LABEL, 12pt target) shared with
+# every other label in the browser. Neither is exposed as a pref, a flag or a
+# switch, so a rebuild is the only way to decouple them.
+#
+# This patch adds a dedicated CONTEXT_TAB_TITLE, has TabTitle use it, and makes
+# ChromeTypographyProvider add a runtime point-delta to both contexts, read
+# once per process from /etc/chromium/ui-font.conf:
+#
+#     omnibox_delta=N       # added to the URL bar size   (target 14pt)
+#     tab_delta=N           # added to the tab strip size (target 12pt)
+#
+# With no config file both deltas are 0 and behaviour is identical to stock
+# Chromium. Written against Chromium 157.0.8103.38.
+#
+# Apply from the Chromium source root:  git apply -p1 <this file>
+# Background, invariants and the version-bump procedure: patches/chromium/README.md
+#
+--- a/ui/views/style/typography.h
++++ b/ui/views/style/typography.h
+@@ -56,6 +56,14 @@
+   // Text for the menu items that appear in the touch-selection context menu.
+   CONTEXT_TOUCH_MENU,
+ 
++  // LOCAL PATCH (slackware-installer-for-rs): text on tab strip labels.
++  // ChromeTypographyProvider maps this context to Chromium's default target
++  // size plus the runtime delta from /etc/chromium/ui-font.conf, so the tab
++  // strip font can be sized independently of the URL bar. See
++  // patches/chromium/README.md. Upstream has no tab-specific context: tab
++  // titles are plain LABEL text, which is why they track every other label.
++  CONTEXT_TAB_TITLE,
++
+   // Embedders must start TextContext enum values from this value.
+   VIEWS_TEXT_CONTEXT_END,
+ 
+--- a/chrome/browser/ui/views/chrome_typography.h
++++ b/chrome/browser/ui/views/chrome_typography.h
+@@ -107,4 +107,21 @@
+                            int style,
+                            ui::ResourceBundle::FontDetails& details);
+ 
++// LOCAL PATCH (slackware-installer-for-rs): point deltas applied on top of
++// Chromium's built-in target sizes, so the URL bar and the tab strip can be
++// sized independently. Values come from /etc/chromium/ui-font.conf (override
++// the path with CHROMIUM_UI_FONT_CONF), are clamped to sane limits and are
++// read once per process. Defined in chrome_typography.cc. Defaults are 0, so
++// an unpatched config file means stock Chromium behaviour.
++// See patches/chromium/README.md and scripts/chromium-ui-font.sh.
++namespace chrome_ui_font {
++
++// Extra points added to the URL bar / omnibox text size (target 14pt).
++int OmniboxDelta();
++
++// Extra points added to the tab strip label size (target 12pt).
++int TabDelta();
++
++}  // namespace chrome_ui_font
++
+ #endif  // CHROME_BROWSER_UI_VIEWS_CHROME_TYPOGRAPHY_H_
+--- a/chrome/browser/ui/views/chrome_typography.cc
++++ b/chrome/browser/ui/views/chrome_typography.cc
+@@ -4,6 +4,15 @@
+ 
+ #include "chrome/browser/ui/views/chrome_typography.h"
+ 
++#include <algorithm>
++#include <cstdlib>
++#include <string>
++#include <string_view>
++
++#include "base/files/file_util.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/string_split.h"
++#include "base/strings/string_util.h"
+ #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+ #include "components/omnibox/browser/omnibox_field_trial.h"
+ #include "ui/base/default_style.h"
+@@ -91,3 +100,100 @@
+       break;
+   }
+ }
++
++// LOCAL PATCH (slackware-installer-for-rs): per-element UI font deltas.
++//
++// Reads `<key>=<delta>` lines from /etc/chromium/ui-font.conf (or the path in
++// $CHROMIUM_UI_FONT_CONF). Deliberately read once per process: these deltas
++// feed the Views typography cache, so a change needs a browser restart —
++// which is what scripts/chromium-ui-font.sh tells the user to do.
++//
++// Supported keys (unknown keys are ignored, values are clamped):
++//   omnibox_delta=N   points added to URL bar text   (Chromium target: 14pt)
++//   tab_delta=N       points added to tab strip text (Chromium target: 12pt)
++//
++// Missing file, unreadable file or garbage input = 0 deltas = stock
++//
++// tests/chromium-ui-font-parse.sh extracts the block between the BEGIN/END
++// markers below and compiles it against stubs for the base:: helpers, so the
++// config parser can be tested on a machine with no Chromium tree. Keep the
++// markers, and do not put anything in the block that needs more than
++// <algorithm>/<cstdlib>/<string>/<string_view> + those four base headers.
++// BEGIN chrome-ui-font-parser
++namespace chrome_ui_font {
++
++namespace {
++
++// Wide enough to be useful with any UI font, narrow enough that a typo
++// cannot clip every tab in the strip.
++constexpr int kMinDelta = -6;
++constexpr int kMaxDelta = 10;
++
++struct Deltas {
++  int omnibox = 0;
++  int tab = 0;
++};
++
++int ClampDelta(int value) {
++  return std::clamp(value, kMinDelta, kMaxDelta);
++}
++
++Deltas LoadDeltas() {
++  Deltas deltas;
++  base::FilePath path("/etc/chromium/ui-font.conf");
++  if (const char* env_path = std::getenv("CHROMIUM_UI_FONT_CONF");
++      env_path && *env_path) {
++    path = base::FilePath(env_path);
++  }
++
++  std::string contents;
++  if (!base::ReadFileToStringWithMaxSize(path, &contents, 4096)) {
++    return deltas;
++  }
++
++  for (std::string_view raw_line :
++       base::SplitStringPiece(contents, "\n", base::TRIM_WHITESPACE,
++                              base::SPLIT_WANT_NONEMPTY)) {
++    if (raw_line.starts_with('#')) {
++      continue;
++    }
++    const size_t equals = raw_line.find('=');
++    if (equals == std::string_view::npos) {
++      continue;
++    }
++    const std::string_view key =
++        base::TrimWhitespaceASCII(raw_line.substr(0, equals), base::TRIM_ALL);
++    int value = 0;
++    if (!base::StringToInt(
++            base::TrimWhitespaceASCII(raw_line.substr(equals + 1),
++                                      base::TRIM_ALL),
++            &value)) {
++      continue;
++    }
++    if (key == "omnibox_delta") {
++      deltas.omnibox = ClampDelta(value);
++    } else if (key == "tab_delta") {
++      deltas.tab = ClampDelta(value);
++    }
++  }
++  return deltas;
++}
++
++const Deltas& GetDeltas() {
++  // Intentionally static: one read per process, no config watching.
++  static const Deltas deltas = LoadDeltas();
++  return deltas;
++}
++
++}  // namespace
++
++int OmniboxDelta() {
++  return GetDeltas().omnibox;
++}
++
++int TabDelta() {
++  return GetDeltas().tab;
++}
++
++}  // namespace chrome_ui_font
++// END chrome-ui-font-parser
+--- a/chrome/browser/ui/views/chrome_typography_provider.cc
++++ b/chrome/browser/ui/views/chrome_typography_provider.cc
+@@ -141,6 +141,22 @@
+     details.size_delta -= 2;
+   }
+ 
++  // LOCAL PATCH (slackware-installer-for-rs): per-element UI font deltas.
++  // Applied last so a user override wins over Chromium's built-in target
++  // sizes. With no /etc/chromium/ui-font.conf both deltas are 0 and this is
++  // a no-op (stock behaviour). See patches/chromium/README.md.
++  switch (context) {
++    case CONTEXT_OMNIBOX_PRIMARY:
++    case CONTEXT_OMNIBOX_POPUP:
++      details.size_delta += chrome_ui_font::OmniboxDelta();
++      break;
++    case views::style::CONTEXT_TAB_TITLE:
++      details.size_delta += chrome_ui_font::TabDelta();
++      break;
++    default:
++      break;
++  }
++
+   return details;
+ }
+ 
+--- a/chrome/browser/ui/views/tabs/tab/tab_title.cc
++++ b/chrome/browser/ui/views/tabs/tab/tab_title.cc
+@@ -6,8 +6,15 @@
+ 
+ #include "chrome/browser/ui/tab_contents/core_tab_helper.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/views/style/typography.h"
+ 
+ TabTitle::TabTitle() {
++  // LOCAL PATCH (slackware-installer-for-rs): use a dedicated typography
++  // context so the tab strip font size can be tuned independently of the URL
++  // bar. Upstream inherits CONTEXT_LABEL, which every other label shares.
++  // See patches/chromium/README.md.
++  SetTextContext(views::style::CONTEXT_TAB_TITLE);
++
+   SetHorizontalAlignment(gfx::ALIGN_TO_HEAD);
+   SetElideBehavior(gfx::FADE_TAIL);
+   SetHandlesTooltips(false);

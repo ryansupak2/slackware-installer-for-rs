@@ -7,8 +7,11 @@
 #     when the browser exits, so not even the incognito session survives;
 #   * no URL is handed to an already-running Chromium, so nothing can leak into
 #     the normal profile's session restore;
-#   * the requested page is opened at the normal profile's page zoom (125%),
-#     which has to be seeded into the throwaway profile — see seed_zoom below.
+#   * the requested page opens at 150% like every other tab, because the 150%
+#     comes from --force-device-scale-factor in /usr/local/bin/chrome (a
+#     browser-wide switch) and not from per-profile zoom settings. Nothing has
+#     to be seeded into the throwaway profile, and Chrome's zoom control still
+#     reads 100%.
 #
 # Usage:  wk / wk y / wk example.com / wk https://example.com/x
 
@@ -64,53 +67,14 @@ chmod 700 "$udd" 2>/dev/null || true
 cleanup() { rm -rf "$udd"; }
 trap cleanup EXIT INT TERM HUP
 
-# Page zoom. The throwaway profile starts empty, so it does not inherit the
-# normal profile's zoom and every page would open at 100%. Chrome reads zoom
-# from the profile that owns the --user-data-dir, so seed it before launch.
-#
-# In this Chrome build only the per-host entries are honoured when rendering:
-# partition.default_zoom_level alone leaves the page at 100% (verified over
-# CDP: seeding it changed nothing, seeding the visited host's zoom_level
-# zoomed the page, incognito included — the OTR profile inherits the regular
-# profile's prefs). So copy the normal profile's partition block (its
-# default_zoom_level and every per-host entry, which covers sites reached by
-# clicking links) and pin the entry for the host we are about to open to that
-# default_zoom_level. Sites on other hosts still open at 100% — exactly as
-# they do in the normal profile, whose default_zoom_level is equally inert.
-seed_zoom() {  # $1 = uri, $2 = Preferences file to write
-    zoom_src="${HOME}/.config/google-chrome/Default/Preferences"
-    [ -f "$zoom_src" ] || return 0
-    command -v python3 >/dev/null 2>&1 || return 0
-    mkdir -p "$(dirname "$2")" 2>/dev/null || return 0
-    python3 - "$zoom_src" "$2" "$1" <<'PYEOF' || return 0
-import json, math, sys
-from urllib.parse import urlsplit
-
-src, dst, uri = sys.argv[1:4]
-host = urlsplit(uri).hostname
-if not host:            # about:blank, file:// — nothing to anchor zoom to
-    sys.exit(0)
-
-try:
-    part = json.load(open(src)).get("partition")
-except Exception:
-    part = None
-if not isinstance(part, dict):
-    part = {}
-
-level = part.get("default_zoom_level")
-if isinstance(level, bool) or not isinstance(level, (int, float)):
-    level = math.log(1.25) / math.log(1.2)     # 125%, the installer default
-
-per_host = part.setdefault("per_host_zoom_levels", {})
-key = next(iter(per_host), "x")   # "x" is Chrome's only partition key
-per_host.setdefault(key, {})[host] = {"zoom_level": level}
-
-with open(dst, "w") as f:
-    json.dump({"partition": part}, f)
-PYEOF
-}
-seed_zoom "$uri" "$udd/Default/Preferences"
+# Page zoom: nothing to do. The 150% the user sees is
+# --force-device-scale-factor=1.5 from the wrapper, which is browser-wide and
+# profile-independent, so the empty throwaway profile renders at exactly the
+# same size as the normal profile and Chrome's zoom control reads 100% in
+# both. (Before this, zoom had to be seeded per host into the throwaway
+# profile: partition.default_zoom_level is inert in this Chrome build, so a
+# freshly created profile opened everything at 100%. DSF removes that whole
+# class of problem — do not reintroduce zoom seeding here.)
 
 "$browser" $SANDBOX_FLAG $WIDEVINE_FLAG \
     --incognito --user-data-dir="$udd" --no-first-run \

@@ -34,6 +34,27 @@ make -j$(nproc) 2>&1 | tail -30
 make -j$(nproc) >/dev/null 2>&1
 ```
 
+## Show the running status of anything you start
+
+Every process started (daemon, server, browser, watcher, long build) must have
+its state visible on screen — not only in a log, not only in your summary:
+
+```bash
+# on launch  — show the tool's own ready line, or:
+pgrep -af voxd
+ss -ltnp | grep 8080
+
+# while running — a fresh status line, not an assertion:
+pgrep -af voxd && tail -3 /var/log/root-vox.log
+
+# when done — the final state (alive / exited / exit code):
+pgrep -x voxd || echo "exited: $?"
+```
+
+Never background something with `&` and then declare success from the launch
+command alone. Never call a service "ready" or "deployed" without a status check
+you actually ran and showed.
+
 ## Logging conventions
 
 All project components log to `/var/log/` with a consistent
@@ -118,3 +139,48 @@ bash -n scripts/foo.sh              # shell syntax
 pgrep -x voxd                         # daemon alive
 tail -3 /var/log/root-vox.log          # logging works
 ```
+
+
+---
+
+# Browser stack — two browsers, do not conflate them
+
+| binary | built by | what it is | launched by |
+|---|---|---|---|
+| `/opt/google/chrome/chrome` (wrapped as `/usr/local/bin/chrome`) | `steps/chrome.sh` | **Google Chrome**, the DRM baseline | `w`, `wk`, Mod+b |
+| `/usr/lib/chromium/chromium` (wrapped as `/usr/bin/chromium`) | `steps/chromium.sh` | **our own Chromium build**: Widevine via Chrome's CDM + URL-bar/tab fonts independently adjustable | `chromium` |
+
+Hard-won facts, do not re-litigate:
+
+* Widevine is **compile-time**. `ungoogled-chromium-bin` (the only Chromium
+  Slackware has) is built without it and rejects
+  `com.widevine.alpha` with `NotSupportedError` — no flag or CDM copy fixes
+  that. That is why we build Chromium ourselves with the switches Debian uses
+  (`proprietary_codecs`, `ffmpeg_branding="Chrome"`, `enable_widevine`), and
+  why the CDM is copied from Chrome's .deb instead of being built
+  (`patches/chromium/README.md` has the licensing reasoning).
+* Stock Chromium sizes the URL bar (14pt target) and tab labels (12pt target)
+  from one font, with no way to move them separately.
+  `patches/chromium/0001-per-element-ui-font-deltas.patch` adds a dedicated
+  `CONTEXT_TAB_TITLE` plus runtime deltas from `/etc/chromium/ui-font.conf`,
+  tuned by `chromium-ui-font`. Never delete that patch to make a build pass:
+  the build is pointless for this machine without it — rebase it instead.
+* Page zoom is 200% with the zoom control reading **100%**, because it comes
+  from `--force-device-scale-factor=2` in the wrapper (`steps/chrome.sh:`
+  section 3), not from Chrome's zoom setting. DSF and the zoom control
+  multiply, so the stored zoom stays at 100% (`chrome-default-zoom 100`).
+  `dotfiles/chromium/wk` must not seed per-host zoom again — DSF is
+  profile-independent and `partition.default_zoom_level` is inert here.
+
+After touching anything under `patches/chromium/`, `dotfiles/chromium/`,
+`lib/chromium-version.sh` or `steps/chromium.sh`, run:
+
+```bash
+bash tests/chromium-ui-font-parse.sh      # parses the shipped patch, 17 cases, no Chromium tree
+REPO_DIR=$PWD bash steps/chromium.sh status
+```
+
+Version bumps: follow the checklist in `lib/chromium-version.sh` and the
+rebase procedure in `patches/chromium/README.md` (includes the 157 renames
+that broke the first attempt). Keep the pin close to the installed Chrome so
+the CDM host version still matches.

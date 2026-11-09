@@ -1,13 +1,22 @@
 #!/bin/sh
-# chrome-default-zoom <percent> — set Chrome's DEFAULT page zoom (what new
-# tabs/sites open at) for the root profile, and normalise any existing
-# per-site zoom entries to the same value.
+# chrome-default-zoom <percent> — set Chrome's OWN page zoom for the root
+# profile (and normalise any per-host zoom entries to the same value).
+#
+# This is NOT where the machine's 150% comes from. The wrapper
+# /usr/local/bin/chrome starts Chrome with --force-device-scale-factor=1.5,
+# which makes pages render at 150% while this zoom control stays at 100% —
+# that is the point: the user sees "100%" in the zoom control and the zoom
+# comes from the DSF switch (steps/chrome.sh, section 3).
+#
+# Leave it at 100% unless a site needs its own zoom: the two multiply, so
+# 125% here is 187.5% on screen.
 #
 # Chrome stores zoom as log(zoom) / log(1.2) in Default/Preferences under
 # "partition". It rewrites that file when it exits, so Chrome MUST be closed.
 #
 # Usage:  chrome-default-zoom           show the current values
-#         chrome-default-zoom 125       default 125% for every site
+#         chrome-default-zoom 100       back to "no stored zoom" (the default)
+#         chrome-default-zoom 125       store 125% for every site (187.5% on screen)
 
 set -u
 PREFS=/root/.config/google-chrome/Default/Preferences
@@ -34,13 +43,13 @@ fi
 if [ $# -eq 0 ]; then
     echo "  Chrome page zoom for /root:"
     show
-    echo "  set with: chrome-default-zoom 125"
+    echo "  set with: chrome-default-zoom 100   (keep at 100: DSF 1.5 already gives 150%)"
     exit 0
 fi
 
 PCT=$1
 case "$PCT" in
-    ''|*[!0-9]*) echo "usage: chrome-default-zoom <percent, e.g. 125>"; exit 1 ;;
+    ''|*[!0-9]*) echo "usage: chrome-default-zoom <percent, e.g. 100>"; exit 1 ;;
 esac
 if awk -v p="$PCT" 'BEGIN{exit !(p >= 25 && p <= 500)}'; then :; else
     echo "  percent must be between 25 and 500"; exit 1

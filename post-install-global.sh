@@ -77,7 +77,7 @@ hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "acpi-wakeu
 security_access=("root-ssh-key" "keychain" "github-ssh")
 dev_tools=("vim" "git-lfs" "pi-path")
 ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm")
-applications=("chrome" "web-shortcuts" "inkscape" "yad" "root-web-shortcuts" "slskd")
+applications=("chrome" "chromium-build" "web-shortcuts" "inkscape" "yad" "root-web-shortcuts" "slskd")
 utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux" "xclick")
 audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox" "vox-sherpa")
 
@@ -397,6 +397,21 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
+        # Locally built Chromium (Widevine + separately sized URL/tab fonts).
+        # A from-source build is HOURS of CPU, so it never runs as a side
+        # effect of "all sections": it needs CHROMIUM_BUILD=1 as well.
+        "chromium-build")
+            if [ "${CHROMIUM_BUILD:-0}" != "1" ]; then
+                echo "Skipping chromium-build: a from-source Chromium build takes hours."
+                echo "Run it deliberately:  CHROMIUM_BUILD=1 ./post-install-global.sh chromium-build"
+                echo "or directly:           REPO_DIR=$PWD bash steps/chromium.sh"
+                success_count=$((success_count + 1))
+            elif ./steps/chromium.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
         # w / w? / wk launchers (wk = private profile, no URL history kept)
         "web-shortcuts")
             if ./steps/web-shortcuts.sh; then
@@ -543,7 +558,27 @@ echo "   chrome://components  -> Widevine Content Decryption Module"
 echo ""
 echo "STEP 3: Test playback at https://www.netflix.com or a YouTube movie"
 echo ""
-echo "STEP 3: Test playback at https://www.netflix.com or a YouTube movie"
+echo "(Page zoom is 200%, from --force-device-scale-factor=2 in the wrapper,"
+echo " so Chrome's own zoom control stays at 100%. The two multiply: see"
+echo " doc/chromium-build.md before setting a site zoom.)"
+echo ""
+fi
+
+# Locally built Chromium notes (only when it is actually installed)
+if [ -x /usr/lib/chromium/chromium ]; then
+echo "*****************************************************"
+echo "LOCAL CHROMIUM (DRM + separately sized URL/tab fonts)"
+echo "*****************************************************"
+echo ""
+echo "  chromium             launch it (200% pages, zoom control at 100%)"
+echo "  chromium-ui-font     show / set URL bar and tab label sizes"
+echo "                       chromium-ui-font omnibox 16"
+echo "                       chromium-ui-font tab 13"
+echo "  /etc/chromium/ui-font.conf   what that helper writes"
+echo "  doc/chromium-build.md        rebuilds, version bumps, troubleshooting"
+echo "  patches/chromium/README.md   the font patch and its invariants"
+echo ""
+echo "  w / wk still launch Google Chrome, which ignores these font settings."
 echo ""
 fi
 

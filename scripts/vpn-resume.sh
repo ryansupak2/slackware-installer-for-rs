@@ -98,11 +98,22 @@ if [ "$1" = "post" ]; then
     fi
 
     read -r user uid sf <<< "$user_info"
-    cc=$(cat "$sf" 2>/dev/null)
+    # vpn_state holds key=value lines (cc=, server=, config=, remote=,
+    # started=), written by scripts/vpn.sh connect_country. Older/foreign
+    # files may still be a bare country code, so accept both — and never feed
+    # anything but a 2-letter code into `vpn <cc>` below.
+    cc=$(sed -n 's/^cc=//p' "$sf" 2>/dev/null | head -1)
+    [ -n "$cc" ] || cc=$(head -1 "$sf" 2>/dev/null)
+    cc=$(printf '%s' "$cc" | tr '[:upper:]' '[:lower:]')
     if [ -z "$cc" ]; then
-        log_msg WARN "empty .vpn-state — nothing to restore"
+        log_msg WARN "empty vpn_state — nothing to restore"
         exit 0
     fi
+    case "$cc" in
+        ??) : ;;
+        *) log_msg WARN "vpn_state has no usable country code ('$cc') — not restoring"
+           exit 0 ;;
+    esac
 
     # vpnsuspend-fix: already-connected guard — skip restore if user reconnected manually
     if /sbin/ip link show tun0 2>/dev/null | grep -q '<.*UP.*>'; then

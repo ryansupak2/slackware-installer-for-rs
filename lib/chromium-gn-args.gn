@@ -1,0 +1,45 @@
+# GN args for the locally built Chromium — copied to out/Default/args.gn by
+# steps/chromium.sh. Read doc/chromium-build.md before changing anything here.
+#
+# This is a Debian-style build in the two ways that matter for this machine:
+#   * proprietary_codecs + ffmpeg_branding="Chrome" + enable_widevine: what
+#     makes Netflix / YouTube movies actually play. Stock ungoogled-chromium-bin
+#     ships with all three off, which is why DRM is impossible there and why we
+#     build our own.
+#   * the Widevine CDM itself is NOT built (proprietary, not redistributable):
+#     the step drops in the copy from Google Chrome's .deb, exactly like
+#     Debian's chromium with a user-supplied libwidevinecdm.so.
+#
+# is_official_build is written by the step, not here:
+#   default             -> is_official_build = false  (hours, less RAM)
+#   CHROMIUM_OFFICIAL=1 -> is_official_build = true   (Debian-like, much longer)
+#
+# Everything below is a real gn arg for Chromium 157; `gn args --list` in the
+# build dir is the way to confirm after a version bump.
+
+is_debug = false
+is_component_build = false
+symbol_level = 0
+blink_symbol_level = 0
+
+# ThinLTO is the main memory hog of an official build; off by default.
+use_thin_lto = false
+treat_warnings_as_errors = false
+
+# System toolchain, Debian/Arch style: compile with the distribution clang
+# instead of Chromium's pinned clang from CIPD. That avoids a 1-2 GB download
+# per version and the "depot_tools refuses to run as root" problem.
+# steps/chromium.sh checks the version and says so if it is too old.
+clang_base_path = "/usr"
+clang_use_chrome_plugins = false
+
+# --- DRM / media (do not remove; this is the point of the build) ---
+proprietary_codecs = true
+ffmpeg_branding = "Chrome"
+enable_widevine = true
+
+# --- Slackware specifics ---
+# No Chromium-bundled sysroot on this box.
+use_sysroot = false
+# No PGO profiles are published for a local build.
+chrome_pgo_phase = 0

@@ -116,21 +116,34 @@ fi
 # 3. /usr/local/bin/chrome — single entry point for w / wk / Mod+b
 # -------------------------------------------------------------------
 if [ -x "$CHROME_DIR/chrome" ]; then
-    # UI scale. The URL bar text is sized by this factor alone; tab labels are
-    # this factor x the GTK UI font, and page content is this factor x page
-    # zoom. 1.44 with gtk-font-name=12 (dotfiles/gtk/settings.ini) gives a URL
-    # bar ~20% larger while leaving tab labels where they were (1.2*14 = 1.44*12);
-    # per-site zoom comes down one step (150% -> 125%) to keep HTML identical.
+    # Page zoom, done the only way that keeps Chrome's own zoom control at
+    # 100%: --force-device-scale-factor. DSF multiplies EVERYTHING (page
+    # content and browser UI); Chrome's zoom stays untouched, so a page's
+    # zoom indicator reads 100% while the content renders at 2x / 200%.
+    #
+    # Why not Chrome's own default zoom: it only applies per host, has to be
+    # seeded into every profile (see dotfiles/chromium/wk), and shows up in
+    # the control the user sees. DSF applies to every tab and every window of
+    # every profile for free.
+    #
+    # Consequence to remember: Chrome's zoom now MULTIPLIES this factor.
+    # Zoom 125% on a site -> 2.0 * 1.25 = 250% effective. That is why the
+    # step keeps the stored zoom at 100% (chrome-default-zoom 100).
+    #
+    # UI text: DSF scales the URL bar text and tab labels with the page. To
+    # bring the UI text back down, use chrome-ui-font <pt> (GTK UI font), or
+    # use the locally built Chromium (steps/chromium.sh), whose URL bar and tab
+    # strip fonts are separately adjustable via chromium-ui-font.
     # Override per-launch with CHROME_UI_SCALE=<factor>.
-    UI_SCALE="${CHROME_UI_SCALE:-1.44}"
+    UI_SCALE="${CHROME_UI_SCALE:-2}"
     cat > /usr/local/bin/chrome << WRAPPER
 #!/bin/sh
 # chrome — entry point for w / wk / Mod+b. Google Chrome, because the Chromium
 # builds available to this installer cannot load the Widevine CDM.
 #
-# --force-device-scale-factor: sizes the URL bar (see UI_SCALE above).
-#   Override per launch: CHROME_UI_SCALE=1.3 w y
-#
+# --force-device-scale-factor: 2 = pages render at 200% while Chrome's own
+#   zoom control still reads 100% (the zoom comes from here, not from the
+#   profile). Override per launch: CHROME_UI_SCALE=1.25 w y
 # --password-store=basic: this machine has no D-Bus secret service
 #   (gnome-keyring/kwallet), so Chrome's OS-crypt waits for the D-Bus lookup
 #   to time out on EVERY launch — measured 25.2s before the first request vs
@@ -247,25 +260,28 @@ install -m 755 "$REPO_DIR/scripts/chrome-ui-font.sh" /usr/local/bin/chrome-ui-fo
     || { cp "$REPO_DIR/scripts/chrome-ui-font.sh" /usr/local/bin/chrome-ui-font && chmod 755 /usr/local/bin/chrome-ui-font; }
 echo "  /usr/local/bin/chrome-ui-font installed (usage: chrome-ui-font 16)"
 
-# Default page zoom helper (chrome-default-zoom 125). Chrome writes its
-# Preferences on exit, so this refuses to run while Chrome is open; the value
-# itself lives in the profile and therefore survives reboots.
+# Chrome's own zoom must stay at 100%: the 200% the user sees comes from
+# --force-device-scale-factor in the wrapper above. Setting this to anything
+# else multiplies on top of it (125% here -> 187.5% effective). This call also
+# walks every stored per-host entry back to 100%, so sites zoomed under the
+# old DSF-1.44 layout do not compound now. Chrome writes Preferences on exit,
+# so it refuses to run while Chrome is open.
 install -m 755 "$REPO_DIR/scripts/chrome-default-zoom.sh" /usr/local/bin/chrome-default-zoom 2>/dev/null \
     || { cp "$REPO_DIR/scripts/chrome-default-zoom.sh" /usr/local/bin/chrome-default-zoom && chmod 755 /usr/local/bin/chrome-default-zoom; }
-echo "  /usr/local/bin/chrome-default-zoom installed (usage: chrome-default-zoom 125)"
+echo "  /usr/local/bin/chrome-default-zoom installed (usage: chrome-default-zoom 100)"
 
 # Which browser fastfetch reports (the dotfiles used to hardcode 'firefox')
 install -m 755 "$REPO_DIR/scripts/browser-name.sh" /usr/local/bin/browser-name 2>/dev/null \
     || { cp "$REPO_DIR/scripts/browser-name.sh" /usr/local/bin/browser-name && chmod 755 /usr/local/bin/browser-name; }
 echo "  /usr/local/bin/browser-name installed"
 
-# Keep the default zoom at 125% (content was tuned at 125%: DSF 1.44 * 1.25 =
-# 1.8, same physical size as the old DSF 1.2 * 150%). Skipped silently when
-# Chrome is running or the profile does not exist yet.
+# Keep Chrome's own zoom at 100% (the page zoom the user asked for is the
+# wrapper's --force-device-scale-factor=2). Skipped silently when Chrome
+# is running or the profile does not exist yet.
 if [ -x /usr/local/bin/chrome-default-zoom ] && [ -f /root/.config/google-chrome/Default/Preferences ]; then
     if ! pgrep -f '/opt/google/chrome/chrome ' >/dev/null 2>&1; then
-        /usr/local/bin/chrome-default-zoom 125 >/dev/null 2>&1 \
-            && echo "  default page zoom: 125%"
+        /usr/local/bin/chrome-default-zoom 100 >/dev/null 2>&1 \
+            && echo "  page zoom: 100% in Chrome's control, 200% effective via DSF 2"
     else
         echo "  default page zoom: left as is (Chrome is running)"
     fi
