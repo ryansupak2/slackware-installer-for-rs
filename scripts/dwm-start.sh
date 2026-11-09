@@ -97,6 +97,11 @@ else
     xset dpms 0 0 0 2>/dev/null || true
 fi
 
+# Lock shortly BEFORE the screen blanks (idle-lock.sh reads BLANK_MINUTES from
+# /var/lib/power/state, which is the same value the DPMS timers above use). The
+# lead time is what guarantees a waking display shows slock, never the desktop.
+/usr/local/bin/idle-lock.sh &
+
 # TrackPoint scroll sensitivity
 xinput set-prop "Elan TrackPoint" "libinput Scrolling Factor" 3.0 2>/dev/null || true
 
@@ -115,6 +120,7 @@ DWL_FIRST_TERMINAL=1 st-logged &
 
 cleanup() {
     echo "[dwm-start] X session ending — cleaning up..."
+    pkill -f '/usr/local/bin/idle-lock.sh' 2>/dev/null || true
     /usr/local/bin/vpn disconnect 2>/dev/null || true
     pkill -USR1 voxd 2>/dev/null || true
     # Audio daemons are deliberately NOT killed and their sockets NOT removed.

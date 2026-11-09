@@ -87,6 +87,10 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_Down,   focusstack,     {.i = +1 } },
 	{ MODKEY,                       XK_Up,     focusstack,     {.i = -1 } },
 	{ MODKEY,                       XK_bracketright, setmfact, {.f = +0.05f} },
+	/* Mod+Escape: lock the screen (steps/slock.sh builds sources/slock).
+	 * Unlock with the password of $USER (root here). slock ignores SIGTERM —
+	 * if it ever wedges, Ctrl+Alt+F2 then `pkill -9 slock`. */
+	{ MODKEY,                       XK_Escape, spawn,          SHCMD("/usr/local/bin/slock") },
 	{ MODKEY,                       XK_t,      setlayout,      {.v = &layouts[1]} },
 	{ MODKEY,                       XK_f,      setlayout,      {.v = &layouts[2]} },
 	{ MODKEY,                       XK_m,      setlayout,      {.v = &layouts[0]} },

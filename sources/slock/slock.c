@@ -86,6 +86,30 @@ beep(void)
 	XBell(dpy, 100);
 }
 
+/* ─── "screen is covered" marker ──────────────────────────────────── */
+
+/* Written only AFTER the keyboard and pointer grabs have succeeded, i.e. when
+ * nothing but this window can be seen or typed into. Anyone who needs to sleep,
+ * blank or suspend the machine WAITS for this file before doing it, which is
+ * what guarantees that a waking screen can only ever show slock. */
+#define LOCK_MARKER "/run/slock.locked"
+
+static void
+mark_locked(void)
+{
+	FILE *f = fopen(LOCK_MARKER, "w");
+	if (!f)
+		return;
+	fprintf(f, "%ld\n", (long)getpid());
+	fclose(f);
+}
+
+static void
+unmark_locked(void)
+{
+	unlink(LOCK_MARKER);
+}
+
 /* ─── PAM ─────────────────────────────────────────────────────────── */
 
 static int
@@ -125,11 +149,14 @@ pam_auth(const char *user)
 static void
 unlock_and_exit(void)
 {
-	XUngrabKeyboard(dpy, CurrentTime);
-	XUngrabPointer(dpy, CurrentTime);
-	if (gc)  XFreeGC(dpy, gc);
-	if (win) XDestroyWindow(dpy, win);
-	if (cmap) XFreeColormap(dpy, cmap);
+	/* Order matters. The covering window is destroyed while the grabs are
+	 * STILL held, so the desktop can become visible without any typing
+	 * reaching the window underneath; the grabs are then released
+	 * implicitly by closing the display. (The old code ungrabbed first,
+	 * which left a window where keys went to whatever had focus.) */
+	unmark_locked();
+	if (gc)  { XFreeGC(dpy, gc); gc = 0; }
+	if (win) { XDestroyWindow(dpy, win); win = 0; XSync(dpy, False); }
 	XCloseDisplay(dpy);
 	exit(EXIT_SUCCESS);
 }
@@ -281,10 +308,11 @@ main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 	/* block until keyboard + pointer grab succeeds (retries on resume) */
 	grab_inputs();
 
-	/* grab secured — keyboard is live, show olive */
+	/* grab secured — keyboard is live, show olive before announcing it */
 	XSetForeground(dpy, gc, col_bg);
 	XFillRectangle(dpy, win, gc, 0, 0, width, height);
-	XFlush(dpy);
+	XSync(dpy, False);
+	mark_locked();
 
 	XEvent ev;
 

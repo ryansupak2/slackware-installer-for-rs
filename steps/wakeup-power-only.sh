@@ -1,5 +1,8 @@
 #!/bin/bash
-# steps/wakeup-power-only.sh — disable all wake sources except power button
+# steps/wakeup-power-only.sh — disable all wake sources except power button + lid
+#
+# The lid switch (PNP0C0D / LID*) is deliberately KEPT: lid close suspends the
+# machine (steps/screen-locking.sh), so lid open must be able to wake it again.
 #
 # Idempotent: safe to re-run. Must be re-applied after every boot.
 
@@ -16,7 +19,7 @@ echo "*****************************************************"
 echo "WAKEUP — POWER BUTTON ONLY"
 echo "*****************************************************"
 
-echo "Disabling all ACPI wake sources except power button..."
+echo "Disabling all ACPI wake sources except power button + lid..."
 
 # Disable everything on the ACPI wakeup table
 for dev in $(grep "\*enabled" /proc/acpi/wakeup | awk '{print $1}'); do
@@ -53,8 +56,8 @@ for dev in $(grep "\*enabled" /proc/acpi/wakeup 2>/dev/null | awk '{print $1}');
     echo "$dev" > /proc/acpi/wakeup 2>/dev/null || true
 done
 for wakefile in $(find /sys/devices -name "wakeup" -path "*/power/*" 2>/dev/null); do
-    # Skip power button — never disable wake from power button
-    case "$wakefile" in *LNXPWRBN*) continue ;; esac
+    # Never disable the power button, and never the lid (lid open must resume)
+    case "$wakefile" in *LNXPWRBN*|*PWRB*|*PNP0C0D*) echo enabled > "$wakefile" 2>/dev/null; continue ;; esac
     if [ "$(cat "$wakefile" 2>/dev/null)" = "enabled" ]; then
         echo "disabled" > "$wakefile" 2>/dev/null || true
     fi
@@ -88,6 +91,6 @@ fi
 echo "  wakeup-power-only deployed to /usr/local/bin/wakeup-power-only"
 echo "  elogind post-resume hook deployed to $HOOK"
 
-echo "SUCCESS: Only power button will wake the machine (deep sleep)."
+echo "SUCCESS: Only the power button and the lid will wake the machine (deep sleep)."
 echo "         mem_sleep set to 'deep' — s2idle would ignore wakeup restrictions."
 exit 0

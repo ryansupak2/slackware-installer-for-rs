@@ -73,7 +73,7 @@ elevate() {
 AUTO=on
 BATTERY_PROFILE=balanced
 AC_PROFILE=performance
-WAKE=power-button-only
+WAKE=power-button-lid
 BLANK_MINUTES=5
 BRIGHTNESS_MODE=auto
 RATE_WINDOW=120     # seconds of battery-draw history averaged for time-left
@@ -81,6 +81,10 @@ RATE_WINDOW=120     # seconds of battery-draw history averaged for time-left
 load_state() {
     # shellcheck disable=SC1090
     [ -r "$STATE_FILE" ] && . "$STATE_FILE"
+    # Older state files said "power-button-only"; the policy now also keeps the
+    # lid (lid close suspends, lid open resumes) so map the old value forward.
+    [ "$WAKE" = "power-button-only" ] && WAKE=power-button-lid
+    return 0
 }
 
 save_state() {
@@ -472,13 +476,15 @@ wake_restrict() {
     if [ -r /proc/acpi/wakeup ]; then
         while read -r dev; do
             [ -n "$dev" ] || continue
-            case "$dev" in PWRB|SLPB|LNXPWRBN*) continue ;; esac
+            # LID* stays enabled: lid close suspends, lid open resumes
+            case "$dev" in PWRB|SLPB|LID*|LNXPWRBN*) continue ;; esac
             echo "$dev" >/proc/acpi/wakeup 2>/dev/null && n=$((n + 1))
         done < <(awk 'NR>1 && $3 ~ /\*enabled/ {print $1}' /proc/acpi/wakeup 2>/dev/null)
     fi
     while IFS= read -r -d '' f; do
         case "$f" in
-            *LNXPWRBN*|*PWRB*) echo enabled >"$f" 2>/dev/null; continue ;;
+            # PNP0C0D is the lid switch — it must be able to wake the machine
+            *LNXPWRBN*|*PWRB*|*PNP0C0D*) echo enabled >"$f" 2>/dev/null; continue ;;
         esac
         if [ "$(cat "$f" 2>/dev/null)" = "enabled" ] && echo disabled >"$f" 2>/dev/null; then
             d=$((d + 1))
@@ -488,7 +494,7 @@ wake_restrict() {
     if grep -q deep /sys/power/mem_sleep 2>/dev/null; then
         echo deep >/sys/power/mem_sleep 2>/dev/null || true
     fi
-    hook_log "wake: power button only ($d sysfs source(s) disabled, $n ACPI toggled, mem_sleep=$(mem_sleep_cur))"
+    hook_log "wake: power button + lid ($d sysfs source(s) disabled, $n ACPI toggled, mem_sleep=$(mem_sleep_cur))"
 }
 
 wake_allow() {
@@ -513,8 +519,8 @@ cmd_wake() {
         restrict)
             elevate wake restrict
             wake_restrict
-            WAKE=power-button-only; save_state
-            echo "SUCCESS: only the power button can wake this machine (mem_sleep=$(mem_sleep_cur))."
+            WAKE=power-button-lid; save_state
+            echo "SUCCESS: only the power button and the lid can wake this machine (mem_sleep=$(mem_sleep_cur))."
             echo "         Undo with: power wake allow"
             ;;
         allow)
@@ -578,7 +584,7 @@ cmd_apply() {
 
 cmd_boot() {
     cmd_apply
-    if [ "$WAKE" = "power-button-only" ]; then
+    if [ "$WAKE" = "power-button-lid" ]; then
         wake_restrict
     fi
 }
@@ -604,7 +610,10 @@ cmd_status() {
     blname=$(backlight_dir 2>/dev/null); blname=${blname##*/}
     msleep=$(mem_sleep_cur)
     wenabled=$(wake_enabled_count)
-    lid=$(sed -n 's/^action=//p' /etc/acpi/events/lid-close 2>/dev/null)
+    # Lid policy is elogind's now (steps/screen-locking.sh); the old acpid
+    # poweroff handler is gone, so read the logind drop-in instead.
+    lid=$(grep -h '^HandleLidSwitch=' /etc/elogind/logind.conf.d/*.conf 2>/dev/null \
+          | tail -1 | cut -d= -f2)
 
     # Top line: the one thing you want at a glance.
     if ac_online; then
@@ -644,7 +653,7 @@ cmd_status() {
         "$msleep" "$WAKE" \
         "$([ "$wenabled" -eq 0 ] 2>/dev/null && echo 'power button only — ACPI fixed event, nothing else' || echo "$wenabled sysfs source(s) enabled")"
     printf '  %-13s %s\n' "Lid" \
-        "${lid:+close → $lid (acpid); }elogind handles lid=$([ -f /etc/elogind/logind.conf.d/10-lid-ignore.conf ] && echo ignore || echo default)"
+        "lid close → ${lid:-suspend} (elogind); wakes on lid open + power button"
     echo
     echo "${DIM}  change: power profile powersave|balanced|performance  ·  power menu${NC}"
 }
@@ -693,7 +702,7 @@ cmd_menu() {
         echo "  6) AC profile (currently: $AC_PROFILE)"
         echo "  7) set backlight % (now)"
         echo "  8) set screen blank minutes (currently: $BLANK_MINUTES)"
-        echo "  9) wake sources: $WAKE (restrict to power button / allow all)"
+        echo "  9) wake sources: $WAKE (power button + lid / allow all)"
         echo " 10) time-left averaging window (currently: $(rate_window_label))"
         echo "  r) re-apply policy for current power source"
         echo "  q) quit"
@@ -723,7 +732,7 @@ cmd_menu() {
                 cmd_set blank "$p"
                 ;;
             9)
-                if [ "$WAKE" = power-button-only ]; then cmd_wake allow; else cmd_wake restrict; fi
+                if [ "$WAKE" = power-button-lid ]; then cmd_wake allow; else cmd_wake restrict; fi
                 ;;
             10)
                 read -r -p "Average battery draw over N seconds (60-1800): " p

@@ -94,8 +94,8 @@ if $ok; then
 fi
 
 if $ok; then
-    # lid-close → shutdown deployed by steps/screen-locking.sh
-    echo "Lid-close: shutdown (deployed separately)"
+    # lid close → suspend + lock-before-sleep: steps/screen-locking.sh
+    echo "Lid-close: suspend with slock covering first (deployed separately)"
 fi
 
 # ── Always deploy: session launcher + status scripts (independent of build) ──

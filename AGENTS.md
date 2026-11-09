@@ -184,3 +184,101 @@ Version bumps: follow the checklist in `lib/chromium-version.sh` and the
 rebase procedure in `patches/chromium/README.md` (includes the 157 renames
 that broke the first attempt). Keep the pin close to the installed Chrome so
 the CDM host version still matches.
+
+---
+
+# Screen locking — lid suspends, and slock covers the screen first
+
+Lid close **suspends** (elogind `HandleLidSwitch=suspend`); lid open wakes it.
+The old `/etc/acpi/events/lid-close` → `/sbin/poweroff` handler is gone — do not
+put it back. `steps/acpi-wakeup.sh` keeps the lid switch enabled as a wake
+source for exactly this reason (power button + lid, nothing else).
+
+Hard rule: **nothing may be visible on wake except slock.** That is enforced
+mechanically, not by sleeps: `slock` writes `/run/slock.locked` only after its
+keyboard/pointer grabs succeed, and `scripts/lock-screen.sh` returns 0 only when
+that marker exists and its pid is really slock. The elogind sleep hook
+(`/lib64/elogind/system-sleep/10-slock-lock`, `pre` stage) and
+`scripts/idle-lock.sh` (locks `IDLE_LOCK_LEAD` seconds before the DPMS blank)
+both wait on it before sleeping/blanking. Unlock destroys the covering window
+*while the grabs are still held* so no keystroke leaks into the desktop.
+
+`steps/slock.sh` builds slock (`sources/slock`), `xidle` (`sources/xidle`,
+MIT-SCREEN-SAVER; nothing in the base system reports idle time) and installs
+`/etc/pam.d/slock`. `steps/screen-locking.sh` owns the lid/sleep policy. Never
+`rm /usr/local/bin/slock` (an old version of that step did, silently deleting
+the locker on every run). Details and verification: `doc/screen-locking.md`.
+
+---
+
+# Power button — two-stage hold, three handlers that can race
+
+The button must never power off on a tap. **Three** things can do that on this
+machine, and all three had to be dealt with (`steps/powerkey-hold.sh`):
+
+| handler | what it did | now |
+|---|---|---|
+| `/etc/acpi/acpi_handler.sh` (acpid) | `power) /sbin/init 0` — powered off instantly, independent of elogind. This was the real tap-killer. | `power) :`, original kept as `acpi_handler.sh.orig` |
+| elogind | `HandlePowerKey=poweroff` (default) | `HandlePowerKey=ignore` in `/etc/elogind/logind.conf.d/20-powerkey.conf` |
+| `powerkey-hold` (new) | — | owns the button now |
+
+`powerkey-hold` measures the hold with a `poll()` timeout (the action fires
+*while* held, not on release):
+
+* **3 s hold** → `/sbin/shutdown -h now` — orderly: services stop, fs sync and
+  unmount.
+* **10 s hold** → `sync()` then `/sbin/poweroff -f` — forces the power off when
+  the orderly path is stuck.
+* **shorter** → nothing at all (logged).
+
+It ignores SIGTERM/SIGINT/SIGHUP/SIGPIPE on purpose: rc.6 stops processes during
+the shutdown it just started, and without that the 10 s escape could never run.
+Times are `ARGS="-t 3 -T 10"` in the step. Log: `/var/log/<user>-powerkey.log`.
+Single instance is a flock on `/run/powerkey-hold.pid`.
+
+Do not "fix" this by putting `HandlePowerKey=poweroff` back, and do not restore
+`power) /sbin/init 0`: either one re-introduces instant poweroff on a tap.
+
+---
+
+# Display / kernel — the GPU is `xe`, not `i915`
+
+The internal GPU is Wildcat Lake bound to the **xe** driver
+(`xe 0000:00:02.0: [drm] Found pantherlake/wildcatlake (device ID fd80)`).
+Every `i915.*` parameter in the elilo append line is therefore inert here —
+it exists for the older XPS 13 (i915) the installer also supports. Do not
+assume "PSR is already off because `i915.enable_psr=0` is there".
+
+Fullscreen hi-res video (usually at playback start) sometimes freezes the
+session: picture stops, no cursor, keyboard dead, audio keeps playing — on
+`flip_done timed out` / `commit wait timed out` on `pipe A`. That message only
+says a wait expired; it does not say which one, so **do not disable PSR (or
+any other power feature) as a guess**. The default profile of
+`steps/gpu-display.sh` is `stock` — it changes nothing.
+
+Evidence gathering is already installed: `display-hang-catcher` (passive;
+reads `/dev/kmsg`, `/proc`, `/sys`) dumps every task's kernel stack on a stall
+signature, so the next event names the hung function:
+
+```bash
+ls -dt /var/log/*-display-hang-* | head -1
+ps -o pid,etime,args= -p "$(cat /run/display-hang-catcher.pid)"
+/usr/local/bin/display-hang-catcher --dump-now     # on-demand capture
+```
+
+Do **not** try to backport `cbe5654759` into 7.2.15 again: measured
+2026-11-09, that `xe.ko` freezes the machine the moment `x` starts (no kernel
+error at all), while the stock module is fine. The patch is written for 7.4 and
+needs its whole series; a vanilla 7.2.15 build was proven symbol-identical to
+Slackware's module, so it is the patch, not the build. The recipe and ABI gates
+stay in `steps/kernel-xe-psr-fix.sh` for a 7.4.y kernel only.
+
+Current mitigation is the kernel knob, not a disable-everything: profile
+`psr1` (`xe.enable_psr=1 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0`)
+keeps panel self-refresh — the actual 0.3–1 W saving — and drops only the
+selective-fetch path that fails at boot here and that the missing upstream
+fixes address. `steps/gpu-display.sh stock` reverts it.
+
+Full evidence, the ABI verification table, fallback profiles (`psr1` keeps
+panel self-refresh, `off` is last resort) and post-reboot checks:
+`doc/display-freeze.md`.
