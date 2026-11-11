@@ -59,11 +59,18 @@ ok=true
 # --- profile -> kernel parameters ------------------------------------------
 case "$PROFILE" in
     psr1)
-        TOKENS="xe.enable_psr=1 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0"
+        # xe.enable_dsb=0 is the important one: measured 2026-11-09 on this box,
+# `[CRTC:151:pipe A] DSB 0 response timeout` repeats ~250 times at X start and
+# the commit worker parks in drm_atomic_helper_wait_for_flip_done ->
+# intel_atomic_commit_tail (captured at the time by display-hang-catcher,
+# retired since — see doc/display-freeze.md). DSB is the
+# hardware display-state-buffer engine; turning it off makes the driver program
+# display registers from the CPU instead. That is the freeze mechanism.
+TOKENS="xe.enable_dsb=0 xe.enable_psr=1 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0"
         DESC="panel self-refresh ON, selective fetch / Panel Replay OFF"
         ;;
     off)
-        TOKENS="xe.enable_psr=0 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0"
+        TOKENS="xe.enable_dsb=0 xe.enable_psr=0 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0"
         DESC="PSR fully OFF"
         ;;
     stock)

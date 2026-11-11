@@ -40,12 +40,15 @@ fi
 
 # Parse command-line flags
 VERBOSE=false
+STATUS_ONLY=false
 case "${1:-}" in
     --verbose|-v) VERBOSE=true ;;
+    --status|-s)  STATUS_ONLY=true ;;
     --help|-h)
-        echo "Usage: wifi-manager [--verbose|-v] [--help|-h]"
+        echo "Usage: wifi-manager [--status|-s] [--verbose|-v] [--help|-h]"
         echo ""
-        echo "  (no flag)  Normal mode: groups scan results by SSID, showing strongest signal."
+        echo "  (no flag)  Interactive menu (what the 'wifi' alias runs)."
+        echo "  --status   Print what WiFi is connected to right now, then exit."
         echo "  --verbose  Show every raw BSSID line from the scan (old behavior)."
         echo "  --help     Show this help."
         exit 0
@@ -67,15 +70,20 @@ if [ -t 1 ]; then
 fi
 
 # Dual logging (everything goes to screen AND the log file)
+# --status is a snapshot: it keeps the log (a record of what the session
+# connected to) but skips the banner so the block reads cleanly under the
+# fastfetch splash in the first terminal.
 LOG_DIR="/var/log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG_FILE="$LOG_DIR/${USER:-root}-wifi-manager-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
-echo "=================================================="
-echo "WiFi Manager started: $(date)"
-echo "Log file: $LOG_FILE"
-echo "=================================================="
+if ! $STATUS_ONLY; then
+    echo "=================================================="
+    echo "WiFi Manager started: $(date)"
+    echo "Log file: $LOG_FILE"
+    echo "=================================================="
+fi
 
 
 # ------------------------------------------------------------------
@@ -179,6 +187,35 @@ quick_wifi_summary() {
             ;;
         # empty = no LAN hardware, skip entirely
     esac
+}
+
+connection_details() {
+    # One compact block describing the CURRENT connection: device, network,
+    # BSSID, signal, address and gateway.
+    # Used by --status, i.e. the summary the session's first terminal shows
+    # right after the fastfetch splash (see dotfiles/shell/bashrc).
+    # Deliberately no ping here: routing already answers "is there internet?"
+    # via the [Internet] tag in quick_wifi_summary, and a startup screen must
+    # not block for seconds when the uplink is down.
+    local ifaces iface ssid ip_info gw sig bssid
+    ifaces=$(get_wifi_ifaces)
+
+    for iface in $ifaces; do
+        ssid=$(get_active_ssid "$iface")
+        [ -z "$ssid" ] && continue
+
+        ip_info=$(ip -4 addr show dev "$iface" 2>/dev/null | awk '/inet / {print $2; exit}')
+        gw=$(ip route show default dev "$iface" 2>/dev/null | awk '/default/ {print $3; exit}')
+        sig=$(iw dev "$iface" link 2>/dev/null | awk '/signal:/ {print $2" "$3; exit}')
+        bssid=$(iw dev "$iface" link 2>/dev/null | awk '/Connected to/ {print $3; exit}')
+
+        echo "Device:  $iface"
+        echo -e "Network: ${BOLD}${ssid}${NC}"
+        [ -n "$bssid" ] && echo "BSSID:   $bssid"
+        [ -n "$sig" ]   && echo "Signal:  $sig"
+        echo "Address: ${ip_info:-(no address)}"
+        echo "Gateway: ${gw:-(none)}"
+    done
 }
 
 show_status() {
@@ -694,6 +731,21 @@ list_saved_networks() {
 
     echo "*****************************************************"
 }
+
+# ------------------------------------------------------------------
+# Non-interactive mode (--status): print the connection summary and exit.
+# This is exactly what the first terminal of a session dumps after the
+# fastfetch splash, so 'wifi --status' reproduces it by hand.
+# ------------------------------------------------------------------
+if $STATUS_ONLY; then
+    echo
+    quick_wifi_summary
+    if [ -n "$(get_wifi_ifaces)" ]; then
+        echo ""
+        connection_details
+    fi
+    exit 0
+fi
 
 # ------------------------------------------------------------------
 # Main menu (same flow style as post-install-global: numbered choices,

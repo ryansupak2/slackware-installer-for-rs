@@ -42,6 +42,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
+#include <sys/ioctl.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -75,40 +76,69 @@ static double now_ms(void)
 	return ts.tv_sec * 1000.0 + ts.tv_nsec / 1000000.0;
 }
 
-static int find_power_button(char *out, size_t outlen)
+/* d_name comes from readdir (up to 256 bytes) but real names are "eventNN";
+ * the truncation warnings are noise, the snprintf calls are bounded. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+
+/* Does this input device advertise KEY_POWER at all? */
+static int has_power_key(int fd)
+{
+	unsigned long bits[(KEY_MAX / (8 * sizeof(unsigned long))) + 2] = { 0 };
+	size_t n = sizeof(bits);
+
+	if (ioctl(fd, EVIOCGBIT(EV_KEY, n), bits) < 0)
+		return 0;
+	return (bits[KEY_POWER / (8 * sizeof(unsigned long))] &
+		(1UL << (KEY_POWER % (8 * sizeof(unsigned long))))) ? 1 : 0;
+}
+
+/* Open every input event device that reports KEY_POWER.
+ *
+ * Matching on the device NAME is wrong on this machine: the node called
+ * "Power Button" is silent, while "Intel HID events" is the one that actually
+ * delivers press/release pairs (measured 2026-11-09). Capability decides. */
+#define MAX_DEVS 8
+static int open_power_devices(char names[][64], int *fds, int max)
 {
 	DIR *d;
 	struct dirent *de;
-	int found = 0;
+	int n = 0;
 
-	d = opendir("/sys/class/input");
+	d = opendir("/dev/input");
 	if (!d)
-		return -1;
-	while ((de = readdir(d)) != NULL) {
-		char path[300], name[128];
+		return 0;
+	while ((de = readdir(d)) != NULL && n < max) {
+		char path[320], comm[64];
 		FILE *f;
+		int fd;
 
 		if (strncmp(de->d_name, "event", 5) != 0)
 			continue;
-		snprintf(path, sizeof(path), "/sys/class/input/%s/device/name", de->d_name);
-		f = fopen(path, "r");
-		if (!f)
+		snprintf(path, sizeof(path), "/dev/input/%s", de->d_name);
+		fd = open(path, O_RDONLY | O_NONBLOCK);
+		if (fd < 0)
 			continue;
-		if (!fgets(name, sizeof(name), f)) {
+		if (!has_power_key(fd)) {
+			close(fd);
+			continue;
+		}
+		snprintf(comm, sizeof(comm), "/sys/class/input/%s/device/name", de->d_name);
+		f = fopen(comm, "r");
+		if (f && fgets(names[n], 64, f))
+			names[n][strcspn(names[n], "\n")] = '\0';
+		else
+			snprintf(names[n], 64, "%s", de->d_name);
+		if (f)
 			fclose(f);
-			continue;
-		}
-		fclose(f);
-		name[strcspn(name, "\n")] = '\0';
-		if (strcmp(name, "Power Button") == 0) {
-			snprintf(out, outlen, "/dev/input/%s", de->d_name);
-			found = 1;
-			break;
-		}
+		fds[n] = fd;
+		n++;
 	}
 	closedir(d);
-	return found ? 0 : -1;
+	return n;
 }
+
+#pragma GCC diagnostic pop
 
 /* Run a command without ever returning into the caller's state machine. */
 static void run(const char *path, char *const argv[])
@@ -127,8 +157,9 @@ int main(int argc, char **argv)
 {
 	double shutdown_s = 3.0, forceoff_s = 10.0;
 	const char *dev = NULL;
-	char devbuf[300];
-	int fd, opt;
+	char names[MAX_DEVS][64];
+	int fds[MAX_DEVS];
+	int ndev = 0, opt;
 	double pressed_at = 0.0;
 	int is_down = 0, shutdown_done = 0, forceoff_done = 0;
 
@@ -159,12 +190,21 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (!dev) {
-		if (find_power_button(devbuf, sizeof(devbuf)) != 0) {
-			logmsg("no input device named \"Power Button\" found");
+	if (dev) {
+		int fd = open(dev, O_RDONLY | O_NONBLOCK);
+		if (fd < 0) {
+			logmsg("cannot open %s: %s", dev, strerror(errno));
 			return 1;
 		}
-		dev = devbuf;
+		fds[0] = fd;
+		snprintf(names[0], sizeof(names[0]), "%s", dev);
+		ndev = 1;
+	} else {
+		ndev = open_power_devices(names, fds, MAX_DEVS);
+		if (ndev == 0) {
+			logmsg("no input device advertising KEY_POWER found");
+			return 1;
+		}
 	}
 
 	/* Survive the shutdown we ourselves start (rc.6 SIGTERMs everything),
@@ -189,51 +229,69 @@ int main(int argc, char **argv)
 		}
 	}
 
-	fd = open(dev, O_RDONLY);
-	if (fd < 0) {
-		logmsg("cannot open %s: %s", dev, strerror(errno));
-		return 1;
+	{
+		char list[512] = "";
+		int i;
+
+		for (i = 0; i < ndev; i++)
+			snprintf(list + strlen(list), sizeof(list) - strlen(list),
+				 "%s%s", i ? ", " : "", names[i]);
+		if (forceoff_s > 0.0)
+			logmsg("watching %d device(s) [%s]: hold %.1f s = orderly shutdown, hold %.1f s = force power off, shorter = ignored%s",
+			       ndev, list, shutdown_s, forceoff_s, dry_run ? " (dry run)" : "");
+		else
+			logmsg("watching %d device(s) [%s]: hold %.1f s = orderly shutdown, shorter = ignored, longer = hardware EC force off (~5 s)%s",
+			       ndev, list, shutdown_s, dry_run ? " (dry run)" : "");
 	}
 
-	logmsg("watching %s: hold %.0f s = orderly shutdown, hold %.0f s = force power off, shorter = ignored%s",
-	       dev, shutdown_s, forceoff_s, dry_run ? " (dry run)" : "");
-
 	for (;;) {
-		struct pollfd pfd = { .fd = fd, .events = POLLIN };
-		struct input_event ev;
-		ssize_t n;
-		int pr;
+		struct pollfd pfds[MAX_DEVS];
+		int i, pr;
 
-		/* Timers must also run while the button is held and no events arrive,
-		 * hence poll() with a timeout instead of a blocking read(). */
-		pr = poll(&pfd, 1, 100);
+		for (i = 0; i < ndev; i++) {
+			pfds[i].fd = fds[i];
+			pfds[i].events = POLLIN;
+			pfds[i].revents = 0;
+		}
+		/* Timers must run while the button is held and no events arrive, so
+		 * poll() with a timeout rather than a blocking read(). */
+		pr = poll(pfds, (nfds_t)ndev, 100);
 		if (pr < 0) {
 			if (errno == EINTR)
 				continue;
 			logmsg("poll error: %s", strerror(errno));
 			return 1;
 		}
+		for (i = 0; i < ndev && pr > 0; i++) {
+			struct input_event ev;
+			ssize_t n;
 
-		if (pr > 0) {
-			n = read(fd, &ev, sizeof(ev));
-			if (n == (ssize_t)sizeof(ev) && ev.type == EV_KEY && ev.code == KEY_POWER) {
-				if (ev.value == 1) {
-					is_down = 1;
-					pressed_at = now_ms();
-					shutdown_done = 0;
-					forceoff_done = 0;
-					if (verbose)
-						logmsg("power button pressed");
-				} else if (ev.value == 0) {
-					double held = is_down ? (now_ms() - pressed_at) / 1000.0 : 0.0;
+			if (!(pfds[i].revents & (POLLIN | POLLERR | POLLHUP)))
+				continue;
+			n = read(fds[i], &ev, sizeof(ev));
+			if (n < 0 && (errno == EAGAIN || errno == EINTR))
+				continue;
+			if (n != (ssize_t)sizeof(ev))
+				continue;
+			if (ev.type != EV_KEY || ev.code != KEY_POWER)
+				continue;
+			if (ev.value == 1) {
+				if (is_down)
+					continue;	/* one press at a time */
+				is_down = 1;
+				pressed_at = now_ms();
+				shutdown_done = 0;
+				forceoff_done = 0;
+				if (verbose)
+					logmsg("power button pressed (%s)", names[i]);
+			} else if (ev.value == 0) {
+				double held = is_down ? (now_ms() - pressed_at) / 1000.0 : 0.0;
 
-					is_down = 0;
-					if (!shutdown_done)
-						logmsg("released after %.2f s (< %.0f s) ignored",
-						       held, shutdown_s);
-					else
-						logmsg("released after %.2f s (shutdown already started)", held);
-				}
+				is_down = 0;
+				if (!is_down && !shutdown_done && held > 0.0)
+					logmsg("released after %.2f s (< %.1f s) ignored", held, shutdown_s);
+				else if (shutdown_done)
+					logmsg("released after %.2f s (shutdown already started)", held);
 			}
 		}
 
@@ -251,7 +309,7 @@ int main(int argc, char **argv)
 		} else if (!shutdown_done && held >= shutdown_s) {
 			char *const av[] = { "/sbin/shutdown", "-h", "now", NULL };
 			shutdown_done = 1;
-			logmsg("held %.0f s — starting orderly shutdown (/sbin/shutdown -h now)", shutdown_s);
+			logmsg("held %.1f s — starting orderly shutdown (/sbin/shutdown -h now)", shutdown_s);
 			run("/sbin/shutdown", av);
 		}
 	}

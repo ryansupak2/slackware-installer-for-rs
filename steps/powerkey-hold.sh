@@ -27,8 +27,11 @@
 #   REPO_DIR=$PWD bash steps/powerkey-hold.sh remove   # back to logind default
 #
 # Two stages, both fired WHILE held (not on release):
-#   -t 3   -> /sbin/shutdown -h now   (orderly: services stop, fs sync+unmount)
-#   -T 10  -> /sbin/poweroff -f       (force the power off if shutdown is stuck)
+#   -t 1.5 -> /sbin/shutdown -h now   (orderly: services stop, fs sync+unmount)
+#            1.5 s leaves ~3.5 s of the EC's ~5 s hard-off window for it.
+#   -T 0   -> disabled: beyond ~5 s the embedded controller force-cuts power
+#             itself (measured), so a software force-off stage is pointless
+#             (it used to be -T 10 and could never fire before the hard cut).
 # Shorter than 3 s does nothing. The daemon ignores SIGTERM so it survives the
 # shutdown it started, which is what makes the 10 s stage reachable.
 # Change the times with ARGS below (e.g. ARGS="-t 2 -T 8").
@@ -47,7 +50,7 @@ DEST=/usr/local/bin/powerkey-hold
 DROPIN=/etc/elogind/logind.conf.d/20-powerkey.conf
 RCLOCAL=/etc/rc.d/rc.local
 LOGF="/var/log/${USER:-root}-powerkey.log"
-ARGS="-t 3 -T 10"
+ARGS="-t 1.5 -T 0"
 
 echo "*****************************************************"
 echo "POWER BUTTON — $ACTION"
@@ -185,14 +188,15 @@ fi
 
 # --- 5. show the facts ------------------------------------------------------
 note "stage 1     : $ARGS  -> /sbin/shutdown -h now at the -t value"
-note "stage 2     : forced /sbin/poweroff -f at the -T value"
+note "stage 2     : disabled (-T 0); hardware EC force-off ~5 s covers it"
+note "tap         : anything shorter than the -t value is ignored"
 note "short tap   : ignored completely (after the next boot, when elogind reads HandlePowerKey=ignore)"
 note "log         : $LOGF"
 [ -f "$LOGF" ] && tail -2 "$LOGF" | sed 's/^/    /'
-note "device      : $(grep -o '/dev/input/event[0-9]*' "$LOGF" 2>/dev/null | tail -1)"
+note "devices     : $(grep -o 'watching [0-9]* device(s) \[[^]]*\]' "$LOGF" 2>/dev/null | tail -1)"
 
 if $ok; then
-    echo "SUCCESS: power button: 3 s hold starts an orderly shutdown, 10 s forces power off, taps do nothing."
+    echo "SUCCESS: power button: 1.5 s hold starts an orderly shutdown; longer is cut by the EC; taps do nothing."
     exit 0
 else
     echo "ERROR: power button setup incomplete (see messages above)."

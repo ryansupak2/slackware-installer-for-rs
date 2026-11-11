@@ -225,15 +225,31 @@ machine, and all three had to be dealt with (`steps/powerkey-hold.sh`):
 `powerkey-hold` measures the hold with a `poll()` timeout (the action fires
 *while* held, not on release):
 
-* **3 s hold** → `/sbin/shutdown -h now` — orderly: services stop, fs sync and
+* **1.5 s hold** → `/sbin/shutdown -h now` — orderly: services stop, fs sync and
   unmount.
-* **10 s hold** → `sync()` then `/sbin/poweroff -f` — forces the power off when
-  the orderly path is stuck.
-* **shorter** → nothing at all (logged).
+* **longer (~5 s)** → the embedded controller cuts power itself; there is no
+  software stage for it (`-T 0`). A `-T 10` force-off stage was tried and could
+  never fire: the EC hard-off wins first.
+* **shorter** → nothing at all (logged, e.g. `released after 1.42 s (< 1.5 s) ignored`).
+
+**Which input device the button appears on is not obvious on this machine.** The
+node *named* "Power Button" (`/dev/input/event1`) is **silent**; the press/release
+pairs come from **"Intel HID events"**. That is why the first version, which
+matched the device by name, never saw a press while `acpid` (ACPI netlink)
+happily powered the machine off. The daemon now opens *every* device that
+advertises `KEY_POWER` (capability via `EVIOCGBIT`, not the name) and logs the
+list at startup:
+
+```
+watching 3 device(s) [Intel HID events, AT Translated Set 2 keyboard, Power Button]
+```
+
+ACPI netlink only reports the press, never the release, so hold timing **must**
+come from evdev.
 
 It ignores SIGTERM/SIGINT/SIGHUP/SIGPIPE on purpose: rc.6 stops processes during
 the shutdown it just started, and without that the 10 s escape could never run.
-Times are `ARGS="-t 3 -T 10"` in the step. Log: `/var/log/<user>-powerkey.log`.
+Times are `ARGS="-t 1.5 -T 0"` in the step. Log: `/var/log/<user>-powerkey.log`.
 Single instance is a flock on `/run/powerkey-hold.pid`.
 
 Do not "fix" this by putting `HandlePowerKey=poweroff` back, and do not restore
@@ -249,35 +265,38 @@ Every `i915.*` parameter in the elilo append line is therefore inert here —
 it exists for the older XPS 13 (i915) the installer also supports. Do not
 assume "PSR is already off because `i915.enable_psr=0` is there".
 
-Fullscreen hi-res video (usually at playback start) sometimes freezes the
-session: picture stops, no cursor, keyboard dead, audio keeps playing — on
-`flip_done timed out` / `commit wait timed out` on `pipe A`. That message only
-says a wait expired; it does not say which one, so **do not disable PSR (or
-any other power feature) as a guess**. The default profile of
-`steps/gpu-display.sh` is `stock` — it changes nothing.
+Freezes (picture stops, no cursor, keyboard dead, audio keeps playing) are the
+**DSB engine** on pipe A never answering — measured 2026-11-09 with the catcher:
 
-Evidence gathering is already installed: `display-hang-catcher` (passive;
-reads `/dev/kmsg`, `/proc`, `/sys`) dumps every task's kernel stack on a stall
-signature, so the next event names the hung function:
-
-```bash
-ls -dt /var/log/*-display-hang-* | head -1
-ps -o pid,etime,args= -p "$(cat /run/display-hang-catcher.pid)"
-/usr/local/bin/display-hang-catcher --dump-now     # on-demand capture
+```
+[CRTC:151:pipe A] DSB 0 response timeout   (x250 at X start)
+kworker+i915_flip state=D wchan=drm_atomic_helper_wait_for_flip_done
+  drm_atomic_helper_wait_for_flip_done <- intel_atomic_commit_tail [xe]
 ```
 
-Do **not** try to backport `cbe5654759` into 7.2.15 again: measured
-2026-11-09, that `xe.ko` freezes the machine the moment `x` starts (no kernel
-error at all), while the stock module is fine. The patch is written for 7.4 and
-needs its whole series; a vanilla 7.2.15 build was proven symbol-identical to
-Slackware's module, so it is the patch, not the build. The recipe and ABI gates
-stay in `steps/kernel-xe-psr-fix.sh` for a 7.4.y kernel only.
+The fix is `xe.enable_dsb=0` (driver programs display registers from the CPU
+instead). It is in every boot entry's append line; PSR stays on (`enable_psr=1`,
+PSR2/selective-fetch/panel-replay off). Do **not** diagnose these stalls as PSR
+again — PSR idle timeouts and the selective-fetch message are noise here, and
+PSR2-off / selective-fetch-off boots still froze.
 
-Current mitigation is the kernel knob, not a disable-everything: profile
-`psr1` (`xe.enable_psr=1 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0`)
-keeps panel self-refresh — the actual 0.3–1 W saving — and drops only the
-selective-fetch path that fails at boot here and that the missing upstream
-fixes address. `steps/gpu-display.sh stock` reverts it.
+Evidence gathering (**retired** 2026-11-09): `display-hang-catcher` was the
+passive `/dev/kmsg` + `/proc` + `/sys` sampler that produced the DSB proof
+above. It is no longer installed, no longer started from `rc.local`, and its
+step is gone — the root cause is in the boot config, so nothing needs
+watching. Its dumps are kept; reinstall it from git history if a stall ever
+needs re-measuring:
+
+```bash
+git log --oneline --all -- steps/display-hang-catcher.sh
+ls -dt /var/log/*-display-hang-* | head -3     # dumps it left behind
+```
+
+Do **not** try to backport `cbe5654759` into 7.2.15: measured, that `xe.ko`
+freezes the machine the moment `x` starts (no kernel error at all) while the
+stock module is fine; the patch is written for 7.4 and needs its whole series.
+A vanilla 7.2.15 build was proven symbol-identical to Slackware's module, so it
+is the patch, not the build.
 
 Full evidence, the ABI verification table, fallback profiles (`psr1` keeps
 panel self-refresh, `off` is last resort) and post-reboot checks:

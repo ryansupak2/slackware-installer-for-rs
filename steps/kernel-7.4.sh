@@ -372,67 +372,109 @@ strip_xe() {
 do_display() {
     local profile="${2:-psr1}" tokens
     case "$profile" in
-        psr1)    tokens="xe.enable_psr=1 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0" ;;
-        off)     tokens="xe.enable_psr=0 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0" ;;
-        stock)   tokens="" ;;
+        psr1)  tokens="xe.enable_dsb=0 xe.enable_psr=1 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0" ;;
+        off)   tokens="xe.enable_dsb=0 xe.enable_psr=0 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0" ;;
+        stock) tokens="" ;;
         *) note "ERROR: unknown profile '$profile' (psr1|off|stock)"; ok=false; return ;;
     esac
-    python3 - "$ELILO" "$NEW_LABEL" "$tokens" <<'PYEOF'
+    # Only the entry whose label is exactly vmlinuz-74rc2 — the diagnostic
+    # entries (…-nomodeset, …-debug) must keep their own extra parameters.
+    python3 - "$ELILO" "$tokens" <<'PYEOF'
 import sys
-path, label, tokens = sys.argv[1:4]
+path, tokens = sys.argv[1:3]
 lines = [l.rstrip('\n') for l in open(path)]
-out, in_block = [], False
-changed = False
+
+header, blocks, cur = [], [], None
 for line in lines:
-    s = line.strip()
-    if s.startswith('image='):
-        in_block = (s.split('=', 1)[1].strip() == 'vmlinuz-74rc2')
-        out.append(line)
+    if line.strip().startswith('image='):
+        if cur is not None:
+            blocks.append(cur)
+        cur = [line]
+    elif cur is None:
+        header.append(line)
+    else:
+        cur.append(line)
+if cur is not None:
+    blocks.append(cur)
+
+def label(b):
+    for l in b:
+        if l.strip().startswith('label='):
+            return l.strip().split('=', 1)[1].strip()
+    return ''
+
+changed = False
+for b in blocks:
+    if label(b) != 'vmlinuz-74rc2':
         continue
-    if in_block and s.startswith('append='):
-        value = s.split('=', 1)[1].strip().strip('"')
-        keep = [w for w in value.split() if not w.startswith((
-            'xe.enable_psr=', 'xe.enable_psr2_sel_fetch=', 'xe.enable_panel_replay=',
-            'xe.psr_safest_params=', 'xe.enable_fbc=', 'xe.enable_dsb=',
-            'xe.enable_dpt=', 'xe.enable_ips='))]
-        new = ' '.join(keep + ([tokens] if tokens else []))
-        out.append('\tappend="%s"' % new)
-        changed = True
-        continue
-    out.append(line)
+    for i, line in enumerate(b):
+        if line.strip().startswith('append='):
+            value = line.strip().split('=', 1)[1].strip().strip('"')
+            keep = [w for w in value.split() if not w.startswith((
+                'xe.enable_psr=', 'xe.enable_psr2_sel_fetch=', 'xe.enable_panel_replay=',
+                'xe.psr_safest_params=', 'xe.enable_fbc=', 'xe.enable_dsb=',
+                'xe.enable_dpt=', 'xe.enable_ips='))]
+            b[i] = '\tappend="%s"' % ' '.join(keep + ([tokens] if tokens else []))
+            changed = True
 if not changed:
-    sys.exit("no append= line found in the vmlinuz-74rc2 entry")
-open(path, 'w').write('\n'.join(out).rstrip() + '\n')
-print("  7.4 entry append now carries: %s" % (tokens or "(no xe overrides — kernel defaults)"))
+    sys.exit("no append= line in the vmlinuz-74rc2 entry")
+open(path, 'w').write('\n'.join(header + [l for b in blocks for l in b]).rstrip() + '\n')
+print("  vmlinuz-74rc2 append: %s" % (tokens or "(kernel defaults)"))
 PYEOF
-    grep -A4 '^image=vmlinuz-74rc2' "$ELILO" | grep 'append=' | sed 's/^/    /'
 }
 
 do_diag() {
-    # A boot entry for the same 7.4 image with the GPU driver disabled, so a
-    # stall at DRM init still leaves a system that comes up on efifb and can be
-    # inspected (and so we can load xe by hand with debug output).
+    # Two extra boot entries for the SAME 7.4 image. Both exist because on this
+    # machine efifb fails ("efifb: abort, cannot remap video memory"), so the
+    # text console is provided BY the GPU driver. Therefore:
+    #   * nomodeset   -> no DRM -> no console at all (blank, not necessarily hung)
+    #   * initcall_debug -> every initcall is printed as it starts, so the LAST
+    #     line on screen names the function that hung. The EFI early console
+    #     registers itself when booted via the stub, which is why boot text is
+    #     visible at all on this machine.
     python3 - "$ELILO" "$NEW_APPEND" <<'PYEOF'
 import sys
 path, append = sys.argv[1:3]
 lines = [l.rstrip('\n') for l in open(path)]
-label = 'vmlinuz-74rc2-nomodeset'
-out, i = [], 0
-while i < len(lines):
-    if lines[i].strip() == 'image=vmlinuz-74rc2' and any(
-            l.strip() == 'label=%s' % label for l in lines[i:i+4]):
-        while i < len(lines) and not lines[i].strip().startswith('image='):
-            i += 1
-        continue
-    out.append(lines[i])
-    i += 1
-out += ['image=vmlinuz-74rc2',
-        '\tlabel=%s' % label,
-        '\tdescription="7.4 diagnostic - no GPU driver (console only)"',
-        '\tread-only',
-        '\tappend="%s nomodeset"' % append]
+
+# split into: header (before first image=) and image blocks
+header, blocks, cur = [], [], None
+for line in lines:
+    if line.strip().startswith('image='):
+        if cur is not None:
+            blocks.append(cur)
+        cur = [line]
+    elif cur is None:
+        header.append(line)
+    else:
+        cur.append(line)
+if cur is not None:
+    blocks.append(cur)
+
+diag_labels = {'vmlinuz-74rc2-nomodeset', 'vmlinuz-74rc2-debug'}
+
+def block_label(block):
+    for l in block:
+        if l.strip().startswith('label='):
+            return l.strip().split('=', 1)[1].strip()
+    return ''
+
+blocks = [b for b in blocks if block_label(b) not in diag_labels]
+
+blocks.append(['image=vmlinuz-74rc2',
+               '\tlabel=vmlinuz-74rc2-nomodeset',
+               '\tdescription="7.4 diagnostic - no GPU driver (1: may be blank)"',
+               '\tread-only',
+               '\tappend="%s nomodeset"' % append])
+blocks.append(['image=vmlinuz-74rc2',
+               '\tlabel=vmlinuz-74rc2-debug',
+               '\tdescription="7.4 diagnostic - last screen line = hung function"',
+               '\tread-only',
+               '\tappend="%s ignore_loglevel initcall_debug keep_bootcon"' % append])
+
+out = header + [l for b in blocks for l in b]
 open(path, 'w').write('\n'.join(out).rstrip() + '\n')
-print("  added/refreshed entry: %s" % label)
+print("  diagnostic entries refreshed: nomodeset, debug")
 PYEOF
 }
 
@@ -449,6 +491,87 @@ do_default() {
 }
 
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# cleanup / purge — undo the whole 7.4 experiment.
+#
+# The display freeze turned out to be the DSB engine (doc/display-freeze.md),
+# fixed by `xe.enable_dsb=0` on the existing kernel, so the extra kernel is no
+# longer needed. `cleanup` removes the boot entries, the image, its module tree
+# and the boot menu furniture; `purge` additionally deletes the build trees.
+# The 7.2.15 entry (with xe.enable_dsb=0 …) is left exactly as it is.
+do_cleanup() {
+    [ -f "$ELILO" ] || { note "ERROR: $ELILO not found"; ok=false; return; }
+    cp -a "$ELILO" "$ELILO.bak-$(date +%Y%m%d-%H%M%S)"
+
+    python3 - "$ELILO" <<'PYEOF'
+import sys
+path = sys.argv[1]
+lines = [l.rstrip('\n') for l in open(path)]
+
+header, blocks, cur = [], [], None
+for line in lines:
+    if line.strip().startswith('image='):
+        if cur is not None:
+            blocks.append(cur)
+        cur = [line]
+    elif cur is None:
+        header.append(line)
+    else:
+        cur.append(line)
+if cur is not None:
+    blocks.append(cur)
+
+def label(b):
+    for l in b:
+        if l.strip().startswith('label='):
+            return l.strip().split('=', 1)[1].strip()
+    return ''
+
+kept = [b for b in blocks if label(b) == 'vmlinuz']
+dropped = [label(b) for b in blocks if label(b) != 'vmlinuz']
+if not kept:
+    sys.exit("refusing: would leave no boot entry")
+
+# single entry -> no chooser, no prompt, no message file, no countdown
+DROP_PREFIXES = ('prompt', 'message=', 'timeout=', 'chooser=')
+header = [l for l in header if not l.strip().startswith(DROP_PREFIXES)]
+if not any(l.strip().startswith('default=') for l in header):
+    header.append('default=vmlinuz')
+else:
+    header = [('default=vmlinuz' if l.strip().startswith('default=') else l) for l in header]
+if not any(l.strip().startswith('delay=') for l in header):
+    header.append('delay=5')
+
+open(path, 'w').write('\n'.join(header + [l for b in kept for l in b]).rstrip() + '\n')
+print("  elilo: kept 'vmlinuz', dropped: %s" % (', '.join(dropped) if dropped else 'nothing'))
+PYEOF
+
+    rm -f "$BOOT_DEST/vmlinuz-74rc2" "$BOOT_DEST/elilo.msg" && note "removed the 7.4 image and its menu message"
+    if [ -d /lib/modules/7.4.0-rc2-wcl ]; then
+        rm -rf /lib/modules/7.4.0-rc2-wcl && note "removed /lib/modules/7.4.0-rc2-wcl"
+    else
+        note "no /lib/modules/7.4.0-rc2-wcl"
+    fi
+    depmod -a "$(uname -r)" 2>/dev/null && note "depmod refreshed for $(uname -r)"
+
+    echo "  --- $ELILO ---"
+    sed 's/^/    /' "$ELILO"
+    grep -q 'enable_dsb=0' "$ELILO" || { note "ERROR: the DSB fix is not in the remaining entry!"; ok=false; }
+}
+
+do_purge() {
+    local freed
+    freed=$(du -sh "$WORK" 2>/dev/null | cut -f1)
+    if [ -d "$WORK" ]; then
+        rm -rf "$WORK" && note "removed $WORK (${freed:-?} reclaimed)"
+    else
+        note "$WORK already gone"
+    fi
+    # the module-build helper is useless without the tree
+    rm -rf /var/cache/powerkey-hold 2>/dev/null || true
+}
+
 do_status() {
     note "source   : $([ -d "$SRC_DIR" ] && echo "$SRC_DIR" || echo 'not fetched')"
     if [ -d "$SRC_DIR" ]; then
@@ -473,9 +596,11 @@ case "$ACTION" in
     bootmenu) do_bootmenu ;;
     display)  do_display "$@" ;;
     diag)     do_diag ;;
+    cleanup)  do_cleanup ;;
+    purge)    do_purge ;;
     default)  do_default "$@" ;;
     status)  do_status ;;
-    *) echo "ERROR: unknown action '$ACTION' (fetch|build|install|bootmenu|display|diag|default|status)"; exit 1 ;;
+    *) echo "ERROR: unknown action '$ACTION' (fetch|build|install|bootmenu|display|diag|default|cleanup|purge|status)"; exit 1 ;;
 esac
 
 $ok || { echo "FAILED: see messages above."; exit 1; }

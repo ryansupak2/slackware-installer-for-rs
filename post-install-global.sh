@@ -73,7 +73,7 @@ browser_ran_marker=/tmp/browser-ran.marker
 # Category definitions (for Slackware: removed glibc-compat, renamed apk step)
 core_prereqs=("slackpkg-setup" "console-font" "timezone" "ca-certificates" "xlibre" "root-dotfiles" "log-permissions")
 networking=("wifi" "openvpn" "vnc")
-hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "slock" "acpi-wakeup" "audio-volume" "audio-mixer" "pipewire" "brightness" "gpu-display" "display-hang-catcher" "power")
+hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "slock" "acpi-wakeup" "audio-volume" "audio-mixer" "pipewire" "brightness" "gpu-display" "power")
 security_access=("root-ssh-key" "keychain" "github-ssh")
 dev_tools=("vim" "git-lfs" "pi-path")
 ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm")
@@ -321,13 +321,9 @@ for section in "${selected[@]}"; do
             fi
             ;;
         # Passive evidence collector for display stalls (doc/display-freeze.md)
-        "display-hang-catcher")
-            if ./steps/display-hang-catcher.sh; then
-                success_count=$((success_count + 1))
-            else
-                error_count=$((error_count + 1))
-            fi
-            ;;
+        # display-hang-catcher: RETIRED 2026-11-09 (root cause fixed by
+        # xe.enable_dsb=0, see steps/gpu-display.sh and doc/display-freeze.md).
+        # The step and the daemon are gone; do not re-add them here.
         # Power/battery policy: `power` tool, auto AC/battery mode, wake sources
         "power")
             if ./steps/power.sh; then

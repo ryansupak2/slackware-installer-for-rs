@@ -40,7 +40,56 @@ to **xe** (`xe 0000:00:02.0: [drm] Found pantherlake/wildcatlake`), eDP
 2560x1600@120, Chrome at `--force-device-scale-factor=2` (composites
 5120x3200). `i915.*` parameters in the cmdline are inert here.
 
-## Prime suspect, found upstream
+## ROOT CAUSE FOUND (2026-11-09): the DSB engine stops responding
+
+`display-hang-catcher` caught the stall live, and the kernel stack names the
+wait — no guessing left:
+
+```
+xe 0000:00:02.0: [drm] *ERROR* [CRTC:151:pipe A] DSB 0 response timeout
+   …that line repeated 249 times ("last message buffered 249 times")…
+xe 0000:00:02.0: [drm] *ERROR* [CRTC:151:pipe A] DSB 0 poll error
+
+kworker/u28:0+i915_flip  state=D  wchan=drm_atomic_helper_wait_for_flip_done
+  drm_atomic_helper_wait_for_flip_done+0x5b/0xb0 [drm_kms_helper]
+  intel_atomic_commit_tail+0xfbb/0x1b70 [xe]
+```
+
+DSB is the *display state buffer*: a hardware unit the driver feeds so it can
+program display registers (plane updates, PSR exit) without the CPU. On this
+display (Wildcat Lake, `30.02 A00`) **DSB 0 never answers**. Every atomic commit
+that used it then waits for a flip-done that can never arrive, in
+`intel_atomic_commit_tail` — which is exactly the "picture frozen, no cursor,
+keyboard dead, audio still playing" symptom: the commit worker is stuck, X
+cannot present, input is never drained, audio is a separate subsystem.
+
+Note what this means for the earlier hypotheses: the PSR idle timeouts and the
+selective-fetch message were **noise**, not the cause. The freeze happens with
+PSR2 off, with selective fetch off, and (in the 7.4 attempts) right after
+`xe_init` returns — all consistent with the DSB path, which every commit uses.
+
+## The fix: `xe.enable_dsb=0`
+
+With DSB disabled the driver programs display registers from the CPU (the
+documented fallback). Cost is a little CPU/power for display updates; PSR and
+the rest of the power features stay enabled.
+
+Every boot entry now carries it (`steps/gpu-display.sh`, `steps/kernel-7.4.sh`):
+
+```
+xe.enable_dsb=0 xe.enable_psr=1 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0
+```
+
+Verify after a boot:
+
+```bash
+cat /sys/module/xe/parameters/enable_dsb     # 0
+dmesg | grep -c 'DSB'                        # 0 (was ~250 per X start)
+```
+
+## History: hypotheses that were tested and ruled out
+
+### `cbe5654759` backported into `xe.ko`## Prime suspect, found upstream
 
 Selective fetch keeps a per-plane "dirty area" in the atomic plane state. In
 this kernel that area is **not cleared when plane state is duplicated**, so a
@@ -62,21 +111,14 @@ Note the display code lives in `drivers/gpu/drm/i915/display/` and is built
 into **xe.ko** (`CONFIG_DRM_XE=m`, `CONFIG_DRM_XE_DISPLAY=y`) — so a backport
 means rebuilding one module, not the whole kernel.
 
-## What is installed right now
+## The collector that produced this evidence (retired)
 
-`steps/display-hang-catcher.sh` → `/usr/local/bin/display-hang-catcher`,
-started from `/etc/rc.d/rc.local`:
-
-```bash
-cat /run/display-hang-catcher.pid
-ps -o pid,etime,args= -p "$(cat /run/display-hang-catcher.pid)"
-tail -3 /var/log/root-display-hang.log
-/usr/local/bin/display-hang-catcher --dump-now    # capture current state on demand
-```
-
-It is **passive**: reads `/dev/kmsg`, `/proc`, `/sys`; no sysrq, no signals, no
-resets. On a stall signature (`flip_done timed out`, `commit wait timed out`,
-`Timed out waiting for PSR Idle`, DSB, `GPU HANG`) it writes one directory:
+`display-hang-catcher` was a passive sampler (reads `/dev/kmsg`, `/proc`,
+`/sys`; no sysrq, no signals, no resets) started from `/etc/rc.d/rc.local` by
+`steps/display-hang-catcher.sh`. On a stall signature (`flip_done timed out`,
+`commit wait timed out`, `Timed out waiting for PSR Idle`, DSB, `GPU HANG`)
+it wrote one directory per stall, and `display-waits.txt` named the hung
+function (`intel_dsb_wait` here):
 
 ```
 /var/log/<user>-display-hang-YYYYMMDD-HHMMSS-N/
@@ -88,9 +130,21 @@ resets. On a stall signature (`flip_done timed out`, `commit wait timed out`,
     parameters.txt     xe/i915 module parameters actually in force
 ```
 
-After the next stall, `display-waits.txt` names the hung function
-(`intel_psr_wait_for_idle` / `intel_dsb_wait` / `intel_fbc_wait_*` /
-`drm_atomic_commit_tail` …). That is the decision point: fix that, don't guess.
+It is **removed** (2026-11-09). With the DSB root cause fixed in the boot
+config there is nothing left to watch, and its own runs cost more than they
+returned. Nothing is installed, `rc.local` no longer starts it, both
+`steps/display-hang-catcher.sh` and `scripts/display-hang-catcher.sh` are
+deleted, and `post-install-global.sh` no longer calls the step. The dumps it
+did capture are kept and still stand as the evidence for `xe.enable_dsb=0`:
+
+```bash
+ls -d /var/log/*-display-hang-*
+grep -E 'intel_psr|intel_dsb|intel_fbc|drm_atomic_commit' \
+    /var/log/*-display-hang-*/display-waits.txt
+```
+
+To reinstate it, restore both files from git history
+(`git log --oneline --all -- steps/display-hang-catcher.sh`) and run the step.
 
 ## Tried: `cbe5654759` backported into `xe.ko` — REGRESSES X START, do not use on 7.2.15
 
@@ -187,10 +241,15 @@ stays on, only the selective-fetch path that failed at boot is dropped.
 
 ## If a stall happens anyway
 
+No new dumps are produced any more (the collector is retired), so read the
+kernel ring and the X log directly:
+
 ```bash
-# what hung (the answer):
-ls -dt /var/log/*-display-hang-* | head -1
-grep -E 'intel_psr|intel_dsb|intel_fbc|drm_atomic_commit' "$(ls -dt /var/log/*-display-hang-* | head -1)/display-waits.txt"
+# what hung: DSB timeouts at X start are the known signature of this box
+dmesg -T | grep -E 'DSB .*timeout|flip_done|commit wait|intel_(psr|fbc)' | tail -30
+grep -E 'DSB|flip_done|commit wait' /var/log/Xorg.0.log | tail -20
+# the dumps captured while the collector was still running:
+ls -dt /var/log/*-display-hang-* 2>/dev/null | head -1
 # recovery, from a VT (Ctrl+Alt+F2):
 #   restart X; if the VT switch also hangs, Alt+SysRq+E, I, S, U, B
 ```

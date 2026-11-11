@@ -96,6 +96,31 @@ if [ -n "$DWL_FIRST_TERMINAL" ] && [ -n "$XDG_RUNTIME_DIR" ]; then
     echo
     fastfetch
     # "Need Help?" message is appended by the fastfetch alias (line 9)
+    # WiFi: show what this session connected to, right after the splash.
+    # Same output as running `wifi --status` (scripts/wifi-manager.sh), so
+    # the first screen answers "what network am I on?" without a menu.
+    # If NetworkManager is still associating, wait for it (max 10s) and show
+    # progress dots; nothing at all is printed on a machine without WiFi.
+    if [ -x /usr/local/bin/wifi-manager ] && command -v nmcli >/dev/null 2>&1; then
+        wifi_state=$(nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null | awk -F: '$2 == "wifi" { print $3; exit }')
+        if [ -n "$wifi_state" ]; then
+            if [ "$wifi_state" != "connected" ]; then
+                printf 'Waiting for WiFi'
+                wifi_waited=0
+                while [ "$wifi_waited" -lt 10 ]; do
+                    sleep 1
+                    wifi_waited=$((wifi_waited + 1))
+                    printf '.'
+                    wifi_state=$(nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null | awk -F: '$2 == "wifi" { print $3; exit }')
+                    if [ "$wifi_state" = "connected" ]; then break; fi
+                done
+                echo
+            fi
+            echo "[$(date '+%H:%M:%S')] first-terminal: wifi status=$wifi_state" >> "$LOG"
+            /usr/local/bin/wifi-manager --status
+            unset wifi_state wifi_waited
+        fi
+    fi
     # Log audio capture devices for post-boot diagnosis
     AUDIO_LOG="$LOG_DIR/audioboot-$(date +%Y%m%d-%H%M%S).log"
     echo "=== $(date) ===" >> "$AUDIO_LOG"
