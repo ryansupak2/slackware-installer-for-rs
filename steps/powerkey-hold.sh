@@ -1,17 +1,20 @@
 #!/bin/bash
-# steps/powerkey-hold.sh - POWER BUTTON MUST BE HELD (3 s) TO SHUT DOWN
+# steps/powerkey-hold.sh - THE POWER BUTTON MUST BE HELD (1 s) TO SHUT DOWN
 #
 # Problem: elogind acts on the power button *press* event (HandlePowerKey=poweroff),
 # so a tap with the lid, a cable or a sleeve powers the machine off. Holding the
-# button for a few seconds is the normal laptop gesture, and the embedded
-# controller's own hard power-off already works that way.
+# button for a moment is the normal laptop gesture, and the embedded controller's
+# own hard power-off already works that way.
 #
 # What this installs:
-#   * /usr/local/bin/powerkey-hold — reads the power button's event device and
-#     measures the hold time from press to release:
-#         release < 3 s  -> nothing at all (the accidental tap case)
-#         release >= 3 s -> sync(2) then /sbin/poweroff (a CLEAN shutdown, and
-#                           it fires before the EC's hard cut at ~5 s)
+#   * /usr/local/bin/powerkey-hold — reads every input device that can report
+#     KEY_POWER and measures the hold time from press to release, WHILE held:
+#         release < 1.0 s  -> nothing at all (the accidental tap case)
+#         held    1.0 s    -> /sbin/shutdown -h now: the Linux-based, orderly
+#                              path (services stop, filesystems sync + unmount)
+#         held    ~5 s     -> the embedded controller cuts the power itself.
+#                              That is the hardware/system fallback and needs
+#                              no software support - keep holding and it happens.
 #   * /etc/elogind/logind.conf.d/20-powerkey.conf with HandlePowerKey=ignore,
 #     because otherwise elogind powers off on the press and the daemon never
 #     gets to measure anything.
@@ -26,14 +29,15 @@
 #   REPO_DIR=$PWD bash steps/powerkey-hold.sh          # install + start
 #   REPO_DIR=$PWD bash steps/powerkey-hold.sh remove   # back to logind default
 #
-# Two stages, both fired WHILE held (not on release):
-#   -t 1.5 -> /sbin/shutdown -h now   (orderly: services stop, fs sync+unmount)
-#            1.5 s leaves ~3.5 s of the EC's ~5 s hard-off window for it.
+# Stage 1 fires WHILE held, not on release:
+#   -t 1.0 -> /sbin/shutdown -h now   (orderly: services stop, fs sync+unmount)
+#             1.0 s is the requested gesture and still leaves ~4 s of the EC's
+#             ~5 s hard-off window for the orderly path to finish.
 #   -T 0   -> disabled: beyond ~5 s the embedded controller force-cuts power
 #             itself (measured), so a software force-off stage is pointless
 #             (it used to be -T 10 and could never fire before the hard cut).
-# Shorter than 3 s does nothing. The daemon ignores SIGTERM so it survives the
-# shutdown it started, which is what makes the 10 s stage reachable.
+# Anything shorter than 1.0 s does nothing. The daemon ignores SIGTERM/SIGINT
+# so it survives the shutdown it started and keeps measuring.
 # Change the times with ARGS below (e.g. ARGS="-t 2 -T 8").
 
 REPO_DIR="${REPO_DIR:-/root/Development/slackware-installer-for-rs}"
@@ -50,7 +54,7 @@ DEST=/usr/local/bin/powerkey-hold
 DROPIN=/etc/elogind/logind.conf.d/20-powerkey.conf
 RCLOCAL=/etc/rc.d/rc.local
 LOGF="/var/log/${USER:-root}-powerkey.log"
-ARGS="-t 1.5 -T 0"
+ARGS="-t 1.0 -T 0"
 
 echo "*****************************************************"
 echo "POWER BUTTON — $ACTION"
@@ -108,9 +112,9 @@ fi
 
 # --- 2. elogind must stop acting on the press -------------------------------
 mkdir -p /etc/elogind/logind.conf.d
-want='# Power button is handled by powerkey-hold: hold 3 s = orderly shutdown,
-# hold 10 s = forced power off, tap = nothing. logind must NOT act on the
-# press event, or an accidental tap powers off.
+want='# Power button is handled by powerkey-hold: hold 1 s = orderly shutdown,
+# a longer hold (~5 s) is cut by the embedded controller, tap = nothing.
+# logind must NOT act on the press event, or an accidental tap powers off.
 [Login]
 HandlePowerKey=ignore'
 if [ -f "$DROPIN" ] && [ "$(cat "$DROPIN")" = "$want" ]; then
@@ -139,7 +143,7 @@ ACPI_HANDLER=/etc/acpi/acpi_handler.sh
 if [ -f "$ACPI_HANDLER" ]; then
     if grep -q '^[[:space:]]*power) /sbin/init 0' "$ACPI_HANDLER"; then
         [ -f "$ACPI_HANDLER.orig" ] || cp -a "$ACPI_HANDLER" "$ACPI_HANDLER.orig"
-        sed -i 's|^\([[:space:]]*\)power) /sbin/init 0|\1power) :   # powerkey-hold decides (hold 3 s); a tap must not power off|' "$ACPI_HANDLER"
+        sed -i 's|^\([[:space:]]*\)power) /sbin/init 0|\1power) :   # powerkey-hold decides (hold 1 s); a tap must not power off|' "$ACPI_HANDLER"
         note "acpid power handler neutralised in $ACPI_HANDLER (backup: .orig)"
         if [ -x /etc/rc.d/rc.acpid ]; then
             /etc/rc.d/rc.acpid restart >/dev/null 2>&1 && note "acpid reloaded" \
@@ -196,7 +200,7 @@ note "log         : $LOGF"
 note "devices     : $(grep -o 'watching [0-9]* device(s) \[[^]]*\]' "$LOGF" 2>/dev/null | tail -1)"
 
 if $ok; then
-    echo "SUCCESS: power button: 1.5 s hold starts an orderly shutdown; longer is cut by the EC; taps do nothing."
+    echo "SUCCESS: power button: 1.0 s hold starts an orderly shutdown; a longer hold is cut by the EC; taps do nothing."
     exit 0
 else
     echo "ERROR: power button setup incomplete (see messages above)."

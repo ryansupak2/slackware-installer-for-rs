@@ -19,8 +19,12 @@ static const char col_gray4[]       = "#eeeeee";
 static const char col_cyan[]        = "#005577";
 static const char *colors[][3]      = {
 	/*               fg         bg         border   */
-	[SchemeNorm] = { col_gray3, col_gray1, col_gray2 },
-	[SchemeSel]  = { "#ffffff", col_gray1, col_gray1 },
+	[SchemeNorm]   = { col_gray3, col_gray1, col_gray2 },
+	[SchemeSel]    = { "#ffffff", col_gray1, col_gray1 },
+	/* Selected tag that is still EMPTY (a blank tag held open): inverted,
+	 * light background with dark glyph. Used by drawbar() for that case
+	 * only - a selected tag with windows keeps SchemeSel + a hollow box. */
+	[SchemeTagSel] = { col_gray1, "#ffffff", "#ffffff" },
 };
 
 /* tagging */

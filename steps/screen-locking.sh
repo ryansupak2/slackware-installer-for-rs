@@ -122,6 +122,42 @@ echo "  installed $HOOK"
 HOOK_DIR="$SLEEP_DIR"
 
 # ---------------------------------------------------------------------------
+# 3b. Sleep log: an on-disk answer to "did it come back this time?"
+#
+# The 2026-11-12 hang left exactly one usable trace (the deep-suspend entry
+# line in /var/log/messages), because syslogd is frozen from the moment the
+# kernel starts suspending and the ring buffer dies with the power cut. This
+# hook runs before the machine sleeps and again after it wakes, so the file
+# itself is the evidence: a pre line without a matching post line means the
+# machine never completed that suspend.
+# ---------------------------------------------------------------------------
+SLEEPLOG="$SLEEP_DIR/20-sleep-log"
+cat > "$SLEEPLOG" << 'SLEEPLOGEOF'
+#!/bin/sh
+# 20-sleep-log — one line before sleeping, one after waking (see
+# steps/screen-locking.sh). A pre line with no post line after it means the
+# machine did not come back from that sleep; the rescue is a power-button
+# hold. Times are local; the timestamp gap is the time spent asleep.
+LOG="/var/log/${USER:-root}-sleep.log"
+mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
+case "$1" in
+    pre)
+        mem=$(sed -n 's/.*\[\(.*\)\].*/\1/p' /sys/power/mem_sleep 2>/dev/null)
+        printf '%s: pre  %-9s mem_sleep=%s  going to sleep (no post line below = never woke)\n' \
+            "$(date '+%Y-%m-%d %H:%M:%S')" "${2:-sleep}" "${mem:-?}" >> "$LOG"
+        ;;
+    post)
+        printf '%s: post %-9s mem_sleep=%s  resumed\n' \
+            "$(date '+%Y-%m-%d %H:%M:%S')" "${2:-sleep}" \
+            "$(sed -n 's/.*\[\(.*\)\].*/\1/p' /sys/power/mem_sleep 2>/dev/null)" >> "$LOG"
+        ;;
+esac
+exit 0
+SLEEPLOGEOF
+chmod 755 "$SLEEPLOG"
+echo "  installed $SLEEPLOG (sleep evidence: /var/log/<user>-sleep.log)"
+
+# ---------------------------------------------------------------------------
 # 4. acpid still serves non-lid events; restart only if the config changed.
 # ---------------------------------------------------------------------------
 if [ -x /etc/rc.d/rc.acpid ]; then
@@ -133,8 +169,11 @@ fi
 # 5. Show the resulting state, and what the lid will now physically do.
 # ---------------------------------------------------------------------------
 echo "  lid policy : $(grep -h '^HandleLidSwitch=' /etc/elogind/logind.conf.d/*.conf 2>/dev/null | tail -1)"
-echo "  sleep hook : $HOOK_DIR/10-slock-lock"
-echo "  lid wake   : $(cat /sys/devices/LNXSYSTM:00/LNXSYBUS:00/PNP0C0D:00/power/wakeup 2>/dev/null || echo 'n/a')"
+echo "  sleep hooks: $HOOK_DIR/10-slock-lock, $HOOK_DIR/20-sleep-log"
+# The lid's wakeup attributes live on the EC node (PNP0C09:00/PNP0C0D:00), NOT
+# on the LNXSYSTM/LNXSYBUS alias - that one has no power/wakeup file at all.
+lidw=$(find /sys/devices -path '*PNP0C0D*/power/wakeup' 2>/dev/null | head -1)
+echo "  lid wake   : ${lidw:-<none found>} -> $(cat "${lidw:-/dev/null}" 2>/dev/null || echo '?')"
 echo "  ACPI lid   : $([ -f /etc/acpi/events/lid-close ] && echo 'poweroff handler STILL PRESENT' || echo 'none (elogind handles it)')"
 echo "  note       : lid close now suspends; opening the lid wakes it. To lock"
 echo "               by hand: Mod+Escape, or /usr/local/bin/lock-screen.sh"

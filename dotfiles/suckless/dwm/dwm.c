@@ -63,7 +63,7 @@
 
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
-enum { SchemeNorm, SchemeSel }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeTagSel }; /* color schemes */
 enum { NetSupported, NetWMName, NetWMState, NetWMCheck,
        NetWMFullscreen, NetActiveWindow, NetWMWindowType,
        NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
@@ -170,6 +170,7 @@ static void detachstack(Client *c);
 static Monitor *dirtomon(int dir);
 static void drawbar(Monitor *m);
 static void drawbars(void);
+static unsigned int taglpad(const char *tag, unsigned int cellw);
 static void enternotify(XEvent *e);
 static void expose(XEvent *e);
 static void focus(Client *c);
@@ -769,13 +770,25 @@ dirtomon(int dir)
 	return m;
 }
 
+/* Horizontal padding that centres a tag's glyph in its square cell.
+ * drw_text() shifts the text right by `lpad` itself and centres it
+ * vertically, so the cell geometry does not move: only the glyph does.
+ * TEXTW() adds lrpad to the glyph width, hence the subtraction. */
+static unsigned int
+taglpad(const char *tag, unsigned int cellw)
+{
+	unsigned int gw = TEXTW(tag) - lrpad;
+
+	return gw < cellw ? (cellw - gw) / 2 : 0;
+}
+
 void
 drawbar(Monitor *m)
 {
-	int x, w, tw = 0;
+	int x, w, tw = 0, blank;
 	int boxs = drw->fonts->h / 9;
 	int boxw = drw->fonts->h / 6 + 2;
-	unsigned int i, occ = 0, urg = 0;
+	unsigned int i, occ = 0;
 	Client *c;
 
 	if (!m->showbar)
@@ -788,24 +801,29 @@ drawbar(Monitor *m)
 		drw_text(drw, m->ww - tw, 0, tw, bh, 0, stext, 0);
 	}
 
-	for (c = m->clients; c; c = c->next) {
+	for (c = m->clients; c; c = c->next)
 		occ |= c->tags;
-		if (c->isurgent)
-			urg |= c->tags;
-	}
 	x = 0;
 	for (i = 0; i < LENGTH(tags); i++) {
 		if (!(m->bartags & (1 << i)))
 			continue;  /* dynamic tags: only draw tags in the bar */
 		w = bh;  /* square tags: width = bar height */
-		drw_setscheme(drw, scheme[i == m->curtagidx ? SchemeSel : SchemeNorm]);
-		drw_text(drw, x, 0, w, bh, lrpad / 2, tags[i], urg & 1 << i);
-		if (i == m->curtagidx)
+		/* Two looks for the selected tag, and nothing else:
+		 *  - it has windows: hollow foreground box on the normal (black)
+		 *    tag background, normal text colours;
+		 *  - it is a revealed but still empty tag (a fresh blank tag being
+		 *    held open until something is created in it): inverted - light
+		 *    background, dark glyph. That IS the "empty" indicator, so no
+		 *    extra mark is drawn on top of it.
+		 * Urgent tags used to be inverted too; they now get no mark at all. */
+		blank = i == m->curtagidx && !(occ & (1 << i));
+		if (blank)
+			drw_setscheme(drw, scheme[SchemeTagSel]);
+		else
+			drw_setscheme(drw, scheme[i == m->curtagidx ? SchemeSel : SchemeNorm]);
+		drw_text(drw, x, 0, w, bh, taglpad(tags[i], w), tags[i], 0);
+		if (i == m->curtagidx && !blank)
 			drw_rect(drw, x, 0, w, bh - 1, 0, 0);
-		if (occ & 1 << i)
-			drw_rect(drw, x + boxs, boxs, boxw, boxw,
-				m == selmon && selmon->sel && selmon->sel->tags & 1 << i,
-				urg & 1 << i);
 		x += w;
 	}
 	w = TEXTW(m->ltsymbol);
@@ -820,6 +838,9 @@ drawbar(Monitor *m)
 				drw_rect(drw, x + boxs, boxs, boxw, boxw, m->sel->isfixed, 0);
 		} else {
 			drw_setscheme(drw, scheme[SchemeNorm]);
+			/* Empty title area: filled=1 invert=1 -> filled with ColBg, i.e.
+			 * cleared to the bar background. (filled=1 invert=0 would paint
+			 * it with ColFg and turn the whole empty bar light.) */
 			drw_rect(drw, x, 0, w, bh, 1, 1);
 		}
 	}

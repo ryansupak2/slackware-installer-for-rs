@@ -205,9 +205,26 @@ both wait on it before sleeping/blanking. Unlock destroys the covering window
 
 `steps/slock.sh` builds slock (`sources/slock`), `xidle` (`sources/xidle`,
 MIT-SCREEN-SAVER; nothing in the base system reports idle time) and installs
-`/etc/pam.d/slock`. `steps/screen-locking.sh` owns the lid/sleep policy. Never
+`/etc/pam.d/slock`. `steps/screen-locking.sh` owns the lid/sleep policy and
+installs both sleep hooks (`10-slock-lock`, `20-sleep-log`). Never
 `rm /usr/local/bin/slock` (an old version of that step did, silently deleting
 the locker on every run). Details and verification: `doc/screen-locking.md`.
+
+**Lid close must resume on lid open — and that means s2idle, not `deep`.**
+The machine used to suspend into legacy S3 (`mem_sleep=deep`) and never come
+back: `/var/log/messages` ends with `PM: suspend entry (deep)` and the next
+line is the next boot, 26 hours later, after a power-button reset (2026-11-12).
+The cause was our own wake policy: `power wake restrict` forced `deep` so the
+sysfs wakeup restrictions would "bite". This firmware does not implement S3
+usefully — it advertises ACPI low-power S0 idle (dmesg: `Low-power S0 idle
+used by default for system suspend`), i.e. it wants **s2idle**. Every place
+that touches `mem_sleep` (`scripts/power.sh`, `steps/wakeup-power-only.sh`)
+now selects s2idle when the kernel offers it. `power set sleep deep` is the
+escape hatch for a machine where s2idle is the broken one; do not make it the
+default again. `/var/log/<user>-sleep.log` (hook `20-sleep-log`) writes a
+`pre` line before sleeping and a `post` line after waking, so "did it come
+back?" is answerable from disk after a hard power-off — syslogd is frozen for
+the whole suspend, so `/var/log/messages` cannot answer it.
 
 ---
 
@@ -225,12 +242,13 @@ machine, and all three had to be dealt with (`steps/powerkey-hold.sh`):
 `powerkey-hold` measures the hold with a `poll()` timeout (the action fires
 *while* held, not on release):
 
-* **1.5 s hold** → `/sbin/shutdown -h now` — orderly: services stop, fs sync and
-  unmount.
-* **longer (~5 s)** → the embedded controller cuts power itself; there is no
-  software stage for it (`-T 0`). A `-T 10` force-off stage was tried and could
-  never fire: the EC hard-off wins first.
-* **shorter** → nothing at all (logged, e.g. `released after 1.42 s (< 1.5 s) ignored`).
+* **1.0 s hold** → `/sbin/shutdown -h now` — orderly: services stop, fs sync and
+  unmount. This is the requested gesture: one full second.
+* **longer (~5 s)** → the embedded controller cuts power itself; that is the
+  system/hardware fallback, and there is no software stage for it (`-T 0`).
+  A `-T 10` force-off stage was tried and could never fire: the EC hard-off
+  wins first.
+* **shorter** → nothing at all (logged, e.g. `released after 0.82 s (< 1.0 s) ignored`).
 
 **Which input device the button appears on is not obvious on this machine.** The
 node *named* "Power Button" (`/dev/input/event1`) is **silent**; the press/release
@@ -249,7 +267,7 @@ come from evdev.
 
 It ignores SIGTERM/SIGINT/SIGHUP/SIGPIPE on purpose: rc.6 stops processes during
 the shutdown it just started, and without that the 10 s escape could never run.
-Times are `ARGS="-t 1.5 -T 0"` in the step. Log: `/var/log/<user>-powerkey.log`.
+Times are `ARGS="-t 1.0 -T 0"` in the step. Log: `/var/log/<user>-powerkey.log`.
 Single instance is a flock on `/run/powerkey-hold.pid`.
 
 Do not "fix" this by putting `HandlePowerKey=poweroff` back, and do not restore

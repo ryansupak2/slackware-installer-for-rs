@@ -146,7 +146,9 @@ Change it:
   power auto on|off                               follow AC/battery
   power auto battery balanced / power auto ac performance
   power set brightness 40 | power set blank 5 | power set turbo off
-  power wake restrict|allow                       power button only / all
+  power wake restrict|allow                       power button + lid / all
+  power set sleep s2idle|deep                     sleep state (s2idle here;
+                                                  deep/S3 never resumes)
   power menu                                      interactive
 
 How the auto mode sticks:

@@ -34,9 +34,12 @@ if $ok; then
         echo "dwm already installed — skipping"
     else
         echo "Installing Suckless dwm..."
-        rm -rf dwm
-        if ! git clone --depth 1 --branch 6.5 https://git.suckless.org/dwm; then
-            echo "ERROR: failed to git clone dwm."
+        # NEVER rm -rf a working tree before a successful clone: if the network
+        # is down this used to delete the only copy of an installed dwm and
+        # leave nothing to rebuild from. Clone only when there is no tree yet;
+        # upstream files in an existing tree are untouched by the cp below.
+        if [ ! -d dwm ] && ! git clone --depth 1 --branch 6.5 https://git.suckless.org/dwm; then
+            echo "ERROR: failed to git clone dwm (no existing source tree either)."
             ok=false
         else
             cd dwm

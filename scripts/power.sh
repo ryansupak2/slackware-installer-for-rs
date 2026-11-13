@@ -23,8 +23,12 @@
 #   power auto battery NAME     Profile applied while unplugged
 #   power auto ac NAME          Profile applied while plugged in
 #   power wake                  Show wake sources + suspend mode
-#   power wake restrict         Power button only (disables USB/lid/PCI wake,
-#                               forces mem_sleep=deep so it is honoured)
+#   power wake restrict         Wake sources: power button + lid only
+#                               (this does not change the sleep state)
+#   power set sleep s2idle|deep Sleep state used by the next suspend. s2idle
+#                               (modern standby) is what this firmware
+#                               implements; deep (S3) never resumes here —
+#                               see doc/screen-locking.md before changing it.
 #   power wake allow            Re-enable all wake sources
 #   power apply                 Re-apply policy for the current source
 #                               (internal: udev + elogind hooks call this)
@@ -461,7 +465,45 @@ apply_cpu_profile() {
 }
 
 # ── Wake sources ──────────────────────────────────────────────────────
+# The sleep state, which is NOT the same question as the wake sources:
+#
+# s2idle is ACPI low-power S0 idle ("Modern Standby"). This platform's
+# firmware advertises it (dmesg: "Low-power S0 idle used by default for
+# system suspend"), which is the kernel saying the firmware wants s2idle.
+#
+# `deep` is legacy S3. `power wake restrict` used to force it, to make sysfs
+# wakeup restrictions bite — and that is exactly what broke the lid: on this
+# machine S3 never comes back. /var/log/messages ends with
+#
+#     Nov 12 10:22:14 ... kernel: PM: suspend entry (deep)
+#
+# and the next line is the next boot, 26 hours later, after a power-button
+# reset. Lid close therefore suspended into a state only a held power button
+# could leave. s2idle is what the firmware implements, so it is what we ask
+# for; `deep` stays available as a fallback with `power set sleep deep` for
+# machines where s2idle is the broken one.
 mem_sleep_cur() { sed -n 's/.*\[\(.*\)\].*/\1/p' /sys/power/mem_sleep 2>/dev/null; }
+
+preferred_mem_sleep() {
+    # The state this kernel/firmware should use: s2idle when offered.
+    local avail
+    avail=$(cat /sys/power/mem_sleep 2>/dev/null)
+    case "$avail" in
+        *s2idle*) echo s2idle ;;
+        *deep*)   echo deep ;;
+        *)        echo "" ;;
+    esac
+}
+
+set_mem_sleep() {
+    # $1 = s2idle|deep. Returns 0 only when the kernel now reports it.
+    local want=$1
+    case "$want" in s2idle|deep) ;; *) return 1 ;; esac
+    grep -qw "$want" /sys/power/mem_sleep 2>/dev/null || return 1
+    [ "$(mem_sleep_cur)" = "$want" ] && return 0
+    echo "$want" > /sys/power/mem_sleep 2>/dev/null || return 1
+    [ "$(mem_sleep_cur)" = "$want" ]
+}
 
 wake_enabled_count() {
     local f n=0
@@ -490,10 +532,10 @@ wake_restrict() {
             d=$((d + 1))
         fi
     done < <(find /sys/devices -path '*/power/wakeup' -not -path '*/virtual/*' -print0 2>/dev/null)
-    # s2idle ignores /proc/acpi/wakeup and sysfs wakeup entirely.
-    if grep -q deep /sys/power/mem_sleep 2>/dev/null; then
-        echo deep >/sys/power/mem_sleep 2>/dev/null || true
-    fi
+    # Make the chosen sleep state explicit (never silently leave it on
+    # whatever a previous run wrote). See preferred_mem_sleep() for why
+    # s2idle and not deep — forcing deep here used to hang lid close.
+    set_mem_sleep "$(preferred_mem_sleep)" || true
     hook_log "wake: power button + lid ($d sysfs source(s) disabled, $n ACPI toggled, mem_sleep=$(mem_sleep_cur))"
 }
 
@@ -530,15 +572,22 @@ cmd_wake() {
             echo "SUCCESS: all wake sources re-enabled."
             ;;
         "")
+            local ms ms_note
+            ms=$(mem_sleep_cur)
+            case "$ms" in
+                s2idle) ms_note="modern standby — what this firmware implements" ;;
+                deep)   ms_note="legacy S3 — HANGS this machine on entry; see doc/screen-locking.md" ;;
+                *)      ms_note="kernel/firmware default" ;;
+            esac
             echo "${BOLD}Wake sources${NC}"
-            deep_note=$([ "$(mem_sleep_cur)" = deep ] && echo "(honours wake restrictions)" || echo "(s2idle ignores wake restrictions)")
-            echo "  Suspend mode  : mem_sleep=$(mem_sleep_cur) ${DIM}${deep_note}${NC}"
+            echo "  Suspend mode  : mem_sleep=${ms:-?} ${DIM}(${ms_note})${NC}"
             echo "  Policy        : $WAKE"
             echo "  sysfs enabled : $(wake_enabled_count) source(s)"
             if [ -r /proc/acpi/wakeup ]; then
                 echo "  ACPI enabled  :"
                 awk 'NR>1 && $3 ~ /\*enabled/ {printf "                  %s\n", $1}' /proc/acpi/wakeup 2>/dev/null
             fi
+            echo "  ${DIM}change: power wake restrict|allow · power set sleep s2idle|deep${NC}"
             ;;
         *) die "unknown wake subcommand '$sub' (restrict|allow)" ;;
     esac
@@ -592,6 +641,7 @@ cmd_boot() {
 # ── Status ────────────────────────────────────────────────────────────
 cmd_status() {
     local b pct st watts avg left leftnote draw gov epp turbo brt blname msleep wenabled lid
+    local sleep_note
     local mode_src mode_prof mode_line
 
     b=$(battery_dir)
@@ -649,8 +699,13 @@ cmd_status() {
         "${blname:+ $blname · }$([ "${BRIGHTNESS_MODE:-auto}" = manual ] && echo 'manual — policy will not change it' || echo 'auto')"
     printf '  %-13s blank after %s min; DPMS %s/%s/%s min\n' "Display" \
         "$BLANK_MINUTES" "$BLANK_MINUTES" "$((BLANK_MINUTES * 2))" "$((BLANK_MINUTES * 4))"
-    printf '  %-13s mem_sleep=%s; wake=%s (%s)\n' "Sleep" \
-        "$msleep" "$WAKE" \
+    case "$msleep" in
+        s2idle) sleep_note="s2idle (modern standby)" ;;
+        deep)   sleep_note="deep (legacy S3 — hangs here, see doc/screen-locking.md)" ;;
+        *)      sleep_note="${msleep:-?}" ;;
+    esac
+    printf '  %-13s %s; wake=%s (%s)\n' "Sleep" \
+        "$sleep_note" "$WAKE" \
         "$([ "$wenabled" -eq 0 ] 2>/dev/null && echo 'power button only — ACPI fixed event, nothing else' || echo "$wenabled sysfs source(s) enabled")"
     printf '  %-13s %s\n' "Lid" \
         "lid close → ${lid:-suspend} (elogind); wakes on lid open + power button"
@@ -764,7 +819,7 @@ cmd_profile() {
 
 cmd_set() {
     local what=${1:-} val=${2:-}
-    [ -n "$what" ] && [ -n "$val" ] || die "usage: power set governor|epp|turbo|brightness|blank|avg <value>"
+    [ -n "$what" ] && [ -n "$val" ] || die "usage: power set governor|epp|turbo|brightness|blank|avg|sleep <value>"
     elevate set "$what" "$val"
     case "$what" in
         governor)
@@ -802,8 +857,17 @@ cmd_set() {
             RATE_WINDOW=$val; save_state
             echo "SUCCESS: time-left estimate averages the last $(rate_window_label) of battery draw."
             ;;
+        sleep)
+            case "$val" in
+                s2idle|deep) ;;
+                *) die "sleep state must be s2idle (modern standby) or deep (legacy S3)" ;;
+            esac
+            set_mem_sleep "$val" || die "cannot select mem_sleep=$val (available: $(cat /sys/power/mem_sleep 2>/dev/null))"
+            echo "SUCCESS: mem_sleep=$val — used by the next suspend (lid close and wake)."
+            [ "$val" = deep ] && echo "         WARNING: deep/S3 is the state that never returned on this machine."
+            ;;
         *)
-            die "unknown setting '$what' (governor|epp|turbo|brightness|blank|avg)"
+            die "unknown setting '$what' (governor|epp|turbo|brightness|blank|avg|sleep)"
             ;;
     esac
 }

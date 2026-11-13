@@ -23,11 +23,23 @@ echo "Disabling all ACPI wake sources except power button + lid..."
 
 # Disable everything on the ACPI wakeup table
 for dev in $(grep "\*enabled" /proc/acpi/wakeup | awk '{print $1}'); do
+    case "$dev" in PWRB|SLPB|LID*) continue ;; esac
     echo "$dev" > /proc/acpi/wakeup 2>/dev/null || true
 done
 
-# Also disable WiFi wakeup via sysfs (sometimes missed by /proc/acpi/wakeup)
+# Disable every sysfs wakeup source EXCEPT the power button and the lid.
+# The lid MUST stay enabled: lid close suspends, so lid open is the only
+# touch-free way back in. Forgetting this exception left PNP0C0D disabled
+# after an install, which makes a suspended machine a brick until the power
+# button is held (that is exactly the bug this loop used to cause).
+lid_wakeup=""
 for wakefile in $(find /sys/devices -name "wakeup" -path "*/power/*" 2>/dev/null); do
+    case "$wakefile" in
+        *PNP0C0D*|*LNXPWRBN*|*PWRB*)
+            echo enabled > "$wakefile" 2>/dev/null || true
+            case "$wakefile" in *PNP0C0D*) lid_wakeup=$wakefile ;; esac
+            continue ;;
+    esac
     if [ "$(cat "$wakefile" 2>/dev/null)" = "enabled" ]; then
         echo "disabled" > "$wakefile" 2>/dev/null || true
     fi
@@ -36,16 +48,29 @@ done
 # Verify
 remaining=$(grep "\*enabled" /proc/acpi/wakeup | wc -l)
 echo "Remaining enabled: $remaining"
-
-# --- Ensure deep suspend (S3) is used, not s2idle ---
-# s2idle ignores /proc/acpi/wakeup and sysfs wakeup controls;
-# only deep sleep honors the power-button-only restrictions.
-if grep -q deep /sys/power/mem_sleep 2>/dev/null; then
-    echo deep > /sys/power/mem_sleep 2>/dev/null \
-        && echo "  mem_sleep set to: deep (s2idle would ignore wakeup restrictions)" \
-        || echo "  WARNING: could not set mem_sleep to deep"
+if [ -n "$lid_wakeup" ]; then
+    echo "  lid wake source: $lid_wakeup -> $(cat "$lid_wakeup" 2>/dev/null)"
 else
-    echo "  WARNING: deep sleep not supported by kernel"
+    echo "  lid wake source: not present (EC handles lid wake without sysfs)"
+fi
+
+# --- Sleep state: s2idle (what the firmware implements), never deep/S3 ---
+# This is NOT a wake-source control. It lives here because the old version
+# forced `deep` to make the sysfs wakeup restrictions "bite" - and that is
+# exactly what broke lid close on this machine: the last line logged before
+# the hang was 'PM: suspend entry (deep)', and the next line is the next
+# boot, hours later, after a power-button reset.
+# The firmware advertises ACPI low-power S0 idle (dmesg: "Low-power S0 idle
+# used by default for system suspend"), i.e. it wants s2idle. Ask for that;
+# deep is only the fallback on kernels/firmware without s2idle.
+if grep -qw s2idle /sys/power/mem_sleep 2>/dev/null; then
+    if echo s2idle > /sys/power/mem_sleep 2>/dev/null; then
+        echo "  mem_sleep set to: s2idle (modern standby - what this firmware implements)"
+    else
+        echo "  WARNING: could not set mem_sleep to s2idle"
+    fi
+else
+    echo "  NOTE: s2idle not offered; leaving mem_sleep=$(sed -n 's/.*\[\(.*\)\].*/\1/p' /sys/power/mem_sleep 2>/dev/null)"
 fi
 
 # Deploy a boot-time enforcer
@@ -62,9 +87,11 @@ for wakefile in $(find /sys/devices -name "wakeup" -path "*/power/*" 2>/dev/null
         echo "disabled" > "$wakefile" 2>/dev/null || true
     fi
 done
-# Use deep suspend (S3) so ACPI wakeup restrictions actually work.
-# s2idle ignores all /proc/acpi/wakeup and sysfs wakeup controls.
-grep -q deep /sys/power/mem_sleep 2>/dev/null && echo deep > /sys/power/mem_sleep 2>/dev/null || true
+# Sleep state: s2idle when the kernel offers it (same reason as the step:
+# forcing deep/S3 is what used to hang lid close on this machine).
+if grep -qw s2idle /sys/power/mem_sleep 2>/dev/null; then
+    echo s2idle > /sys/power/mem_sleep 2>/dev/null || true
+fi
 EOF
 chmod +x /usr/local/bin/wakeup-power-only
 
@@ -91,6 +118,7 @@ fi
 echo "  wakeup-power-only deployed to /usr/local/bin/wakeup-power-only"
 echo "  elogind post-resume hook deployed to $HOOK"
 
-echo "SUCCESS: Only the power button and the lid will wake the machine (deep sleep)."
-echo "         mem_sleep set to 'deep' — s2idle would ignore wakeup restrictions."
+echo "SUCCESS: Only the power button and the lid will wake the machine."
+echo "         Sleep state: s2idle (modern standby). deep/S3 never resumes here:"
+echo "         see doc/screen-locking.md. Change it with 'power set sleep deep'."
 exit 0

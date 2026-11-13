@@ -1,19 +1,24 @@
-/* powerkey-hold - power button needs a HOLD, in two stages
+/* powerkey-hold - the power button must be HELD to shut down
  *
- * Stage 1 (default 3 s): start an orderly shutdown — runs `/sbin/shutdown -h
- *         now`, so services stop, filesystems sync and unmount (Slackware's
- *         init 0 -> rc.6 path).
- * Stage 2 (default 10 s): if you keep holding, cut the power for real —
- *         `/sbin/poweroff -f` after a sync(2), i.e. reboot(RB_POWER_OFF)
- *         without waiting for init. This is the "shutdown is stuck" escape.
+ * Stage 1 (the installed setting is `-t 1.0`): start an orderly, Linux-based
+ *         shutdown — runs `/sbin/shutdown -h now`, so services stop and the
+ *         filesystems sync and unmount (Slackware's init 0 -> rc.6 path).
+ * Stage 2 (default 10 s, DISABLED by the installer with `-T 0`): if you keep
+ *         holding, cut the power for real — `/sbin/poweroff -f` after a
+ *         sync(2), i.e. reboot(RB_POWER_OFF) without waiting for init. It is
+ *         off here because the embedded controller hard-cuts power at ~5 s by
+ *         itself, so a software stage after ~5 s could never fire: keeping the
+ *         button held past 1 s is therefore the system/hardware fallback.
  * Anything shorter than stage 1 does nothing at all (the accidental-tap case).
  *
- * Both thresholds fire WHILE the button is held, not on release, so you can
- * hold straight through: shutdown at 3 s, power off at 10 s.
+ * Stage 1 fires WHILE the button is held, not on release, so the hold can be
+ * continued straight into the ~5 s hardware cut-off if the orderly path is
+ * not wanted (it starts anyway, and stops when the power goes away).
+ *
  *
  * The daemon ignores SIGTERM/SIGINT/SIGHUP/SIGPIPE on purpose: rc.6 stops
- * processes during a shutdown, and if this helper died then the 10 s escape
- * would never be reachable.
+ * processes during a shutdown, and if this helper died then stage 2 would
+ * never be reachable.
  *
  * elogind must be told not to act on the press (HandlePowerKey=ignore) and
  * acpid's `power) /sbin/init 0` handler must be neutralised — both are done by

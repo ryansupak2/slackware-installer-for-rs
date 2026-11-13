@@ -90,6 +90,15 @@ if [ -f /etc/rc.d/rc.local ]; then
         ' /etc/rc.d/rc.local > /etc/rc.d/rc.local.new && mv /etc/rc.d/rc.local.new /etc/rc.d/rc.local
         echo "  removed the old lid-disabling block from rc.local"
     fi
+    # Older installs also left single lines that write "disabled" to the lid's
+    # wakeup file (the LNXSYSTM/LNXSYBUS alias of PNP0C0D). The lid is a wake
+    # source now - lid close suspends, so lid open has to resume - and such a
+    # line makes that impossible. Strip every one of them.
+    if grep -qE 'PNP0C0D.*power/wakeup' /etc/rc.d/rc.local 2>/dev/null; then
+        grep -vE 'PNP0C0D.*power/wakeup' /etc/rc.d/rc.local > /etc/rc.d/rc.local.new \
+            && mv /etc/rc.d/rc.local.new /etc/rc.d/rc.local
+        echo "  removed a stale lid-wakeup-disabling line from rc.local"
+    fi
     if ! grep -q "acpi-wakeup: keep power button" /etc/rc.d/rc.local 2>/dev/null; then
         cat >> /etc/rc.d/rc.local << 'EOF'
 
