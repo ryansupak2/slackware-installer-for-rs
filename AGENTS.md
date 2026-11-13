@@ -335,7 +335,9 @@ The lock is switched from the command line instead: **`capslock`**
 `capslock` toggles, `capslock on|off` sets, `--help` explains, and it prints
 exactly one line, `Capslock On` / `Capslock Off`. It uses `XkbLockModifiers`
 on the Lock modifier, not a fake keycode (no keycode produces `Caps_Lock` any
-more), so the LED follows. It is listed in `help.sh`.
+more), so the LED follows. `~/.bashrc` aliases `cl`, `CL` and `CAPSLOCK` to it
+(`capslock` is also the short form). `help.sh` lists them on ONE line — put
+the single `#help:` marker on the `cl` alias only, or the list grows three.
 
 **The Copilot key's firmware presses Shift and Super itself** (Shift+Super+F23 is
 the Microsoft keyboard spec; xkeyboard-config's `PC_SHIFT_SUPER_LEVEL2` type
