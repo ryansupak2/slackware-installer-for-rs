@@ -30,7 +30,9 @@ if $ok; then
     # ── dwm ──────────────────────────────────────────────────────
     if [ -x /usr/local/bin/dwm ] && \
        cmp -s "$REPO_DIR/dotfiles/suckless/dwm/config.h" /usr/local/src/suckless/dwm-stamp/config.h 2>/dev/null && \
-       cmp -s "$REPO_DIR/dotfiles/suckless/dwm/dwm.c" /usr/local/src/suckless/dwm-stamp/dwm.c 2>/dev/null; then
+       cmp -s "$REPO_DIR/dotfiles/suckless/dwm/dwm.c" /usr/local/src/suckless/dwm-stamp/dwm.c 2>/dev/null && \
+       cmp -s "$REPO_DIR/dotfiles/suckless/dwm/drw.c" /usr/local/src/suckless/dwm-stamp/drw.c 2>/dev/null && \
+       cmp -s "$REPO_DIR/dotfiles/suckless/dwm/drw.h" /usr/local/src/suckless/dwm-stamp/drw.h 2>/dev/null; then
         echo "dwm already installed — skipping"
     else
         echo "Installing Suckless dwm..."
@@ -43,9 +45,11 @@ if $ok; then
             ok=false
         else
             cd dwm
-            # Copy our config.h and patched dwm.c (replaces vanilla dwm.c)
+            # Copy our config.h and patched dwm.c/drw.c (replace the vanilla ones)
             cp -f "$REPO_DIR/dotfiles/suckless/dwm/config.h" config.h
             cp -f "$REPO_DIR/dotfiles/suckless/dwm/dwm.c" dwm.c
+            cp -f "$REPO_DIR/dotfiles/suckless/dwm/drw.c" drw.c
+            cp -f "$REPO_DIR/dotfiles/suckless/dwm/drw.h" drw.h
             cp -f "$REPO_DIR/dotfiles/suckless/dwm/config.mk" config.mk
             if ! make clean install; then
                 echo "ERROR: make clean install for dwm failed."
@@ -55,6 +59,8 @@ if $ok; then
                 mkdir -p /usr/local/src/suckless/dwm-stamp
                 cp -f "$REPO_DIR/dotfiles/suckless/dwm/config.h" /usr/local/src/suckless/dwm-stamp/config.h
                 cp -f "$REPO_DIR/dotfiles/suckless/dwm/dwm.c" /usr/local/src/suckless/dwm-stamp/dwm.c
+                cp -f "$REPO_DIR/dotfiles/suckless/dwm/drw.c" /usr/local/src/suckless/dwm-stamp/drw.c
+                cp -f "$REPO_DIR/dotfiles/suckless/dwm/drw.h" /usr/local/src/suckless/dwm-stamp/drw.h
             fi
             cd ..
         fi

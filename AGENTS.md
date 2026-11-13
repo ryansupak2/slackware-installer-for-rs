@@ -242,13 +242,14 @@ machine, and all three had to be dealt with (`steps/powerkey-hold.sh`):
 `powerkey-hold` measures the hold with a `poll()` timeout (the action fires
 *while* held, not on release):
 
-* **1.0 s hold** → `/sbin/shutdown -h now` — orderly: services stop, fs sync and
-  unmount. This is the requested gesture: one full second.
+* **2.5 s hold** → `/sbin/shutdown -h now` — orderly: services stop, fs sync and
+  unmount. 2.5 s is the requested gesture, and the bar counts up to it and
+  names it: `Power button: 1.2 s / 2.5 s = SHUTDOWN`.
 * **longer (~5 s)** → the embedded controller cuts power itself; that is the
   system/hardware fallback, and there is no software stage for it (`-T 0`).
   A `-T 10` force-off stage was tried and could never fire: the EC hard-off
   wins first.
-* **shorter** → nothing at all (logged, e.g. `released after 0.82 s (< 1.0 s) ignored`).
+* **shorter** → nothing at all (logged, e.g. `released after 0.82 s (< 2.5 s) ignored`).
 
 **Which input device the button appears on is not obvious on this machine.** The
 node *named* "Power Button" (`/dev/input/event1`) is **silent**; the press/release
@@ -267,13 +268,115 @@ come from evdev.
 
 It ignores SIGTERM/SIGINT/SIGHUP/SIGPIPE on purpose: rc.6 stops processes during
 the shutdown it just started, and without that the 10 s escape could never run.
-Times are `ARGS="-t 1.0 -T 0"` in the step. Log: `/var/log/<user>-powerkey.log`.
-Single instance is a flock on `/run/powerkey-hold.pid`.
+Times are `ARGS="-t 2.5 -T 0"` in `scripts/powerkey-hold-start`, the ONLY place
+they are written: `/etc/rc.d/rc.local` and `scripts/dwm-start.sh` both call that
+helper, so two thresholds cannot drift apart. Log:
+`/var/log/<user>-powerkey.log`. Single instance is a flock on
+`/run/powerkey-hold.pid`.
+
+**The daemon must exist in every session.** `rc.local` starts it at boot
+(outside any logind session, so it survives X), but Slackware ships
+`/etc/rc.d/rc.local` as **0644** while `rc.M` runs it only `if [ -x ]` — every
+hook in it was silently dead at boot and the hold count vanished from the bar
+after the next reboot (seen 2026-11-13). `steps/powerkey-hold.sh` now chmods
+rc.local **after** its own rewrite (the `grep > new && mv` would otherwise
+leave 0644), and `scripts/dwm-start.sh` re-runs the start helper on every X
+start, so an X restart or a killed daemon cannot lose it either.
 
 Do not "fix" this by putting `HandlePowerKey=poweroff` back, and do not restore
 `power) /sbin/init 0`: either one re-introduces instant poweroff on a tap.
 
+**What the user sees while holding.** The daemon itself only updates the
+topbar, in 0.1 s steps: `Power button: 0.3 s / 2.5 s = SHUTDOWN`, written to the
+session's temp-message files (`status_msg`/`status_end`) so dwm-status draws
+it — no console or terminal output while counting. At the threshold it spawns
+`/usr/local/bin/powerkey-shutdown-msg` (installed from `scripts/`) and then
+`/sbin/shutdown -h now`. That helper emits ONE message, verbatim:
+`Shutting Down Now...` — to every terminal via `broadcast` (the same
+mechanism Mod+Shift+Q uses for `Exiting Window Manager Now...`), to
+`/dev/console` (the VT, ready when X lets go), and to the topbar (temp-msg +
+`xsetroot` + `show all 600` on the dwm FIFO so hide mode keeps the bar up).
+**All three say exactly the same words** — do not add timestamps or prefixes
+to one channel only. dwm's `quit()` does the mirror image for Mod+Shift+Q:
+same text to broadcast, `/dev/console` and `stext`, then half a second of
+`usleep` before `running = 0` so the bar line can actually be read;
+`updatestatus()` returns early while `exiting` so dwm-status cannot wipe it.
+The timestamped record of the power event is the daemon's own log
+(`/var/log/<user>-powerkey.log`), not the console.
+
 ---
+---
+
+# Keyboard — Mod is Super, and BOTH Caps Lock and the Copilot key are Mod
+
+`dwm`'s `MODKEY` is `Mod4Mask` (Super). `scripts/dwm-start.sh` re-applies the
+keymap at **every** X start (`xmodmap`, plus dwm re-grabs on the resulting
+mappingNotify):
+
+| key | keycode | mapping |
+|---|---|---|
+| Caps Lock | 66 | `Super_L` only — Mod and nothing else |
+| Copilot | 201 (evdev `KEY_F23`) | `Super_L` on **both** levels (Mod) |
+
+**Caps Lock has NO lock function on this machine, by decision** (2026-11-13).
+With `Caps_Lock` on level 2, `Shift+CapsLock` toggled the lock — and so did
+`Copilot+CapsLock`, because the Copilot key's firmware Shift is present in the
+state at that moment. The user wants neither ("only Fn+CapsLock, nothing
+else"), and Fn+CapsLock **cannot exist**: the AT keyboard does not advertise
+`KEY_FN` (checked its capability bitmap), an evdev capture of a real
+Fn+CapsLock press produced no event at all, and dmesg shows no unmapped
+scancode either — the embedded controller never forwards Fn to the OS. So the
+lock is deliberately unbound; if a trigger is ever added back it must not be
+Mod+something. `Shift+CapsLock` and `Copilot+CapsLock` were measured to leave
+the Lock LED untouched now (`xset q` LED mask stays 00000000).
+
+**The Copilot key's firmware presses Shift and Super itself** (Shift+Super+F23 is
+the Microsoft keyboard spec; xkeyboard-config's `PC_SHIFT_SUPER_LEVEL2` type
+exists for that chord and *preserves* both modifiers). The Super half is what we
+want; the Shift half is poison because dwm grabs keys with **exact** masks:
+Mod+X would arrive as Mod+Shift+X (tag instead of view, `quit` for Mod+Shift+Q)
+and bindings with no Shift sibling (`Mod+Return`, `Mod+r`, `Mod+h`, ...) would
+never reach dwm at all. That is why `sources/copilot-mod/copilot-mod.c` exists
+(installed by `steps/copilot-mod.sh`, started from `dwm-start`): it watches the
+key with **RECORD** (no grabs, nothing is taken from any client) and drops the
+firmware Shift with `XTest` — a fake release, which updates the server's
+modifier state exactly like a real one, so the *next* key press matches the
+right grab. It asserts Mod4 itself only if the firmware sent none.
+
+Two traps that cost real time here:
+
+* `XRecordInterceptData.data_len` is in **4-byte units**, not bytes (a full
+  event is 8). Comparing it to `sizeof(xEvent)` (32) rejects every event and
+  the daemon silently does nothing — which is exactly how it shipped first and
+  why `Copilot+CapsLock` kept toggling the lock. Measure: press the key and
+  check that the modifier state loses Shift (`XQueryPointer` mask 0x41 -> 0x40),
+  not just that the process is running.
+* RECORD reports the keycode it was given; `XTestFakeKeyEvent` takes **X**
+  keycodes (evdev + 8), so a probe must press 201 (F23), not 193.
+
+Do not "simplify" this into an xmodmap-only change: `xmodmap` cannot remove a
+modifier the firmware pressed, and XKB `SetMods` only *adds* modifiers (see
+`_XkbFilterSetState` in `xkbActions.c` — it sets `setMods`, it does not clear
+Shift).
+
+**Hide-mode bar reveals are input-driven — measured, not guessed.** 60 s of
+idle with the session untouched produced zero lines in the dwm log, so nothing
+reveals itself. The bar is shown by (a) a bare Mod press (`grabkeys()` grabs
+bare Super deliberately, "hide-mode temp-bar-reveal"), (b) a Mod *release*
+(`keyrelease()` starts a 3 s auto-hide timer) and (c) `focusin()`'s "lost Mod
+release" reconciliation, which starts a 3 s reveal too. (c) usually is not a
+lost release at all: a normal Mod+Left chord moves focus, `modkeyheld` is
+still 1, and the bar is re-revealed for no visible change (44 times in one
+session). Before blaming the bar, look at the reason in the session log; and
+if (c) is narrowed, check whether Mod is still down (`XkbGetState` mods &
+MODKEY) before reconciling — the release path (b) covers the normal case.
+
+"New tag" (a revealed but still empty tag) is the light cell with the dark
+number; its glyph is drawn a second time 1 px over with `drw_text_over()` (no
+background repaint) so the number reads bolder. `drw.c`/`drw.h` are vendored in
+`dotfiles/suckless/dwm/` for exactly that, and `steps/suckless-dwm.sh` stamps
+them alongside `dwm.c`/`config.h`.
+
 
 # Display / kernel — the GPU is `xe`, not `i915`
 

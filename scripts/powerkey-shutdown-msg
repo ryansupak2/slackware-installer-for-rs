@@ -1,0 +1,73 @@
+#!/bin/sh
+# powerkey-shutdown-msg — say "we are shutting down" the instant the power
+# button hold threshold is reached.
+#
+# Called by /usr/local/bin/powerkey-hold immediately BEFORE it runs
+# `/sbin/shutdown -h now` (installed by steps/powerkey-hold.sh).
+#
+# ONE message, verbatim in every place it appears:
+#
+#     Shutting Down Now...
+#
+# That is deliberate — it is the counterpart of the Mod+Shift+Q notice
+# ("Exiting Window Manager Now..."), which dwm puts on the terminals, on the
+# console and (now) in the topbar. Same mechanism, same words everywhere:
+#
+#   1. TERMINALS  `broadcast`, exactly as Mod+Shift+Q does it, so every open
+#                 terminal shows the line immediately.
+#   2. CONSOLE VT the same line, undecorated. Not visible while X owns the VT,
+#                 but already sitting there as the first thing the shutdown
+#                 text shows when X lets go — instead of appearing only after
+#                 init has scrolled for a while.
+#   3. TOPBAR     the same line again, through the session's own temp-message
+#                 files (dwm-status re-reads them every 0.1 s and prints the
+#                 text as-is) plus an immediate xsetroot. Hide mode is asked to
+#                 keep the bar revealed for the rest of the shutdown
+#                 ("show all SECONDS") instead of the usual 3 s.
+#
+# The 0.1 s running count while the button is held is a topbar-only thing: it
+# lives in powerkey-hold itself and never touches the console or the terminals.
+#
+# Everything here is best-effort and non-blocking: the shutdown must never be
+# delayed by a missing display, a missing xsetroot or an unread FIFO.
+
+# Tools come from the caller's PATH when it has one (rc.local's is fine); this
+# is only a fallback for a broken/empty environment.
+[ -n "${PATH:-}" ] || PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+export PATH
+
+CONSOLE="${CONSOLE:-/dev/console}"           # overridable for tests
+RUN="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+NOTE="Shutting Down Now..."
+KEEP_REVEALED=600                            # seconds; X dies long before that
+
+# ── 1. Every terminal, exactly like the Mod+Shift+Q exit notice ───────────
+if command -v broadcast >/dev/null 2>&1; then
+    broadcast "$NOTE" >/dev/null 2>&1 || true
+fi
+
+# ── 2. The console VT: the SAME text, no decoration ──────────────────────
+printf '\n%s\n' "$NOTE" >"$CONSOLE" 2>/dev/null || true
+
+# ── 3. The topbar ────────────────────────────────────────────────────────
+[ -d "$RUN" ] || exit 0
+
+# dwm-status re-reads these every 0.1 s and shows $NOTE verbatim (no clock
+# appended) until status_end passes.
+printf '%s\n' "$NOTE" >"$RUN/status_msg" 2>/dev/null || true
+printf '%s\n' "$(( $(date +%s) + KEEP_REVEALED ))" >"$RUN/status_end" 2>/dev/null || true
+
+# Show it NOW rather than at dwm-status's next tick (dwm redraws the bar on the
+# root-name change: PropertyNotify -> updatestatus -> drawbar).
+DISPLAY="${DISPLAY:-:0}" XAUTHORITY="${XAUTHORITY:-/root/.Xauthority}" \
+    xsetroot -name "$NOTE" >/dev/null 2>&1 || true
+
+# Hide mode: reveal the bar and KEEP it revealed ("show all" alone is 3 s).
+# Opened READ-WRITE in a subshell: a plain write-open on a FIFO waits for a
+# reader, and dwm may already be gone. Nothing here may block.
+if [ -p "$RUN/dwmbar-0" ]; then
+    ( exec 3<>"$RUN/dwmbar-0" &&
+      printf 'show all %s\n' "$KEEP_REVEALED" >&3 ) 2>/dev/null || true
+fi
+
+exit 0

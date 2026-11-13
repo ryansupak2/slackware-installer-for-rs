@@ -1,6 +1,6 @@
 /* powerkey-hold - the power button must be HELD to shut down
  *
- * Stage 1 (the installed setting is `-t 1.0`): start an orderly, Linux-based
+ * Stage 1 (the installed setting is `-t 2.5`): start an orderly, Linux-based
  *         shutdown — runs `/sbin/shutdown -h now`, so services stop and the
  *         filesystems sync and unmount (Slackware's init 0 -> rc.6 path).
  * Stage 2 (default 10 s, DISABLED by the installer with `-T 0`): if you keep
@@ -8,7 +8,7 @@
  *         sync(2), i.e. reboot(RB_POWER_OFF) without waiting for init. It is
  *         off here because the embedded controller hard-cuts power at ~5 s by
  *         itself, so a software stage after ~5 s could never fire: keeping the
- *         button held past 1 s is therefore the system/hardware fallback.
+ *         button held past 2.5 s is therefore the system/hardware fallback.
  * Anything shorter than stage 1 does nothing at all (the accidental-tap case).
  *
  * Stage 1 fires WHILE the button is held, not on release, so the hold can be
@@ -26,7 +26,7 @@
  * program can measure anything.
  *
  * Usage: powerkey-hold [-t SECONDS] [-T SECONDS] [-d /dev/input/eventN] [-n] [-v]
- *          -t  hold to start shutdown            (default 3)
+ *          -t  hold to start shutdown            (default 2.5)
  *          -T  hold to force power off           (default 10; 0 disables)
  *          -d  input device (default: the one named "Power Button")
  *          -n  dry run: report, never run anything
@@ -158,9 +158,76 @@ static void run(const char *path, char *const argv[])
 	}
 }
 
+/* ─── "holding the power button" notice ───────────────────────────────
+ *
+ * While the button is held the bar counts up in 0.1 s steps
+ * ("Power button: 0.3 s / 2.5 s = SHUTDOWN"), so the hold is visibly being
+ * tracked, and the text names the mark at which shutdown starts, before
+ * anything is shut down. The text travels through the session's own
+ * temp-message files: dwm-status reads them every 0.1 s and puts the text in
+ * the bar (temp-msg is the mechanism the rest of the session uses for short
+ * notices). No fork per tick, and nothing here can block the shutdown.
+ */
+static int notice_on = 0;
+static double notice_next = 0.0;
+
+static void
+notice_paths(char *msg, size_t msglen, char *end, size_t endlen)
+{
+	const char *run = getenv("XDG_RUNTIME_DIR");
+	static char fallback[64];
+
+	if (!run) {
+		snprintf(fallback, sizeof(fallback), "/run/user/%ld", (long)getuid());
+		run = fallback;
+	}
+	snprintf(msg, msglen, "%s/status_msg", run);
+	snprintf(end, endlen, "%s/status_end", run);
+}
+
+static void
+notice_show(const char *text)
+{
+	char mpath[300], epath[300];
+	FILE *f;
+
+	if (dry_run)
+		return;
+	notice_paths(mpath, sizeof(mpath), epath, sizeof(epath));
+	if (!(f = fopen(mpath, "w")))
+		return;
+	fprintf(f, "%s\n", text);
+	fclose(f);
+	if ((f = fopen(epath, "w"))) {
+		fprintf(f, "%ld\n", (long)time(NULL) + 3);
+		fclose(f);
+	}
+}
+
+static void
+notice_clear(void)
+{
+	char mpath[300], epath[300], line[128] = "";
+	FILE *f;
+
+	if (dry_run)
+		return;
+	notice_paths(mpath, sizeof(mpath), epath, sizeof(epath));
+	/* Only clear the message if it is OURS: another tool's temp message
+	 * (volume, vpn, ...) must not be wiped by a button release. */
+	if (!(f = fopen(mpath, "r")))
+		return;
+	fgets(line, sizeof(line), f);
+	fclose(f);
+	if (strncmp(line, "Power button:", 13) != 0)
+		return;
+	unlink(mpath);
+	unlink(epath);
+}
+
 int main(int argc, char **argv)
 {
-	double shutdown_s = 3.0, forceoff_s = 10.0;
+	double shutdown_s = 2.5, forceoff_s = 10.0;
 	const char *dev = NULL;
 	char names[MAX_DEVS][64];
 	int fds[MAX_DEVS];
@@ -287,16 +354,29 @@ int main(int argc, char **argv)
 				pressed_at = now_ms();
 				shutdown_done = 0;
 				forceoff_done = 0;
+				/* Start the 0.1 s running notice; the first step lands
+				 * 100 ms after the press, not at 0. */
+				notice_on = 1;
+				notice_next = pressed_at + 100.0;
 				if (verbose)
 					logmsg("power button pressed (%s)", names[i]);
 			} else if (ev.value == 0) {
 				double held = is_down ? (now_ms() - pressed_at) / 1000.0 : 0.0;
 
 				is_down = 0;
-				if (!is_down && !shutdown_done && held > 0.0)
-					logmsg("released after %.2f s (< %.1f s) ignored", held, shutdown_s);
-				else if (shutdown_done)
+				if (!shutdown_done) {
+					/* The hold was abandoned: take the running count
+					 * back off the bar (only if it is still ours). */
+					if (notice_on) {
+						notice_on = 0;
+						notice_clear();
+					}
+					if (held > 0.0)
+						logmsg("released after %.2f s (< %.1f s) ignored",
+						       held, shutdown_s);
+				} else {
 					logmsg("released after %.2f s (shutdown already started)", held);
+				}
 			}
 		}
 
@@ -305,16 +385,42 @@ int main(int argc, char **argv)
 
 		double held = (now_ms() - pressed_at) / 1000.0;
 
+		/* Running notice, 0.1 s per step, while the button is held and
+		 * before the threshold is reached: the bar shows how long it has
+		 * been held and what the target is. Once the shutdown starts the
+		 * notice belongs to /usr/local/bin/powerkey-shutdown-msg.
+		 */
+		if (!shutdown_done && notice_on && now_ms() >= notice_next) {
+			char text[96];
+
+			snprintf(text, sizeof(text),
+			         "Power button: %.1f s / %.1f s = SHUTDOWN",
+			         held, shutdown_s);
+			notice_show(text);
+			notice_next = now_ms() + 100.0;
+		}
+
 		if (forceoff_s > 0 && !forceoff_done && held >= forceoff_s) {
 			char *const av[] = { "/sbin/poweroff", "-f", NULL };
 			forceoff_done = 1;
+			notice_on = 0;
 			logmsg("held %.0f s — FORCE power off now", forceoff_s);
 			sync();
 			run("/sbin/poweroff", av);
 		} else if (!shutdown_done && held >= shutdown_s) {
 			char *const av[] = { "/sbin/shutdown", "-h", "now", NULL };
+			char *const msg[] = { "/usr/local/bin/powerkey-shutdown-msg", NULL };
+
 			shutdown_done = 1;
+			notice_on = 0;   /* the helper owns the bar text from here on */
 			logmsg("held %.1f s — starting orderly shutdown (/sbin/shutdown -h now)", shutdown_s);
+			/* Say so FIRST: "Shutting Down Now..." goes to every terminal
+			 * (broadcast, like Mod+Shift+Q's exit notice), to the console
+			 * VT, and to the topbar - identical words in all three. It
+			 * appears in milliseconds, so the hold has visible feedback
+			 * before the shutdown itself prints anything. Installed by
+			 * steps/powerkey-hold.sh; a missing helper is harmless. */
+			run("/usr/local/bin/powerkey-shutdown-msg", msg);
 			run("/sbin/shutdown", av);
 		}
 	}

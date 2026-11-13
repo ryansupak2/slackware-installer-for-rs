@@ -59,6 +59,12 @@ fi
 # ── X11 / dwm ──
 # Power policy for the current power source + wake restrictions (steps/power.sh)
 /usr/local/bin/power boot 2>/dev/null || true
+
+# Power button: hold-to-shut-down daemon. rc.local starts it at boot (outside
+# any session) and it ignores SIGTERM, but if it is missing — rc.local not
+# executable, killed by hand — every X start puts it back. Without this the
+# 0.1 s hold count silently disappears from the bar.
+[ -x /usr/local/bin/powerkey-hold-start ] && /usr/local/bin/powerkey-hold-start
 echo "── dwm + st ──"
 
 pkill -f dwm-status 2>/dev/null || true
@@ -75,10 +81,14 @@ if [ -f /sys/class/leds/tpacpi::kbd_backlight/max_brightness ]; then
     echo "$half" > /sys/class/leds/tpacpi::kbd_backlight/brightness 2>/dev/null || true
 fi
 
-# Caps Lock → Super
-xmodmap -e "clear lock" 2>/dev/null || true
-xmodmap -e "keysym Caps_Lock = Super_L" 2>/dev/null || true
-xmodmap -e "add mod4 = Super_L" 2>/dev/null || true
+# ── Mod keys: Caps Lock AND the Copilot key both act as Mod (Super/mod4) ──
+# The map itself lives in /usr/local/bin/keyboard-mod-map (installed by
+# steps/copilot-mod.sh) and is only CALLED here: the xinitrc is generated once
+# per dwm-start and cached in /tmp, so a map written into this heredoc would be
+# the old one for any session started from an older copy of this script — the
+# reason the Copilot/Caps mapping vanished after an X restart. See that file
+# for the keycodes and why the Copilot key's firmware Shift has to be dropped.
+[ -x /usr/local/bin/keyboard-mod-map ] && /usr/local/bin/keyboard-mod-map
 
 # Keyboard repeat rate
 xset r rate 250 34 2>/dev/null || true
@@ -114,6 +124,10 @@ eval $(dbus-launch --sh-syntax) 2>/dev/null || true
 # Status bar + network watcher
 /usr/local/bin/dwm-status &
 /usr/local/bin/net-watch &
+
+# Copilot key: drop the Shift its firmware sends with the key, so holding it is
+# holding Mod. RECORD-based, starts nothing else (steps/copilot-mod.sh).
+[ -x /usr/local/bin/copilot-mod ] && /usr/local/bin/copilot-mod &
 
 # First terminal
 DWL_FIRST_TERMINAL=1 st-logged &

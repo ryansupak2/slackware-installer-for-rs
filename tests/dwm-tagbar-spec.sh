@@ -138,7 +138,38 @@ check_has "...and returns half the leftover space" \
 
 # ------------------------------------------------------------------
 echo ""
-echo "6. It still compiles (skipped when the X11 headers are missing)"
+echo "6. Mod+Shift+Q notice: one text in terminals, console and topbar"
+quitfn=$(awk '/^quit\(const Arg \*arg\)/ { f = 1 }
+               f && /^}/ { print; exit }
+               f { print }' "$SRC")
+[ -n "$quitfn" ] || { echo "FATAL: could not extract quit() from $SRC"; exit 1; }
+check_has "the exit text is the broadcast text" \
+    'Exiting Window Manager Now...' "$quitfn"
+check_has "it is broadcast to every terminal" \
+    "broadcast 'Exiting Window Manager Now...'" "$quitfn"
+check_has "the console VT gets the same words" \
+    'fopen("/dev/console"' "$quitfn"
+check_has "the topbar gets the same words" \
+    'snprintf(stext, sizeof(stext), "%s", notice);' "$quitfn"
+check_has "the bar is revealed if hide mode hid it" \
+    'autoshowuntil = time(NULL) + 2;' "$quitfn"
+check_has "it is drawn and flushed before exiting" \
+    'XSync(dpy, False);' "$quitfn"
+check_has "it stays up long enough to read" \
+    'usleep(EXIT_NOTICE_US);' "$quitfn"
+check "the exit notice is half a second" "#define EXIT_NOTICE_US 500000" \
+    "$(grep '^#define EXIT_NOTICE_US' "$SRC")"
+check_has "a second quit does not restart the notice" \
+    'if (exiting)' "$quitfn"
+check_has "status updates cannot wipe the notice" \
+    'if (exiting)' "$(awk '/^updatestatus\(void\)/ { f = 1 }
+                           f && /^}/ { print; exit }
+                           f { print }' "$SRC")"
+check_has "the notice flag exists" 'static int exiting = 0;' "$(cat "$SRC")"
+
+# ------------------------------------------------------------------
+echo ""
+echo "7. It still compiles (skipped when the X11 headers are missing)"
 if [ -f /usr/include/X11/Xlib.h ] && command -v cc >/dev/null 2>&1; then
     WORK=$(mktemp -d "${TMPDIR:-/tmp}/dwm-spec-XXXXXX") || exit 1
     trap 'rm -rf "$WORK"' EXIT

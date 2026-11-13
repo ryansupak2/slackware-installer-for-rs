@@ -5,7 +5,7 @@
 # Load aliases from bashrc
 source ~/.bashrc
 
-echo "=== dwm KEYBINDINGS (Mod = Super / Caps Lock) ==="
+echo "=== dwm KEYBINDINGS (Mod = Super / Caps Lock / Copilot) ==="
 echo ""
 echo "  LAUNCHING"
 echo "  Mod+Enter                   -> New terminal window (st)"
@@ -60,6 +60,10 @@ echo "  XF86MonBrightnessDown      -> Screen brightness down"
 echo "  XF86MonBrightnessUp        -> Screen brightness up"
 echo "  Shift+XF86MonBrightnessDown  -> Keyboard backlight down"
 echo "  Shift+XF86MonBrightnessUp    -> Keyboard backlight up"
+echo ""
+echo "  CAPS LOCK (no key on this machine — Fn+CapsLock is not sent by the EC)"
+echo "  capslock                   -> Toggle Caps Lock"
+echo "  capslock on / capslock off -> Set it"
 echo ""
 echo "=== SHELL COMMANDS (from ~/.bashrc) ==="
 echo ""

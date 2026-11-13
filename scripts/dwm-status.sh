@@ -246,7 +246,11 @@ while true; do
     msg=""
     if [ -f "$XDG_RUNTIME_DIR/status_msg" ] && [ "$now" -lt $(cat "$XDG_RUNTIME_DIR/status_end" 2>/dev/null || echo 0) ]; then
         msg=$(cat "$XDG_RUNTIME_DIR/status_msg")
-        line="${msg} | $(date +'%T')"
+        # Shown VERBATIM: a temp message is an event notice, and the same
+        # words go to the terminals and the console (broadcast), so the bar
+        # must not decorate them with the clock. (The regular status below
+        # keeps its date/time.)
+        line="$msg"
         msg_active=1
     else
         rm -f "$XDG_RUNTIME_DIR/status_msg" "$XDG_RUNTIME_DIR/status_end" 2>/dev/null || true

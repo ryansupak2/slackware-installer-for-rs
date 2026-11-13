@@ -47,9 +47,20 @@ When shown (permanent or temporary), the bar reclaims its normal height.
 |---|---|---|
 | `show all` | dwm-status signal changes | In hideMode: `autoshowuntil=now+3`, show bar |
 | | | In !hideMode: restore bar on all monitors |
+| `show all SECONDS` | power-key shutdown notice | Same, but the reveal lasts SECONDS (1-3600, default 3). Used so the "Shutting Down Now..." line stays up until X dies. |
 | `hide all` | toggle-bar.sh | `autoshowuntil=0`, hide bar on all monitors |
 | `hidemode on` | toggle-hide-mode.sh | `hidemode=true`, hide bar, create hide_mode file |
 | `hidemode off` | toggle-hide-mode.sh | `hidemode=false`, show bar, remove hide_mode file |
+
+## Temp messages
+
+`$XDG_RUNTIME_DIR/status_msg` + `status_end` replace the whole status line
+while they are current. dwm-status prints the text **verbatim** (no clock
+appended): a temp message is an event notice, and the same words go to the
+terminals and the console through `broadcast`, so the bar must say exactly
+the same thing. Producers: `temp-msg.sh` (`set_temp_msg`), the power-button
+hold count and its shutdown notice, and dwm itself for the Mod+Shift+Q
+notice.
 
 ## Key design decisions
 

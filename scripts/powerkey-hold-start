@@ -1,0 +1,35 @@
+#!/bin/sh
+# powerkey-hold-start — start the power-button hold daemon, at most once.
+#
+# TWO callers, both idempotent:
+#   /etc/rc.d/rc.local     at boot, outside any logind session
+#   scripts/dwm-start.sh   at every X start, so an X exit/restart (or a daemon
+#                          that was killed by hand) cannot leave the power
+#                          button without its hold-to-shut-down handler — the
+#                          symptom was the hold count silently vanishing from
+#                          the bar after a session restart.
+#
+# Why this file exists: the hold times must live in ONE place. They used to be
+# written twice (a `setsid ... -t 1.0 -T 0` line in rc.local and the step's own
+# copy), and the rc.local copy never ran at all because Slackware ships
+# /etc/rc.d/rc.local as 0644 while rc.M executes it only `if [ -x ]` — so the
+# daemon was dead after every boot. steps/powerkey-hold.sh now installs this
+# helper, chmod +x on rc.local, and calls the helper itself.
+#
+# The daemon is `setsid`-ed and its flock on /run/powerkey-hold.pid is the real
+# single-instance guard; the pgrep check below only keeps a second start from
+# logging a pointless "already running" line.
+
+DEST=/usr/local/bin/powerkey-hold
+ARGS="-t 2.5 -T 0"
+LOG="/var/log/${USER:-root}-powerkey.log"
+
+[ -x "$DEST" ] || exit 0
+
+# comm is truncated to 15 chars; "powerkey-hold" is 13, so -x matches.
+if pgrep -x powerkey-hold >/dev/null 2>&1; then
+    exit 0
+fi
+
+setsid "$DEST" $ARGS >>"$LOG" 2>&1 &
+exit 0

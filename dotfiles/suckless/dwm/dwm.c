@@ -282,6 +282,7 @@ static void (*handler[LASTEvent]) (XEvent *) = {
 };
 static Atom wmatom[WMLast], netatom[NetLast];
 static int running = 1;
+static int exiting = 0;   /* quitting notice owns the bar (see quit()) */
 static Cur *cursor[CurLast];
 static Clr **scheme;
 static Display *dpy;
@@ -813,8 +814,10 @@ drawbar(Monitor *m)
 		 *    tag background, normal text colours;
 		 *  - it is a revealed but still empty tag (a fresh blank tag being
 		 *    held open until something is created in it): inverted - light
-		 *    background, dark glyph. That IS the "empty" indicator, so no
-		 *    extra mark is drawn on top of it.
+		 *    background, dark glyph, and the glyph is drawn a second time 1 px
+		 *    over so the black number reads bolder on the white cell. That
+		 *    IS the "empty"/new-tag indicator, so no extra mark is drawn on
+		 *    top of it.
 		 * Urgent tags used to be inverted too; they now get no mark at all. */
 		blank = i == m->curtagidx && !(occ & (1 << i));
 		if (blank)
@@ -822,6 +825,8 @@ drawbar(Monitor *m)
 		else
 			drw_setscheme(drw, scheme[i == m->curtagidx ? SchemeSel : SchemeNorm]);
 		drw_text(drw, x, 0, w, bh, taglpad(tags[i], w), tags[i], 0);
+		if (blank)
+			drw_text_over(drw, x + 1, 0, w, bh, taglpad(tags[i], w), tags[i], 0);
 		if (i == m->curtagidx && !blank)
 			drw_rect(drw, x, 0, w, bh - 1, 0, 0);
 		x += w;
@@ -1525,10 +1530,50 @@ propertynotify(XEvent *e)
 	}
 }
 
+/* How long the quitting notice stays up. The bar is destroyed the instant dwm
+ * exits, so without a short pause the message could never be read. */
+#define EXIT_NOTICE_US 500000
+
 void
 quit(const Arg *arg)
 {
-	system("broadcast Exiting Window Manager Now...");
+	/* One text, three channels, word for word the same (this is the
+	 * "message when you exit X"):
+	 *   - every open terminal, via broadcast (as before),
+	 *   - the console VT, where it is waiting when X lets go of it,
+	 *   - the topbar, which needs to be drawn now: it disappears with dwm.
+	 */
+	static const char notice[] = "Exiting Window Manager Now...";
+	Monitor *m;
+	FILE *c;
+
+	if (exiting)
+		return;
+	exiting = 1;
+
+	system("broadcast 'Exiting Window Manager Now...'");
+
+	if ((c = fopen("/dev/console", "a"))) {
+		fprintf(c, "\n%s\n", notice);
+		fclose(c);
+	}
+
+	snprintf(stext, sizeof(stext), "%s", notice);
+	if (hidemode) {
+		autoshowuntil = time(NULL) + 2;
+		updatebarvisibility();
+	} else {
+		for (m = mons; m; m = m->next) {
+			if (!m->showbar) {
+				m->showbar = 1;
+				updatebarpos(m);
+				XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, m->ww, bh);
+			}
+		}
+	}
+	drawbars();
+	XSync(dpy, False);
+	usleep(EXIT_NOTICE_US);
 	running = 0;
 }
 
@@ -1665,9 +1710,20 @@ handlefifo(void)
 			while (*p == ' ' || *p == '\t') p++;
 
 			if (strncmp(p, "show all", 8) == 0) {
+				/* "show all" or "show all SECONDS". The optional duration is
+				 * for callers that already know they need the bar for a while
+				 * - the power-button shutdown notice asks for minutes, where
+				 * the 3 s default would hide it again mid-shutdown. */
+				long secs = 3;
+
+				if (p[8] != '\0') {
+					secs = strtol(p + 8, NULL, 10);
+					if (secs < 1 || secs > 3600)
+						secs = 3;
+				}
 				if (hidemode) {
-					fprintf(stderr, "[dwm] FIFO: show all (hidemode=1) — auto-show 3s\n");
-					autoshowuntil = time(NULL) + 3;
+					fprintf(stderr, "[dwm] FIFO: show all %lds (hidemode=1)\n", secs);
+					autoshowuntil = time(NULL) + secs;
 					updatebarvisibility();
 				} else {
 					/* Not in hide mode: only restore bars that weren't manually hidden.
@@ -2619,6 +2675,11 @@ updatesizehints(Client *c)
 void
 updatestatus(void)
 {
+	/* While quitting, the notice from quit() owns the bar text. dwm-status
+	 * keeps rewriting the root name right up to the end, and without this
+	 * it would wipe the notice out before it could be read. */
+	if (exiting)
+		return;
 	if (!gettextprop(root, XA_WM_NAME, stext, sizeof(stext)))
 		strcpy(stext, "dwm-"VERSION);
 	drawbar(selmon);
