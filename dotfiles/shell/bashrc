@@ -67,6 +67,11 @@ alias gc='git commit'  #help:gc=git commit
 alias gs='git status'  #help:gs=git status
 alias gp='git push'  #help:gp=git push
 alias ga='git add'  #help:ga=git add
+# Caps Lock has no key on this machine (Caps Lock is Mod, Fn is not sent to the
+# OS), so the lock is a command: capslock [on|off]. cl is the short form.
+alias cl='capslock'        #help:cl / CL / CAPSLOCK=toggle Caps Lock (capslock on|off)
+alias CL='capslock'
+alias CAPSLOCK='capslock'
 # Keyboard backlight: no longer set automatically on shell start.
 # (Set once at X session start by ~/.xinitrc to 50%.)
 
