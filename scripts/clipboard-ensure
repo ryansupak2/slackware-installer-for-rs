@@ -11,28 +11,57 @@
 #
 # Idempotent, per-user, safe to call on every X start (scripts/dwm-start.sh).
 # No DISPLAY -> nothing to do.
+#
+# Matching is by user AND display, not by user alone. autocutsel is a per
+# display client, so "uid matches, selection matches" is not the same session:
+# root's second X session (another display, or the same user back on tty1
+# while a stale pair still exists) found the *other* session's instances,
+# decided "already running", started nothing, and had no clipboard sync at all.
 
 [ -n "${DISPLAY:-}" ] || exit 0
 command -v autocutsel >/dev/null 2>&1 || exit 0
 
 myuid=$(id -u)
-started=0
+# ":0" from ":0.0" — a screen suffix does not make it a different display.
+mydisplay=${DISPLAY%%.*}
 
+# sync_running <selection> — an autocutsel for this selection, this user and
+# THIS display is already up?
+sync_running() {
+    for pid in $(pgrep -u "$myuid" -x autocutsel 2>/dev/null); do
+        cmd=$(tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null) || continue
+        case "$cmd" in *"-selection $1 "*) ;; *) continue ;; esac
+        disp=$(tr '\0' '\n' <"/proc/$pid/environ" 2>/dev/null | sed -n 's/^DISPLAY=//p')
+        [ "${disp%%.*}" = "$mydisplay" ] && return 0
+    done
+    return 1
+}
+
+started=0
 for sel in PRIMARY CLIPBOARD; do
-    if pgrep -u "$myuid" -f "autocutsel -selection $sel" >/dev/null 2>&1; then
-        continue
-    fi
+    sync_running "$sel" && continue
     autocutsel -selection "$sel" -fork 2>/dev/null || true
     started=$((started + 1))
 done
 
+# autocutsel -fork returns as soon as the child is forked; give the daemons a
+# moment (bounded, 1 s) so the report below is about the daemon, not the race.
+if [ "$started" -gt 0 ]; then
+    i=0
+    while [ "$i" -lt 10 ]; do
+        sync_running PRIMARY && sync_running CLIPBOARD && break
+        sleep 0.1
+        i=$((i + 1))
+    done
+fi
+
 # Report the live state (goes to the dwm session log).
 for sel in PRIMARY CLIPBOARD; do
-    if pgrep -u "$myuid" -f "autocutsel -selection $sel" >/dev/null 2>&1; then
-        echo "clipboard: $sel synced"
+    if sync_running "$sel"; then
+        echo "clipboard: $sel synced (display $mydisplay)"
     else
-        echo "clipboard: WARNING $sel not synced (autocutsel failed)" >&2
+        echo "clipboard: WARNING $sel not synced on $mydisplay (autocutsel failed)" >&2
     fi
 done
-[ "$started" -eq 0 ] && echo "clipboard: already running"
+[ "$started" -eq 0 ] && echo "clipboard: already running on $mydisplay"
 exit 0
