@@ -330,6 +330,13 @@ lock is deliberately unbound; if a trigger is ever added back it must not be
 Mod+something. `Shift+CapsLock` and `Copilot+CapsLock` were measured to leave
 the Lock LED untouched now (`xset q` LED mask stays 00000000).
 
+The lock is switched from the command line instead: **`capslock`**
+(`sources/capslock/capslock.c`, installed by `steps/capslock.sh`) —
+`capslock` toggles, `capslock on|off` sets, `--help` explains, and it prints
+exactly one line, `Capslock On` / `Capslock Off`. It uses `XkbLockModifiers`
+on the Lock modifier, not a fake keycode (no keycode produces `Caps_Lock` any
+more), so the LED follows. It is listed in `help.sh`.
+
 **The Copilot key's firmware presses Shift and Super itself** (Shift+Super+F23 is
 the Microsoft keyboard spec; xkeyboard-config's `PC_SHIFT_SUPER_LEVEL2` type
 exists for that chord and *preserves* both modifiers). The Super half is what we
