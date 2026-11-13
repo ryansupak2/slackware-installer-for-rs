@@ -14,6 +14,17 @@ fi
 echo "DWM session starting — $(date)"
 echo "Log: $LOGFILE"
 
+# Mouse cursor theme + size (installed by steps/xcursor.sh). Exported here so
+# every client this session starts — dwm, st, dwm-status, anything run from a
+# shell — resolves the same cursor. The xinitrc below also merges
+# /etc/X11/xcursor-resources into the root resource database, which is what
+# libXcursor reads for clients that never see this environment.
+# 48px is 2x the freedesktop default: 225 dpi panel driven at 96 dpi.
+if [ -r /etc/xcursor.conf ]; then
+    . /etc/xcursor.conf
+    export XCURSOR_THEME XCURSOR_SIZE
+fi
+
 # Runtime dir. A real login (agetty/login + elogind) already creates
 # /run/user/<uid> for the user, so no privilege is needed. Only an X start
 # outside a logind session (e.g. from cron/ssh) needs it created, and that
@@ -101,6 +112,13 @@ fi
 
 # Keyboard repeat rate
 xset r rate 250 34 2>/dev/null || true
+
+# Mouse cursor: libXcursor reads Xcursor.size from the root resource
+# database, so this merge has to happen before dwm (and therefore st) start.
+# dwm and st load their cursors through libXcursor — the server's own XC_*
+# cursorfont glyphs are fixed 9x16 bitmaps and cannot be made larger.
+# Values: /etc/xcursor.conf, installed by steps/xcursor.sh.
+[ -r /etc/X11/xcursor-resources ] && xrdb -merge /etc/X11/xcursor-resources 2>/dev/null || true
 
 # Screen blanking / DPMS from the power policy (/var/lib/power/state).
 # Applied on every X start so an X exit/restart cannot lose it.

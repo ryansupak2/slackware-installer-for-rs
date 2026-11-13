@@ -4,6 +4,8 @@
 #include <string.h>
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
+#include <X11/Xcursor/Xcursor.h>
+#include <X11/cursorfont.h> /* XC_left_ptr, the fallback below */
 
 #include "drw.h"
 #include "util.h"
@@ -444,14 +446,25 @@ drw_font_getexts(Fnt *font, const char *text, unsigned int len, unsigned int *w,
 }
 
 Cur *
-drw_cur_create(Drw *drw, int shape)
+drw_cur_create(Drw *drw, const char *name)
 {
 	Cur *cur;
 
 	if (!drw || !(cur = ecalloc(1, sizeof(Cur))))
 		return NULL;
 
-	cur->cursor = XCreateFontCursor(drw->dpy, shape);
+	/* Theme cursor via libXcursor, NOT XCreateFontCursor: the server's
+	 * cursorfont glyphs are fixed-size bitmaps (XC_left_ptr is 9x16 px,
+	 * measured with XFixesGetCursorImage) and cannot scale, which is half
+	 * size on our 225 dpi panel driven at 96 dpi. libXcursor picks the
+	 * image at XCURSOR_SIZE / the Xcursor.size resource, so the size lives
+	 * in /etc/xcursor.conf and nowhere else. The name must exist in the
+	 * theme (Adwaita has left_ptr, se-resize, fleur); for a missing name
+	 * libXcursor silently falls back to a core glyph, so keep names real.
+	 */
+	cur->cursor = XcursorLibraryLoadCursor(drw->dpy, name ? name : "default");
+	if (cur->cursor == None)
+		cur->cursor = XCreateFontCursor(drw->dpy, XC_left_ptr);
 
 	return cur;
 }

@@ -94,6 +94,8 @@ fi
 HOOK="$SLEEP_DIR/10-slock-lock"
 cat > "$HOOK" << 'HOOKEOF'
 #!/bin/sh
+# 10-slock-lock — run by elogind around sleep.
+#
 # pre : lock the X session and WAIT until slock provably covers the screen,
 #       so nothing but slock can ever be seen when the machine wakes.
 # post: if slock somehow died across the sleep, put it back immediately.
@@ -105,28 +107,70 @@ cat > "$HOOK" << 'HOOKEOF'
 #
 # DISPLAY/XAUTHORITY are only defaults: the hook can be pointed at a scratch
 # display (DISPLAY=:97 ...) for testing without touching the live session.
+
+# Remember whether the caller supplied a display; only then do we derive one
+# from the active session's X server.
+_user_display="${DISPLAY:-}"
 DISPLAY="${DISPLAY:-:0}"
-export DISPLAY
 
 xuid=""
 xuser=""
+_xtty=""
 if command -v loginctl >/dev/null 2>&1; then
-    # Do not use positional parameters here; $1/$2 are pre/post and the event.
-    _xsess=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$4=="seat0" {print $1, $2, $3; exit}')
-    xuid=$(printf '%s\n' "$_xsess" | awk '{print $2}')
-    xuser=$(printf '%s\n' "$_xsess" | awk '{print $3}')
+    # Pick the ACTIVE session on the seat, not merely the first one: with a
+    # second desktop user there are two seat0 sessions (root's user-early +
+    # rs's), and locking the inactive one would leave the visible desktop
+    # unlocked. Do not use positional parameters here; $1/$2 are pre/post.
+    for _sid in $(loginctl list-sessions --no-legend 2>/dev/null | awk '$4=="seat0" {print $1}'); do
+        [ "$(loginctl show-session "$_sid" -p Active --value 2>/dev/null)" = "yes" ] || continue
+        xuser=$(loginctl show-session "$_sid" -p Name --value 2>/dev/null)
+        xuid=$(loginctl show-session "$_sid" -p User --value 2>/dev/null)
+        _xtty=$(loginctl show-session "$_sid" -p TTY --value 2>/dev/null)
+        [ -n "$xuser" ] && break
+    done
+    # Older/odd logind: fall back to the first seat0 row.
+    if [ -z "$xuser" ]; then
+        _xsess=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$4=="seat0" {print $1, $2, $3; exit}')
+        xuid=$(printf '%s\n' "$_xsess" | awk '{print $2}')
+        xuser=$(printf '%s\n' "$_xsess" | awk '{print $3}')
+    fi
 fi
 [ -n "$xuser" ] || { xuid=0; xuser=root; }
 xhome=$(getent passwd "$xuser" | cut -d: -f6)
 [ -n "$xhome" ] || xhome=/root
 
+# Find the X server belonging to the ACTIVE session's VT. That gives both the
+# right display (:0, :1, ...) and the authoritative -auth file for it; with
+# two users, "the last Xorg in ps" or a hardcoded :0 is the wrong session.
+if [ -n "$_xtty" ]; then
+    _vt=${_xtty#tty}
+    _args=$(ps -o args= -C Xorg 2>/dev/null | grep -F -- " vt${_vt} " | head -1)
+    [ -n "$_args" ] || _args=$(ps -o args= -C Xorg 2>/dev/null | head -1)
+    if [ -n "$_args" ]; then
+        _disp=$(printf '%s\n' "$_args" | tr ' ' '\n' | grep -E '^:[0-9]+$' | head -1)
+        [ -n "$_disp" ] && [ -z "$_user_display" ] && DISPLAY="$_disp"
+        if [ -z "${XAUTHORITY:-}" ]; then
+            _auth=$(printf '%s\n' "$_args" | tr ' ' '\n' | grep -A1 '^-auth$' | tail -1)
+            [ -n "$_auth" ] && [ -r "$_auth" ] && XAUTHORITY="$_auth"
+        fi
+    fi
+fi
+export DISPLAY
+
 if [ -z "${XAUTHORITY:-}" ]; then
-    for c in "$xhome/.Xauthority" "$HOME/.Xauthority" /root/.Xauthority; do
-        [ -n "$c" ] && [ -r "$c" ] && { XAUTHORITY=$c; break; }
-    done
-    if [ -z "${XAUTHORITY:-}" ]; then
-        auth=$(ps -o args= -C Xorg 2>/dev/null | tr ' ' '\n' | grep -A1 '^-auth$' | tail -1)
-        [ -n "$auth" ] && [ -r "$auth" ] && XAUTHORITY=$auth
+    # The session user's own cookie first; then the -auth file THIS display
+    # was actually started with; root's ~/.Xauthority is only a last resort
+    # for root itself, never for another user.
+    if [ -r "$xhome/.Xauthority" ]; then
+        XAUTHORITY="$xhome/.Xauthority"
+    else
+        auth=$(ps -o args= -C Xorg 2>/dev/null | grep -F -- " $DISPLAY " | tr ' ' '\n' | grep -A1 '^-auth$' | tail -1)
+        [ -n "$auth" ] || auth=$(ps -o args= -C Xorg 2>/dev/null | tr ' ' '\n' | grep -A1 '^-auth$' | tail -1)
+        if [ -n "$auth" ] && [ -r "$auth" ]; then
+            XAUTHORITY="$auth"
+        elif [ "$xuser" = root ] && [ -r /root/.Xauthority ]; then
+            XAUTHORITY=/root/.Xauthority
+        fi
     fi
 fi
 [ -n "${XAUTHORITY:-}" ] && export XAUTHORITY

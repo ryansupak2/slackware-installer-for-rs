@@ -16,6 +16,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <poll.h>
+#include <pwd.h>
 #include <security/pam_appl.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -191,7 +192,13 @@ try_auth(void)
 	if (pw_len == 0) return;
 	password[pw_len] = '\0';
 
-	const char *user = getenv("USER");
+	/* The PAM user is the REAL user (setuid keeps getuid() = the person
+	 * at the keyboard). $USER is only a fallback: an X session should not
+	 * depend on the environment for who is authenticating, and a stale
+	 * USER must never make the prompt ask for a different account. */
+	struct passwd *pw = getpwuid(getuid());
+	const char *user = pw ? pw->pw_name : NULL;
+	if (!user) user = getenv("USER");
 	if (!user) user = getenv("LOGNAME");
 	if (!user) user = "root";
 

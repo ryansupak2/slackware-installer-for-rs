@@ -187,6 +187,34 @@ the CDM host version still matches.
 
 ---
 
+# Mouse cursor — 48 px theme cursors, and dwm/st must not use XC_* glyphs
+
+The panel is 2560x1600 on 288x180 mm (~225 dpi) but X reports 96 dpi, so the
+cursor was half-size *and* fixed: dwm and st loaded the server's cursorfont
+bitmaps (`XCreateFontCursor(XC_left_ptr)`, measured 9x16 px with
+`XFixesGetCursorImage`), which no setting can enlarge — the server does not
+link libXcursor. Both now use `XcursorLibraryLoadCursor` (step
+`steps/xcursor.sh` for the values, `doc/cursor-size.md` for the measurements).
+
+The size and theme live in exactly one file, `dotfiles/xcursor/xcursor.conf`
+(48 px, Adwaita — 2x the 24 px freedesktop default, and one of the theme's
+real image sizes 24/30/36/48/72/96). `steps/xcursor.sh` installs it as
+`/etc/xcursor.conf` and generates `/etc/X11/xcursor-resources` (xrdb -merge in
+dwm-start's xinitrc → `Xcursor.size` for every libXcursor client) and
+`/etc/profile.d/xcursor.sh` (env for login shells, `dwm-start` also exports
+both). GTK is the exception: once `gtk-cursor-theme-size` is present GTK stops
+consulting `Xcursor.size`, so the step rewrites those two keys in each human
+user's `gtk-3.0/settings.ini` (`/root`, `/home/*` with uid >= 1000, `/etc/skel`).
+
+A theme name the theme does not have falls back to the small core glyph
+*silently* — Adwaita has no `sizing` (dwm's old `XC_sizing`), so dwm asks for
+`se-resize`. After touching the conf run `REPO_DIR=$PWD bash steps/xcursor.sh`;
+after touching dwm/st cursor code run the matching suckless step (they stamp
+`config.mk` too, because `-lXcursor` lives there). A running session keeps the
+old cursor until X restarts — dwm loads cursors once at startup.
+
+---
+
 # Screen locking — lid suspends, and slock covers the screen first
 
 Lid close **suspends** (elogind `HandleLidSwitch=suspend`); lid open wakes it.

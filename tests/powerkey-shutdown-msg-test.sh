@@ -216,6 +216,28 @@ check_has "the step installs it"      "powerkey-shutdown-msg"         "$(cat "$S
 
 # ------------------------------------------------------------------
 echo ""
+echo "9. Fan-out: the notice reaches every live desktop session"
+# One root-started helper must reach the bar of whichever user is at the
+# screen (e.g. rs at /run/user/4877), not just root's. POWERKEY_SESSION_ROOT
+# points the scan at a scratch tree so no live session is touched.
+rm -rf "$WORK/sessions"
+mkdir -p "$WORK/sessions/0" "$WORK/sessions/1000"
+mkfifo "$WORK/sessions/1000/dwmbar-0"
+: > "$WORK/xsetroot.calls"
+: > "$WORK/broadcast.calls"
+( cat "$WORK/sessions/1000/dwmbar-0" > "$WORK/fifo2.out" 2>/dev/null ) &
+reader=$!
+CONSOLE="$WORK/console2" XDG_RUNTIME_DIR="$WORK/sessions/0" \
+    POWERKEY_SESSION_ROOT="$WORK/sessions" \
+    PATH="$WORK/bin:/usr/bin:/bin" timeout 10 sh "$HELPER" >/dev/null 2>&1
+rc=$?
+wait "$reader" 2>/dev/null || true
+check "exits 0" 0 "$rc"
+check "own session bar"        "$NOTE" "$(cat "$WORK/sessions/0/status_msg" 2>/dev/null)"
+check "other user's session bar" "$NOTE" "$(cat "$WORK/sessions/1000/status_msg" 2>/dev/null)"
+check "other user's reveal"     "show all 600" "$(sed -n 1p "$WORK/fifo2.out" 2>/dev/null)"
+check "console still written"   "$NOTE" "$(sed -n 2p "$WORK/console2" 2>/dev/null)"
+
 echo "*****************************************************"
 echo "RESULT: $PASS passed, $FAIL failed"
 echo "*****************************************************"

@@ -167,52 +167,110 @@ static void run(const char *path, char *const argv[])
  * temp-message files: dwm-status reads them every 0.1 s and puts the text in
  * the bar (temp-msg is the mechanism the rest of the session uses for short
  * notices). No fork per tick, and nothing here can block the shutdown.
+ *
+ * The daemon runs once at boot as root (rc.local), possibly with no
+ * XDG_RUNTIME_DIR at all. A non-root desktop user's dwm-status reads
+ * /run/user/<uid>/status_msg, so writing only to our own dir meant the
+ * countdown and the final message were invisible in any other user's
+ * session. When we are root and our runtime dir is a real session dir, fan
+ * the notice out to every session under /run/user/<uid> (root can write
+ * there). Fan-out is skipped for a synthetic XDG_RUNTIME_DIR (tests).
  */
 static int notice_on = 0;
 static double notice_next = 0.0;
 
 static void
-notice_paths(char *msg, size_t msglen, char *end, size_t endlen)
+notice_run_dir(char *out, size_t len)
 {
 	const char *run = getenv("XDG_RUNTIME_DIR");
-	static char fallback[64];
 
-	if (!run) {
-		snprintf(fallback, sizeof(fallback), "/run/user/%ld", (long)getuid());
-		run = fallback;
+	if (run && *run)
+		snprintf(out, len, "%s", run);
+	else
+		snprintf(out, len, "/run/user/%ld", (long)getuid());
+}
+
+/* Only fan out when we are root AND our own runtime dir is a real session
+ * dir (or unset, the rc.local case). A test harness sets XDG_RUNTIME_DIR to a
+ * scratch directory and must not touch live sessions. */
+static int
+notice_fanout_ok(void)
+{
+	const char *run = getenv("XDG_RUNTIME_DIR");
+
+	if (getuid() != 0)
+		return 0;
+	if (!run || !*run)
+		return 1;
+	return strncmp(run, "/run/user/", 10) == 0;
+}
+
+static void
+notice_write_dir(const char *run, const char *text)
+{
+	char mpath[300], epath[300];
+	FILE *f;
+
+	snprintf(mpath, sizeof(mpath), "%s/status_msg", run);
+	snprintf(epath, sizeof(epath), "%s/status_end", run);
+	if ((f = fopen(mpath, "w"))) {
+		fprintf(f, "%s\n", text);
+		fclose(f);
 	}
-	snprintf(msg, msglen, "%s/status_msg", run);
-	snprintf(end, endlen, "%s/status_end", run);
+	if ((f = fopen(epath, "w"))) {
+		fprintf(f, "%ld\n", (long)time(NULL) + 3);
+		fclose(f);
+	}
+	/* Hand the files to the session user (best effort): that user's
+	 * dwm-status removes them, and /run/user/<uid> is not sticky. */
+	const char *slash = strrchr(run, '/');
+	if (slash && slash[1]) {
+		char *endp = NULL;
+		long uid = strtol(slash + 1, &endp, 10);
+		if (endp && *endp == '\0' && uid > 0) {
+			(void)chown(mpath, (uid_t)uid, (gid_t)-1);
+			(void)chown(epath, (uid_t)uid, (gid_t)-1);
+		}
+	}
 }
 
 static void
 notice_show(const char *text)
 {
-	char mpath[300], epath[300];
-	FILE *f;
+	char run[256];
+	DIR *d;
+	struct dirent *de;
 
 	if (dry_run)
 		return;
-	notice_paths(mpath, sizeof(mpath), epath, sizeof(epath));
-	if (!(f = fopen(mpath, "w")))
+	notice_run_dir(run, sizeof(run));
+	notice_write_dir(run, text);
+
+	if (!notice_fanout_ok())
 		return;
-	fprintf(f, "%s\n", text);
-	fclose(f);
-	if ((f = fopen(epath, "w"))) {
-		fprintf(f, "%ld\n", (long)time(NULL) + 3);
-		fclose(f);
+	if (!(d = opendir("/run/user")))
+		return;
+	while ((de = readdir(d))) {
+		char dir[300];
+
+		if (de->d_name[0] < '0' || de->d_name[0] > '9')
+			continue;
+		snprintf(dir, sizeof(dir), "/run/user/%s", de->d_name);
+		if (strcmp(dir, run) == 0)
+			continue;
+		notice_write_dir(dir, text);
 	}
+	closedir(d);
 }
 
 static void
-notice_clear(void)
+notice_clear_dir(const char *run)
 {
 	char mpath[300], epath[300], line[128] = "";
 	FILE *f;
 
-	if (dry_run)
-		return;
-	notice_paths(mpath, sizeof(mpath), epath, sizeof(epath));
+	snprintf(mpath, sizeof(mpath), "%s/status_msg", run);
+	snprintf(epath, sizeof(epath), "%s/status_end", run);
 	/* Only clear the message if it is OURS: another tool's temp message
 	 * (volume, vpn, ...) must not be wiped by a button release. */
 	if (!(f = fopen(mpath, "r")))
@@ -223,6 +281,35 @@ notice_clear(void)
 		return;
 	unlink(mpath);
 	unlink(epath);
+}
+
+static void
+notice_clear(void)
+{
+	char run[256];
+	DIR *d;
+	struct dirent *de;
+
+	if (dry_run)
+		return;
+	notice_run_dir(run, sizeof(run));
+	notice_clear_dir(run);
+
+	if (!notice_fanout_ok())
+		return;
+	if (!(d = opendir("/run/user")))
+		return;
+	while ((de = readdir(d))) {
+		char dir[300];
+
+		if (de->d_name[0] < '0' || de->d_name[0] > '9')
+			continue;
+		snprintf(dir, sizeof(dir), "/run/user/%s", de->d_name);
+		if (strcmp(dir, run) == 0)
+			continue;
+		notice_clear_dir(dir);
+	}
+	closedir(d);
 }
 
 int main(int argc, char **argv)

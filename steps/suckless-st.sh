@@ -17,7 +17,7 @@ ok=true
 
 # ── Build dependencies ──
 echo "Installing build deps for st..."
-install_pkg "libX11 libXft libXrender freetype fontconfig pkg-config"
+install_pkg "libX11 libXft libXrender libXcursor freetype fontconfig pkg-config"
 
 if $ok; then
     mkdir -p /usr/local/src/suckless
@@ -27,13 +27,15 @@ if $ok; then
        cmp -s "$REPO_DIR/dotfiles/suckless/st/config.h" /usr/local/src/suckless/st-stamp/config.h 2>/dev/null && \
        cmp -s "$REPO_DIR/dotfiles/suckless/st/st.c" /usr/local/src/suckless/st-stamp/st.c 2>/dev/null && \
        cmp -s "$REPO_DIR/dotfiles/suckless/st/st.h" /usr/local/src/suckless/st-stamp/st.h 2>/dev/null && \
-       cmp -s "$REPO_DIR/dotfiles/suckless/st/x.c" /usr/local/src/suckless/st-stamp/x.c 2>/dev/null; then
+       cmp -s "$REPO_DIR/dotfiles/suckless/st/x.c" /usr/local/src/suckless/st-stamp/x.c 2>/dev/null && \
+       cmp -s "$REPO_DIR/dotfiles/suckless/st/config.mk" /usr/local/src/suckless/st-stamp/config.mk 2>/dev/null; then
         echo "st already installed — skipping"
     else
         echo "Installing Suckless st..."
-        rm -rf st
-        if ! git clone --depth 1 --branch 0.9.2 https://git.suckless.org/st; then
-            echo "ERROR: failed to git clone st."
+        # Never rm -rf a working tree before a clone succeeds (same reason as
+        # in steps/suckless-dwm.sh): clone only when there is no tree yet.
+        if [ ! -d st ] && ! git clone --depth 1 --branch 0.9.2 https://git.suckless.org/st; then
+            echo "ERROR: failed to git clone st (no existing source tree either)."
             ok=false
         else
             cd st
@@ -41,6 +43,8 @@ if $ok; then
             cp -f "$REPO_DIR/dotfiles/suckless/st/st.c" st.c
             cp -f "$REPO_DIR/dotfiles/suckless/st/st.h" st.h
             cp -f "$REPO_DIR/dotfiles/suckless/st/x.c" x.c
+            # -lXcursor in LIBS: st loads its cursor from the theme (x.c).
+            cp -f "$REPO_DIR/dotfiles/suckless/st/config.mk" config.mk
             if ! make clean install; then
                 echo "ERROR: make clean install for st failed."
                 ok=false
@@ -50,6 +54,7 @@ if $ok; then
                 cp -f "$REPO_DIR/dotfiles/suckless/st/st.c" /usr/local/src/suckless/st-stamp/st.c
                 cp -f "$REPO_DIR/dotfiles/suckless/st/st.h" /usr/local/src/suckless/st-stamp/st.h
                 cp -f "$REPO_DIR/dotfiles/suckless/st/x.c" /usr/local/src/suckless/st-stamp/x.c
+                cp -f "$REPO_DIR/dotfiles/suckless/st/config.mk" /usr/local/src/suckless/st-stamp/config.mk
                 echo "st installed successfully."
             fi
             cd ..

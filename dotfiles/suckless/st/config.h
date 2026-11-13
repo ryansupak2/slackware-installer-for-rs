@@ -154,8 +154,15 @@ static unsigned int rows = 24;
 
 /*
  * Default colour and shape of the mouse cursor
+ *
+ * mouseshape is a libXcursor THEME name, not an XC_* cursorfont glyph:
+ * the glyphs are fixed-size bitmaps (XC_xterm is 8x14) and cannot scale,
+ * while a theme ships the same cursor at 24/30/36/48/72/96 px and
+ * libXcursor picks the one XCURSOR_SIZE asks for (steps/xcursor.sh).
+ * Keep it a name every freedesktop theme has; a miss silently falls
+ * back to the small bitmap.
  */
-static unsigned int mouseshape = XC_xterm;
+static const char *mouseshape = "xterm";
 static unsigned int mousefg = 7;
 static unsigned int mousebg = 0;
 

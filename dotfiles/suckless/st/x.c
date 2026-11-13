@@ -13,6 +13,7 @@
 #include <X11/cursorfont.h>
 #include <X11/keysym.h>
 #include <X11/Xft/Xft.h>
+#include <X11/Xcursor/Xcursor.h>
 #include <X11/XKBlib.h>
 
 char *argv0;
@@ -1217,8 +1218,12 @@ xinit(int cols, int rows)
 	                                       ximinstantiate, NULL);
 	}
 
-	/* white cursor, black outline */
-	cursor = XCreateFontCursor(xw.dpy, mouseshape);
+	/* cursor from the libXcursor theme at XCURSOR_SIZE (see config.h and
+	 * doc/cursor-size.md); the core cursorfont glyphs are fixed-size
+	 * bitmaps and stay 9x16 however large the panel is. */
+	cursor = XcursorLibraryLoadCursor(xw.dpy, mouseshape);
+	if (cursor == None)
+		cursor = XCreateFontCursor(xw.dpy, XC_xterm);
 	XDefineCursor(xw.dpy, xw.win, cursor);
 
 	if (XParseColor(xw.dpy, xw.cmap, colorname[mousefg], &xmousefg) == 0) {

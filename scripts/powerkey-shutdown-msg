@@ -50,24 +50,55 @@ fi
 printf '\n%s\n' "$NOTE" >"$CONSOLE" 2>/dev/null || true
 
 # ── 3. The topbar ────────────────────────────────────────────────────────
-[ -d "$RUN" ] || exit 0
+# Every live desktop session has its own runtime dir, and dwm-status in that
+# session reads <dir>/status_msg and <dir>/dwmbar-0. This helper runs from
+# the root-started powerkey-hold (rc.local, possibly with no session at all),
+# so a single write to $RUN only ever reached root's bar. Fan out to every
+# real session: the message must appear in the bar of whoever is looking at
 
-# dwm-status re-reads these every 0.1 s and shows $NOTE verbatim (no clock
-# appended) until status_end passes.
-printf '%s\n' "$NOTE" >"$RUN/status_msg" 2>/dev/null || true
-printf '%s\n' "$(( $(date +%s) + KEEP_REVEALED ))" >"$RUN/status_end" 2>/dev/null || true
+# the screen. A synthetic XDG_RUNTIME_DIR (tests) disables the fan-out;
+# POWERKEY_SESSION_ROOT lets a test point the scan at a scratch tree.
+SESSION_ROOT="${POWERKEY_SESSION_ROOT:-/run/user}"
+RUNS="$RUN"
+FANOUT=0
+if [ "$(id -u)" -eq 0 ]; then
+    case "${XDG_RUNTIME_DIR:-}" in
+        ""|"$SESSION_ROOT"/*) FANOUT=1 ;;
+    esac
+fi
+if [ "$FANOUT" = 1 ]; then
+    for d in "$SESSION_ROOT"/[0-9]*; do
+        [ -d "$d" ] || continue
+        case " $RUNS " in *" $d "*) continue ;; esac
+        RUNS="$RUNS $d"
+    done
+fi
+
+for R in $RUNS; do
+    [ -d "$R" ] || continue
+    # dwm-status re-reads these every 0.1 s and shows $NOTE verbatim (no
+    # clock appended) until status_end passes.
+    printf '%s\n' "$NOTE" >"$R/status_msg" 2>/dev/null || true
+    printf '%s\n' "$(( $(date +%s) + KEEP_REVEALED ))" >"$R/status_end" 2>/dev/null || true
+    # Hand the files to the session owner (dwm-status removes them).
+    u=${R##*/}
+    case "$u" in
+        ''|*[!0-9]*) ;;
+        *) chown "$u" "$R/status_msg" "$R/status_end" 2>/dev/null || true ;;
+    esac
+    # Hide mode: reveal the bar and KEEP it revealed ("show all" alone is 3 s).
+    # Opened READ-WRITE in a subshell: a plain write-open on a FIFO waits for a
+    # reader, and dwm may already be gone. Nothing here may block.
+    if [ -p "$R/dwmbar-0" ]; then
+        ( exec 3<>"$R/dwmbar-0" &&
+          printf 'show all %s\n' "$KEEP_REVEALED" >&3 ) 2>/dev/null || true
+    fi
+done
 
 # Show it NOW rather than at dwm-status's next tick (dwm redraws the bar on the
-# root-name change: PropertyNotify -> updatestatus -> drawbar).
+# root-name change: PropertyNotify -> updatestatus -> drawbar). This is only
+# the caller's own display; the status_msg fan-out above covers other users.
 DISPLAY="${DISPLAY:-:0}" XAUTHORITY="${XAUTHORITY:-/root/.Xauthority}" \
     xsetroot -name "$NOTE" >/dev/null 2>&1 || true
-
-# Hide mode: reveal the bar and KEEP it revealed ("show all" alone is 3 s).
-# Opened READ-WRITE in a subshell: a plain write-open on a FIFO waits for a
-# reader, and dwm may already be gone. Nothing here may block.
-if [ -p "$RUN/dwmbar-0" ]; then
-    ( exec 3<>"$RUN/dwmbar-0" &&
-      printf 'show all %s\n' "$KEEP_REVEALED" >&3 ) 2>/dev/null || true
-fi
 
 exit 0

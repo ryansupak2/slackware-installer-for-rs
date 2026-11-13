@@ -76,7 +76,7 @@ networking=("wifi" "openvpn" "vnc")
 hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "slock" "acpi-wakeup" "audio-volume" "audio-mixer" "pipewire" "brightness" "gpu-display" "power")
 security_access=("root-ssh-key" "keychain" "github-ssh")
 dev_tools=("vim" "git-lfs" "pi-path" "pi-shared")
-ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm" "clipboard")
+ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm" "xcursor" "clipboard")
 applications=("chrome" "chromium-build" "web-shortcuts" "inkscape" "yad" "root-web-shortcuts" "slskd")
 utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux" "xclick")
 audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox" "vox-sherpa")
@@ -540,6 +540,13 @@ for section in "${selected[@]}"; do
             ;;
         "suckless-dwm")
             if ./steps/suckless-dwm.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+        "xcursor")
+            if ./steps/xcursor.sh; then
                 success_count=$((success_count + 1))
             else
                 error_count=$((error_count + 1))

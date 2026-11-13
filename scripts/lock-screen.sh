@@ -21,14 +21,20 @@ DISPLAY="${DISPLAY:-:0}"
 export DISPLAY
 
 if [ -z "${XAUTHORITY:-}" ]; then
-    # The session's own authority file first, then root's, then whatever
-    # -auth xinit passed to the running X server.
-    for candidate in "${HOME:-}/.Xauthority" /root/.Xauthority; do
-        [ -n "$candidate" ] && [ -r "$candidate" ] && { XAUTHORITY=$candidate; break; }
-    done
-    if [ -z "${XAUTHORITY:-}" ]; then
-        auth=$(ps -o args= -C Xorg 2>/dev/null | tr ' ' '\n' | grep -A1 '^-auth$' | tail -1)
-        [ -n "$auth" ] && [ -r "$auth" ] && XAUTHORITY=$auth
+    # The session's own authority file first; else the -auth file THIS
+    # display was started with (filter by DISPLAY: with a second user there
+    # are two Xorg processes and "the last one" may be the other session's);
+    # root's ~/.Xauthority only as a last resort for root.
+    if [ -r "${HOME:-}/.Xauthority" ]; then
+        XAUTHORITY="$HOME/.Xauthority"
+    else
+        auth=$(ps -o args= -C Xorg 2>/dev/null | grep -F -- " $DISPLAY " | tr ' ' '\n' | grep -A1 '^-auth$' | tail -1)
+        [ -n "$auth" ] || auth=$(ps -o args= -C Xorg 2>/dev/null | tr ' ' '\n' | grep -A1 '^-auth$' | tail -1)
+        if [ -n "$auth" ] && [ -r "$auth" ]; then
+            XAUTHORITY="$auth"
+        elif [ "$(id -u)" -eq 0 ] && [ -r /root/.Xauthority ]; then
+            XAUTHORITY=/root/.Xauthority
+        fi
     fi
 fi
 export XAUTHORITY
@@ -42,8 +48,6 @@ else
 fi
 TIMEOUT="${LOCK_TIMEOUT:-5}"
 
-MARKER=/run/slock.locked
-TIMEOUT="${LOCK_TIMEOUT:-5}"
 
 slock_running() {   # marker exists AND the pid in it is really slock
     pid=$(cat "$MARKER" 2>/dev/null) || return 1
