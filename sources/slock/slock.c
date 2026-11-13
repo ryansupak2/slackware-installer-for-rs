@@ -91,13 +91,37 @@ beep(void)
 /* Written only AFTER the keyboard and pointer grabs have succeeded, i.e. when
  * nothing but this window can be seen or typed into. Anyone who needs to sleep,
  * blank or suspend the machine WAITS for this file before doing it, which is
- * what guarantees that a waking screen can only ever show slock. */
-#define LOCK_MARKER "/run/slock.locked"
+ * what guarantees that a waking screen can only ever show slock.
+ *
+ * Path is per-user: /run is root-owned, so a non-root session cannot create
+ * /run/slock.locked. Root keeps the historical path (sleep hooks and docs
+ * refer to it); every other user gets the marker in their own
+ * XDG_RUNTIME_DIR, which that desktop session owns.
+ * scripts/lock-screen.sh and scripts/idle-lock.sh compute the same path. */
+#define LOCK_MARKER_ROOT "/run/slock.locked"
+#define LOCK_MARKER_NAME "slock.locked"
+
+static char lock_marker[256];
+
+static const char *
+lock_marker_path(void)
+{
+	if (getuid() == 0)
+		return LOCK_MARKER_ROOT;
+
+	const char *dir = getenv("XDG_RUNTIME_DIR");
+	if (dir && *dir)
+		snprintf(lock_marker, sizeof lock_marker, "%s/%s", dir, LOCK_MARKER_NAME);
+	else
+		snprintf(lock_marker, sizeof lock_marker, "/run/user/%ld/%s",
+		         (long)getuid(), LOCK_MARKER_NAME);
+	return lock_marker;
+}
 
 static void
 mark_locked(void)
 {
-	FILE *f = fopen(LOCK_MARKER, "w");
+	FILE *f = fopen(lock_marker_path(), "w");
 	if (!f)
 		return;
 	fprintf(f, "%ld\n", (long)getpid());
@@ -107,7 +131,7 @@ mark_locked(void)
 static void
 unmark_locked(void)
 {
-	unlink(LOCK_MARKER);
+	unlink(lock_marker_path());
 }
 
 /* ─── PAM ─────────────────────────────────────────────────────────── */

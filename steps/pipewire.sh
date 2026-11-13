@@ -32,8 +32,15 @@ echo "*****************************************************"
 echo "PIPEWIRE SESSION"
 echo "*****************************************************"
 
-RT="/run/user/0"
+# Per-user session: /run/user/<uid>. This step runs as the session user from
+# dwm-start, so a hardcoded /run/user/0 made a non-root user's audio point at
+# root's runtime directory (permission denied, then a broken session).
+# Honor the session's runtime dir (dwm-start falls back to /tmp/runtime-<uid>
+# when logind has not created /run/user/<uid>); otherwise use the logind path.
+RT="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 PWRUN="$HOME/.run"
+MYUID=$(id -u)
+mkdir -p "$RT" 2>/dev/null || true
 
 export XDG_RUNTIME_DIR="$RT"
 export PULSE_SERVER="unix:$RT/pulse/native"
@@ -52,12 +59,14 @@ wait_sock() {   # $1 socket, $2 seconds (default 4)
     return 1
 }
 
-supervisor_pid() { pgrep -f "daemon .*--name=$1 " 2>/dev/null | head -1; }
+# Scoped to this user: an unscoped pgrep/pkill as a desktop user would see
+# root's daemons, mis-detect them as our own, and try to kill them.
+supervisor_pid() { pgrep -u "$MYUID" -f "daemon .*--name=$1 " 2>/dev/null | head -1; }
 
 ensure_supervised() {   # $1 name, $2.. command
     name="$1"; shift
     sup=$(supervisor_pid "$name")
-    child=$(pgrep -x "$name" 2>/dev/null | head -1)
+    child=$(pgrep -u "$MYUID" -x "$name" 2>/dev/null | head -1)
     if [ -n "$sup" ] && [ -n "$child" ]; then
         echo "  $name: supervised (pid $child) — ok"
         return 0
@@ -90,12 +99,29 @@ ensure_supervised() {   # $1 name, $2.. command
 # seds or an intentional local edit; both are reported.
 PW_STOCK=/usr/share/pipewire/pipewire.conf
 PW_LOCAL=/etc/pipewire/pipewire.conf
-if [ -f "$PW_STOCK" ] && [ -f "$PW_LOCAL" ] && ! cmp -s "$PW_STOCK" "$PW_LOCAL"; then
+# Only root may rewrite the system config; a user session must just report it.
+if [ "$(id -u)" -eq 0 ] && [ -f "$PW_STOCK" ] && [ -f "$PW_LOCAL" ] && ! cmp -s "$PW_STOCK" "$PW_LOCAL"; then
     diff_file="/var/log/${USER:-root}-pipewire-conf-$(date +%Y%m%d-%H%M%S).diff"
     diff -u "$PW_STOCK" "$PW_LOCAL" > "$diff_file" 2>/dev/null || true
     echo "  $PW_LOCAL differs from the packaged default (diff: $diff_file)"
     cp "$PW_STOCK" "$PW_LOCAL"
     echo "  restored $PW_LOCAL from $PW_STOCK"
+fi
+
+# ── Deploy the session-time helper BEFORE any early exit ────────────
+# dwm-start calls /usr/local/bin/pipewire-ensure on every X start, and that
+# script must be the per-user version above. A healthy install-time session
+# used to return early and leave the old helper installed forever.
+# Only root may write /usr/local/bin; a user-session run is a no-op.
+if [ "$(id -u)" -eq 0 ]; then
+    if ! cmp -s "$0" /usr/local/bin/pipewire-ensure 2>/dev/null; then
+        install -m 755 "$0" /usr/local/bin/pipewire-ensure 2>/dev/null || {
+            cp "$0" /usr/local/bin/pipewire-ensure && chmod 755 /usr/local/bin/pipewire-ensure
+        }
+        echo "  /usr/local/bin/pipewire-ensure updated"
+    else
+        echo "  /usr/local/bin/pipewire-ensure already current"
+    fi
 fi
 
 # ── Probe: is the session actually serving clients? ─────────────────
@@ -119,10 +145,10 @@ chmod 700 "$RT" 2>/dev/null || true
 # respawns exactly what we are killing.
 echo "  audio session is not serving clients — resetting"
 for name in pipewire-pulse wireplumber pipewire; do
-    for sp in $(pgrep -f "daemon .*--name=$name " 2>/dev/null); do
+    for sp in $(pgrep -u "$MYUID" -f "daemon .*--name=$name " 2>/dev/null); do
         kill "$sp" 2>/dev/null || true
     done
-    pkill -x "$name" 2>/dev/null || true
+    pkill -u "$MYUID" -x "$name" 2>/dev/null || true
 done
 sleep 1
 mkdir -p "$RT/pulse" 2>/dev/null || true
@@ -140,7 +166,7 @@ fi
 # ── Session/policy manager ──────────────────────────────────────────
 ensure_supervised wireplumber /usr/bin/wireplumber
 for i in 1 2 3 4 5 6 7 8 9 10; do
-    pgrep -x wireplumber >/dev/null 2>&1 && break
+    pgrep -u "$MYUID" -x wireplumber >/dev/null 2>&1 && break
     sleep 0.1
 done
 
@@ -176,12 +202,8 @@ fi
 
 echo "  sinks:   $(timeout 4 pactl list sinks short 2>/dev/null | awk '{print $2}' | tr '\n' ' ')"
 echo "  sources: $(timeout 4 pactl list sources short 2>/dev/null | grep -v monitor | awk '{print $2}' | tr '\n' ' ')"
-# Deploy itself as the session-time helper: dwm-start calls this on every X
-# start, so a session that logind half-tore-down heals before audio is needed.
-install -m 755 "$0" /usr/local/bin/pipewire-ensure 2>/dev/null || {
-    cp "$0" /usr/local/bin/pipewire-ensure && chmod 755 /usr/local/bin/pipewire-ensure
-}
-echo "  /usr/local/bin/pipewire-ensure updated"
+
+
 
 echo "SUCCESS: PipeWire session is serving clients."
 exit 0

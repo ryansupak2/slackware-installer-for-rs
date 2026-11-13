@@ -34,6 +34,8 @@ setup_bashrc() {
         else
             backup="$HOME_TARGET/.bashrc.backup-$(date +%Y%m%d-%H%M%S)"
             cp "$target" "$backup"
+            chown "$TARGET_USER:$TARGET_USER" "$backup" 2>/dev/null || true
+
             echo "  Existing .bashrc differs from template — backed up to $(basename "$backup")"
         fi
     fi
@@ -49,6 +51,7 @@ setup_bashrc() {
         if ! cmp -s "$bp_src" "$bp_target" 2>/dev/null; then
             bp_backup="$HOME_TARGET/.bash_profile.backup-$(date +%Y%m%d-%H%M%S)"
             cp "$bp_target" "$bp_backup"
+            chown "$TARGET_USER:$TARGET_USER" "$bp_backup" 2>/dev/null || true
             echo "  Existing .bash_profile differs from template — backed up to $(basename "$bp_backup")"
             cp "$bp_src" "$bp_target"
             echo "  Deployed $bp_target"
@@ -68,6 +71,7 @@ setup_bashrc() {
         if ! cmp -s "$bl_src" "$bl_target" 2>/dev/null; then
             bl_backup="$HOME_TARGET/.bash_logout.backup-$(date +%Y%m%d-%H%M%S)"
             cp "$bl_target" "$bl_backup"
+            chown "$TARGET_USER:$TARGET_USER" "$bl_backup" 2>/dev/null || true
             echo "  Existing .bash_logout differs from template — backed up to $(basename "$bl_backup")"
             cp "$bl_src" "$bl_target"
             echo "  Deployed $bl_target"

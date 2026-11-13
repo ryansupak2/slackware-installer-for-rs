@@ -24,6 +24,14 @@ log() { printf '%s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
 LEAD_SECONDS="${IDLE_LOCK_LEAD:-20}"   # lock this long before the blank
 POLL_SECONDS=5
 
+# Marker written by slock (see sources/slock/slock.c and lock-screen.sh):
+# root -> /run/slock.locked, everyone else -> their own XDG_RUNTIME_DIR.
+if [ "$(id -u)" -eq 0 ]; then
+    LOCK_MARKER=/run/slock.locked
+else
+    LOCK_MARKER="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/slock.locked"
+fi
+
 blank_minutes=0
 if [ -r /var/lib/power/state ]; then
     # shellcheck disable=SC1091
@@ -54,10 +62,10 @@ while :; do
             # slock re-arms the idle counter (input is grabbed), so the next
             # iteration would fire again; wait for the unlock instead. The
             # marker is validated each pass: a SIGKILLed slock leaves it behind.
-            while [ -r /run/slock.locked ]; do
-                pid=$(cat /run/slock.locked 2>/dev/null)
+            while [ -r "$LOCK_MARKER" ]; do
+                pid=$(cat "$LOCK_MARKER" 2>/dev/null)
                 if [ -z "$pid" ] || ! grep -qx 'slock' "/proc/$pid/comm" 2>/dev/null; then
-                    rm -f /run/slock.locked
+                    rm -f "$LOCK_MARKER"
                     log "stale lock marker removed (slock was killed)"
                     break
                 fi

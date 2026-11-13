@@ -21,15 +21,26 @@ DISPLAY="${DISPLAY:-:0}"
 export DISPLAY
 
 if [ -z "${XAUTHORITY:-}" ]; then
-    if [ -r /root/.Xauthority ]; then
-        XAUTHORITY=/root/.Xauthority
-    else
-        # X was started by xinit with -auth /root/.serverauth.NNNN; reuse it.
+    # The session's own authority file first, then root's, then whatever
+    # -auth xinit passed to the running X server.
+    for candidate in "${HOME:-}/.Xauthority" /root/.Xauthority; do
+        [ -n "$candidate" ] && [ -r "$candidate" ] && { XAUTHORITY=$candidate; break; }
+    done
+    if [ -z "${XAUTHORITY:-}" ]; then
         auth=$(ps -o args= -C Xorg 2>/dev/null | tr ' ' '\n' | grep -A1 '^-auth$' | tail -1)
-        [ -n "$auth" ] && XAUTHORITY=$auth
+        [ -n "$auth" ] && [ -r "$auth" ] && XAUTHORITY=$auth
     fi
 fi
 export XAUTHORITY
+
+# Same rule as sources/slock/slock.c: root keeps /run/slock.locked, any other
+# user's marker lives in their own runtime dir (they cannot write /run).
+if [ "$(id -u)" -eq 0 ]; then
+    MARKER=/run/slock.locked
+else
+    MARKER="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/slock.locked"
+fi
+TIMEOUT="${LOCK_TIMEOUT:-5}"
 
 MARKER=/run/slock.locked
 TIMEOUT="${LOCK_TIMEOUT:-5}"

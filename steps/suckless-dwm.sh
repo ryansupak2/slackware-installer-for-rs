@@ -124,6 +124,22 @@ cp "$REPO_DIR/scripts/temp-msg.sh" /usr/local/bin/temp-msg.sh
 chmod +x /usr/local/bin/temp-msg.sh
 cp "$REPO_DIR/scripts/broadcast.sh" /usr/local/bin/broadcast
 chmod +x /usr/local/bin/broadcast
+cp "$REPO_DIR/scripts/broadcast.sh" /usr/local/bin/broadcast
+chmod +x /usr/local/bin/broadcast
+
+# Per-user desktop background: system map + self-service tool.
+# root=#CC0000 (signal red, unchanged); rs=#808080 (medium grey).
+mkdir -p /etc/dwm
+if [ -f /etc/dwm/backgrounds.conf ] && cmp -s "$REPO_DIR/dotfiles/dwm/backgrounds.conf" /etc/dwm/backgrounds.conf; then
+    echo "  /etc/dwm/backgrounds.conf already up to date"
+else
+    cp "$REPO_DIR/dotfiles/dwm/backgrounds.conf" /etc/dwm/backgrounds.conf
+    chmod 644 /etc/dwm/backgrounds.conf
+    echo "  /etc/dwm/backgrounds.conf deployed"
+fi
+cp "$REPO_DIR/scripts/dwm-background.sh" /usr/local/bin/dwm-background.sh
+chmod +x /usr/local/bin/dwm-background.sh
+echo "  dwm-background deployed to /usr/local/bin/dwm-background.sh"
 
 echo "  dwm-start deployed to /usr/local/bin/dwm-start"
 echo "  dwm-status deployed to /usr/local/bin/dwm-status"

@@ -75,8 +75,8 @@ core_prereqs=("slackpkg-setup" "console-font" "timezone" "ca-certificates" "xlib
 networking=("wifi" "openvpn" "vnc")
 hardware_config=("input-hardware" "touchscreen-off" "screen-locking" "slock" "acpi-wakeup" "audio-volume" "audio-mixer" "pipewire" "brightness" "gpu-display" "power")
 security_access=("root-ssh-key" "keychain" "github-ssh")
-dev_tools=("vim" "git-lfs" "pi-path")
-ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm")
+dev_tools=("vim" "git-lfs" "pi-path" "pi-shared")
+ui_appearance=("fastfetch" "symbola-font" "additional-fonts" "suckless-dwm" "clipboard")
 applications=("chrome" "chromium-build" "web-shortcuts" "inkscape" "yad" "root-web-shortcuts" "slskd")
 utilities=("help" "midnight-commander" "wifi-manager" "net-watch" "htop" "tmux" "xclick")
 audio_dsp=("sof-firmware" "sox" "whisper-cpp-vox" "vox-sherpa")
@@ -361,6 +361,13 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
+        "pi-shared")
+            if ./steps/pi-shared.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
         "fastfetch")
             if ./steps/fastfetch.sh; then
                 success_count=$((success_count + 1))
@@ -538,6 +545,14 @@ for section in "${selected[@]}"; do
                 error_count=$((error_count + 1))
             fi
             ;;
+        "clipboard")
+            if ./steps/clipboard.sh; then
+                success_count=$((success_count + 1))
+            else
+                error_count=$((error_count + 1))
+            fi
+            ;;
+
 
         "log-permissions")
             if ./steps/log-permissions.sh; then

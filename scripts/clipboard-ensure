@@ -1,0 +1,38 @@
+#!/bin/sh
+# clipboard-ensure — keep PRIMARY and CLIPBOARD in sync for this X session
+#
+# Two autocutsel instances mirror both selections through the X cut buffer:
+#   -selection PRIMARY    mouse selection  <-> cut buffer
+#   -selection CLIPBOARD  Ctrl+C/Ctrl+V    <-> cut buffer
+# With both running, text selected with the mouse in st is already in
+# CLIPBOARD (so Ctrl+V pastes it in Chrome), and Ctrl+C in Chrome lands in
+# PRIMARY (so Button2 / Shift+Insert pastes it in st). The cut buffer also
+# keeps the last value, so the clipboard survives the app that copied it.
+#
+# Idempotent, per-user, safe to call on every X start (scripts/dwm-start.sh).
+# No DISPLAY -> nothing to do.
+
+[ -n "${DISPLAY:-}" ] || exit 0
+command -v autocutsel >/dev/null 2>&1 || exit 0
+
+myuid=$(id -u)
+started=0
+
+for sel in PRIMARY CLIPBOARD; do
+    if pgrep -u "$myuid" -f "autocutsel -selection $sel" >/dev/null 2>&1; then
+        continue
+    fi
+    autocutsel -selection "$sel" -fork 2>/dev/null || true
+    started=$((started + 1))
+done
+
+# Report the live state (goes to the dwm session log).
+for sel in PRIMARY CLIPBOARD; do
+    if pgrep -u "$myuid" -f "autocutsel -selection $sel" >/dev/null 2>&1; then
+        echo "clipboard: $sel synced"
+    else
+        echo "clipboard: WARNING $sel not synced (autocutsel failed)" >&2
+    fi
+done
+[ "$started" -eq 0 ] && echo "clipboard: already running"
+exit 0

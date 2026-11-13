@@ -62,10 +62,16 @@ fi
 echo "  built: $BUILD/slock ($(du -h "$BUILD/slock" | cut -f1)), all libraries resolve"
 
 # 3. Install binary + PAM service.
-if [ -f "$DEST" ] && cmp -s "$BUILD/slock" "$DEST"; then
+#    setuid root: pam_unix has to read /etc/shadow, which no ordinary user
+#    can open. Root's own slock did not need it; a second desktop user does.
+#    getuid() is still the real uid, so the per-user lock marker stays
+#    per-user (sources/slock/slock.c).
+SLOCK_MODE=4755
+if [ -f "$DEST" ] && cmp -s "$BUILD/slock" "$DEST" \
+   && [ "$(stat -c %a "$DEST" 2>/dev/null)" = "$SLOCK_MODE" ]; then
     echo "  $DEST already up to date"
 else
-    install -Dm 755 "$BUILD/slock" "$DEST" && echo "  installed $DEST"
+    install -Dm "$SLOCK_MODE" "$BUILD/slock" "$DEST" && echo "  installed $DEST (mode $SLOCK_MODE)"
 fi
 if [ -f "$PAM_DEST" ] && cmp -s "$SRC/slock.pam" "$PAM_DEST"; then
     echo "  $PAM_DEST already up to date"
@@ -152,7 +158,7 @@ done
 echo "  binary : $DEST ($(stat -c %a "$DEST" 2>/dev/null))"
 echo "  pam    : $PAM_DEST"
 echo "  helpers: /usr/local/bin/lock-screen.sh, /usr/local/bin/idle-lock.sh, /usr/local/bin/xidle"
-echo "  marker : /run/slock.locked is written by slock only after the grabs succeed"
+echo "  marker : /run/slock.locked (root) or <XDG_RUNTIME_DIR>/slock.locked (other users), written only after the grabs succeed"
 if [ -d /usr/local/src/suckless/dwm-stamp ]; then
     if grep -q 'slock' "$REPO_DIR/dotfiles/suckless/dwm/config.h" 2>/dev/null; then
         echo "  dwm key: Mod+Escape -> slock (see dotfiles/suckless/dwm/config.h)"

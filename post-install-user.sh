@@ -89,8 +89,22 @@ if [ -x "$REPO_DIR/steps/user-ensure.sh" ]; then
     fi
 else
     echo "ERROR: $REPO_DIR/steps/user-ensure.sh not found or not executable (even after chmod)."
+fi
+
+# Narrow passwordless helpers this user needs for the installed desktop
+# tools (power/vpn/slsk). Scoped to the user, not to wheel.
+if [ -x "$REPO_DIR/steps/user-helpers.sh" ]; then
+    TARGET_USER="$TARGET_USER" REPO_DIR="$REPO_DIR" "$REPO_DIR/steps/user-helpers.sh" || {
+        echo "ERROR: user-helpers step failed. Aborting."
+        exit 1
+    }
+else
+    echo "ERROR: $REPO_DIR/steps/user-helpers.sh not found or not executable."
     exit 1
 fi
+
+
+
 
 # Recompute HOME_TARGET (the user may have been deleted + recreated)
 HOME_TARGET=$(eval echo ~$TARGET_USER)

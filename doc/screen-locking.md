@@ -16,13 +16,17 @@ below.
 
 ## The guarantee, mechanically
 
-`slock` writes **`/run/slock.locked`** (its pid) only *after* both the keyboard
-and pointer grabs have succeeded and the olive frame is on screen
-(`sources/slock/slock.c`, `mark_locked()` after `grab_inputs()`), and removes it
-on unlock. Every path that could expose the desktop waits for that marker:
+`slock` writes its pid to **`/run/slock.locked`** when running as root and to
+**`$XDG_RUNTIME_DIR/slock.locked`** for every other user (`/run` is root-owned,
+so a non-root session cannot create the historical path). It writes only
+*after* both the keyboard and pointer grabs have succeeded and the olive
+frame is on screen (`sources/slock/slock.c`, `mark_locked()` after
+`grab_inputs()`), and removes it on unlock. Every path that could expose the
+desktop waits for that marker:
 
 ```
-sources/slock/slock.c ──> /run/slock.locked
+sources/slock/slock.c ──> /run/slock.locked                (root)
+                          $XDG_RUNTIME_DIR/slock.locked (any other user)
         ▲                        │
         │                        ▼
 scripts/lock-screen.sh ── blocks until the marker exists and its pid is really
@@ -65,7 +69,7 @@ Two secondary details that matter for the same goal:
 # locking works and is provable (scratch display, does not touch the session):
 Xvfb :97 -screen 0 1600x1200x24 &
 DISPLAY=:97 XAUTHORITY= /usr/local/bin/lock-screen.sh; echo rc=$?
-cat /run/slock.locked            # pid of slock
+cat /run/slock.locked            # root; non-root: $XDG_RUNTIME_DIR/slock.locked
 
 # policy in place:
 grep HandleLidSwitch /etc/elogind/logind.conf.d/*.conf      # suspend
@@ -167,5 +171,6 @@ Sleep-hook order in `/lib64/elogind/system-sleep/`: `10-slock-lock` runs before
 * The display-commit stall described in `doc/display-freeze.md` can freeze the
   *picture* while locked. The keyboard is already grabbed by slock, so the
   recovery is the same: VT switch, kill slock, restart X if needed.
-* If a stale `/run/slock.locked` appears after a hard kill, it is harmless — both
+* If a stale lock marker (`/run/slock.locked` for root, `$XDG_RUNTIME_DIR/
+  slock.locked` otherwise) appears after a hard kill, it is harmless — both
   helpers check the pid before trusting it, and `idle-lock.sh` removes it.

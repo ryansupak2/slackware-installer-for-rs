@@ -63,6 +63,10 @@ alias sound='alsamixer -c 0'  #help:sound=volume mixer
 alias vnc='/usr/local/bin/vnc'  #help:vnc=VNC server manager
 alias vpn='/usr/local/bin/vpn'  #help:vpn=openvpn toggle
 alias slsk='/usr/local/bin/slsk'  #help:slsk=soulseek
+alias bg='/usr/local/bin/dwm-background.sh'  #help:bg=desktop background colour (per user; bg '#808080' sets it)
+alias clip='xclip -selection clipboard'  #help:clip=copy stdin to the clipboard (echo hi | clip)
+alias clipout='xclip -selection clipboard -o'  #help:clipout=print the clipboard contents
+alias clipp='xclip -selection primary'  #help:clipp=copy stdin to PRIMARY (mouse-selection paste)
 alias gc='git commit'  #help:gc=git commit
 alias gs='git status'  #help:gs=git status
 alias gp='git push'  #help:gp=git push

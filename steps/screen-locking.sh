@@ -94,25 +94,62 @@ fi
 HOOK="$SLEEP_DIR/10-slock-lock"
 cat > "$HOOK" << 'HOOKEOF'
 #!/bin/sh
-# 10-slock-lock — run by elogind around sleep.
-#
 # pre : lock the X session and WAIT until slock provably covers the screen,
 #       so nothing but slock can ever be seen when the machine wakes.
 # post: if slock somehow died across the sleep, put it back immediately.
+#
+# The hook runs as root, but the X session may belong to any user. Lock as
+# THAT user: slock needs their XAUTHORITY/runtime dir, and its per-user lock
+# marker lives in /run/user/<uid>/slock.locked (root keeps
+# /run/slock.locked — see sources/slock/slock.c).
 #
 # DISPLAY/XAUTHORITY are only defaults: the hook can be pointed at a scratch
 # display (DISPLAY=:97 ...) for testing without touching the live session.
 DISPLAY="${DISPLAY:-:0}"
 export DISPLAY
+
+xuid=""
+xuser=""
+if command -v loginctl >/dev/null 2>&1; then
+    # Do not use positional parameters here; $1/$2 are pre/post and the event.
+    _xsess=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$4=="seat0" {print $1, $2, $3; exit}')
+    xuid=$(printf '%s\n' "$_xsess" | awk '{print $2}')
+    xuser=$(printf '%s\n' "$_xsess" | awk '{print $3}')
+fi
+[ -n "$xuser" ] || { xuid=0; xuser=root; }
+xhome=$(getent passwd "$xuser" | cut -d: -f6)
+[ -n "$xhome" ] || xhome=/root
+
+if [ -z "${XAUTHORITY:-}" ]; then
+    for c in "$xhome/.Xauthority" "$HOME/.Xauthority" /root/.Xauthority; do
+        [ -n "$c" ] && [ -r "$c" ] && { XAUTHORITY=$c; break; }
+    done
+    if [ -z "${XAUTHORITY:-}" ]; then
+        auth=$(ps -o args= -C Xorg 2>/dev/null | tr ' ' '\n' | grep -A1 '^-auth$' | tail -1)
+        [ -n "$auth" ] && [ -r "$auth" ] && XAUTHORITY=$auth
+    fi
+fi
 [ -n "${XAUTHORITY:-}" ] && export XAUTHORITY
-[ -r /root/.Xauthority ] && XAUTHORITY="${XAUTHORITY:-/root/.Xauthority}" && export XAUTHORITY
+
+run_lock() {
+    if [ "$(id -u)" -eq "$xuid" ]; then
+        /usr/local/bin/lock-screen.sh
+    elif command -v runuser >/dev/null 2>&1; then
+        runuser -u "$xuser" -- env DISPLAY="$DISPLAY" \
+            ${XAUTHORITY:+XAUTHORITY="$XAUTHORITY"} \
+            XDG_RUNTIME_DIR="/run/user/$xuid" HOME="$xhome" \
+            /usr/local/bin/lock-screen.sh
+    else
+        su -s /bin/sh "$xuser" -c "HOME='$xhome' DISPLAY='$DISPLAY' XDG_RUNTIME_DIR='/run/user/$xuid' /usr/local/bin/lock-screen.sh"
+    fi
+}
 
 case "$1" in
     pre)
-        /usr/local/bin/lock-screen.sh || echo "10-slock-lock: FAILED to lock before $2" >&2
+        run_lock || echo "10-slock-lock: FAILED to lock before $2" >&2
         ;;
     post)
-        /usr/local/bin/lock-screen.sh || echo "10-slock-lock: could not re-lock after $2" >&2
+        run_lock || echo "10-slock-lock: could not re-lock after $2" >&2
         ;;
 esac
 exit 0

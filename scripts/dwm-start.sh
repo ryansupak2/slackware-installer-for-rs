@@ -14,13 +14,22 @@ fi
 echo "DWM session starting — $(date)"
 echo "Log: $LOGFILE"
 
-# Runtime dir
+# Runtime dir. A real login (agetty/login + elogind) already creates
+# /run/user/<uid> for the user, so no privilege is needed. Only an X start
+# outside a logind session (e.g. from cron/ssh) needs it created, and that
+# must not hang on a sudo password prompt: use -n, then fall back to a
+# private /tmp dir instead of pointing every helper at a missing path.
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 if [ ! -d "$XDG_RUNTIME_DIR" ]; then
-    sudo mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
-    sudo chown $(whoami):$(whoami) "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    sudo -n mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
+    sudo -n chown "$(id -un):$(id -gn)" "$XDG_RUNTIME_DIR" 2>/dev/null || true
+fi
+if [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    XDG_RUNTIME_DIR="/tmp/runtime-$(id -u)"
+    mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
     chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
 fi
+export XDG_RUNTIME_DIR
 export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
 
 # ── Audio ──
@@ -115,11 +124,31 @@ fi
 # TrackPoint scroll sensitivity
 xinput set-prop "Elan TrackPoint" "libinput Scrolling Factor" 3.0 2>/dev/null || true
 
-# Desktop background — signal red for root
-[ "$(whoami)" = "root" ] && xsetroot -solid "#CC0000" 2>/dev/null || true
+# Desktop background — per user, never hardcoded here:
+#   ~/.dwm-background  >  /etc/dwm/backgrounds.conf (user=, then default=)
+# root stays signal red (#CC0000); rs is medium grey (#808080).
+DWM_BG=""
+[ -r "$HOME/.dwm-background" ] && DWM_BG=$(head -1 "$HOME/.dwm-background" | tr -d ' \t\r\n')
+if [ -z "$DWM_BG" ] && [ -r /etc/dwm/backgrounds.conf ]; then
+    DWM_BG=$(awk -F= -v u="$(id -un)" '
+        { k=$1; v=$2; gsub(/[ \t]/, "", k); gsub(/[ \t]/, "", v) }
+        k == u         { print v; found=1; exit }
+        k == "default" { d=v }
+        END            { if (!found && d != "") print d }
+    ' /etc/dwm/backgrounds.conf)
+fi
+[ -n "$DWM_BG" ] || DWM_BG="#808080"
+xsetroot -solid "$DWM_BG" 2>/dev/null || true
 
 # dbus session
 eval $(dbus-launch --sh-syntax) 2>/dev/null || true
+
+# Clipboard: mirror PRIMARY <-> CLIPBOARD and keep the last value after the
+# owning app exits (autocutsel, installed by steps/clipboard.sh). Without it,
+# a mouse selection in st only lands in PRIMARY, which Chrome's Ctrl+V does
+# not read. Idempotent per user; output goes to this session log.
+[ -x /usr/local/bin/clipboard-ensure ] && /usr/local/bin/clipboard-ensure
+
 
 # Status bar + network watcher
 /usr/local/bin/dwm-status &

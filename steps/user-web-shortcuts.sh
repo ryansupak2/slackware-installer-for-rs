@@ -25,11 +25,20 @@ SHORTCUT_FILE="$SHORTCUT_DIR/shortcuts"
 
 mkdir -p "$SHORTCUT_DIR" 2>/dev/null
 
+# The installed browser is Chromium/Chrome (see AGENTS.md); the shortcut list
+# lives under dotfiles/chromium. Keep a firefox/ fallback for older trees.
+SHORTCUTS_SRC="$REPO_DIR/dotfiles/chromium/shortcuts.default"
+[ -f "$SHORTCUTS_SRC" ] || SHORTCUTS_SRC="$REPO_DIR/dotfiles/firefox/shortcuts.default"
+if [ ! -f "$SHORTCUTS_SRC" ]; then
+    echo "ERROR: no shortcuts.default found under dotfiles/chromium or dotfiles/firefox"
+    exit 1
+fi
+
 if [ -f "$SHORTCUT_FILE" ]; then
-    cp "$REPO_DIR/dotfiles/firefox/shortcuts.default" "$SHORTCUT_FILE"
+    cp "$SHORTCUTS_SRC" "$SHORTCUT_FILE"
     echo "Overwritten $SHORTCUT_FILE"
 else
-    cp "$REPO_DIR/dotfiles/firefox/shortcuts.default" "$SHORTCUT_FILE"
+    cp "$SHORTCUTS_SRC" "$SHORTCUT_FILE"
     echo "Created $SHORTCUT_FILE"
 fi
 

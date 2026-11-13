@@ -61,7 +61,11 @@ elevate() {
     [ "$(id -u)" -eq 0 ] && return 0
     [ -n "${POWER_ELEVATED:-}" ] && return 0
     self=$(command -v /usr/local/bin/power 2>/dev/null || echo "$0")
-    if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    # Probe the command we are actually about to run. `sudo -n true` asks for
+    # /usr/bin/true, which narrow NOPASSWD rules (steps/user-helpers.sh) do
+    # not cover — it would report "no sudo" for a user who has exactly the
+    # one rule this tool needs.
+    if command -v sudo >/dev/null 2>&1 && sudo -n -l "$self" >/dev/null 2>&1; then
         export POWER_ELEVATED=1
         export POWER_INVOKER="${POWER_INVOKER:-${USER:-$(id -un)}}"
         export POWER_DISPLAY="${POWER_DISPLAY:-${DISPLAY:-}}"

@@ -30,12 +30,28 @@ for bin in pipewire wireplumber pipewire-pulse pactl parecord arecord aplay; do
     command -v "$bin" >/dev/null 2>&1 || { echo "ERROR: $bin not found — run audio-volume.sh first"; exit 1; }
 done
 
-# ── Use the running PipeWire session (the ALSA device is exclusive to one) ──
-ROOT_RT="/run/user/0"
-ROOT_HOME=$(eval echo ~root)
-export XDG_RUNTIME_DIR="$ROOT_RT"
-mkdir -p "$ROOT_RT/pulse" 2>/dev/null || true
-chmod 700 "$ROOT_RT" 2>/dev/null || true
+# ── Use the TARGET USER's PipeWire session ────────────────────────
+# The ALSA device is exclusive to one audio session, and root's socket at
+# /run/user/0 is 0700 root — testing it as another user would both fail and
+# amount to letting that user share root's audio. Each desktop user gets
+# their own session at /run/user/<uid>, started by pipewire-ensure from
+# dwm-start. If that session does not exist yet (user has not logged in),
+# there is nothing honest to verify here; defer to the first X login instead
+# of reporting a failure that belongs to the wrong session.
+USER_RT="/run/user/$USER_UID"
+USER_HOME=$(eval echo "~$TARGET_USER")
+USER_RUN="$USER_HOME/.run"
+
+if [ "$USER_UID" -ne 0 ] && [ ! -S "$USER_RT/pipewire-0" ]; then
+    echo "  $TARGET_USER has no audio session yet ($USER_RT/pipewire-0 missing)."
+    echo "  Root's session is exclusive to root and is NOT used as a stand-in."
+    echo "  pipewire-ensure starts $TARGET_USER's own session at X login."
+    echo "SKIPPED: Microphone capture deferred for $TARGET_USER (no session yet)."
+    exit 0
+fi
+
+export XDG_RUNTIME_DIR="$USER_RT"
+mkdir -p "$USER_RT/pulse" 2>/dev/null || true
 
 wait_for_sock() {   # $1 = socket path, $2 = seconds (default 3)
     i=0
@@ -55,18 +71,26 @@ wait_for_sock() {   # $1 = socket path, $2 = seconds (default 3)
 # child, which recreates the socket. A healthy session is never touched and a
 # socket held by a live process is never `rm`'d — deleting it is precisely
 # what produced this breakage in the first place.
-if pgrep -x pipewire >/dev/null 2>&1 && [ ! -S "$ROOT_RT/pipewire-0" ]; then
+if pgrep -u "$TARGET_USER" -x pipewire >/dev/null 2>&1 && [ ! -S "$USER_RT/pipewire-0" ]; then
+    if [ "$USER_UID" -ne 0 ]; then
+        echo "SKIPPED: stale $USER_RT/pipewire-0 and no live pipewire for $TARGET_USER."
+        exit 0
+    fi
     echo "  Broken PipeWire session (control socket unlinked) — restarting..."
-    [ -f "$ROOT_HOME/.run/pipewire.pid" ] && kill "$(cat "$ROOT_HOME/.run/pipewire.pid")" 2>/dev/null || true
-    wait_for_sock "$ROOT_RT/pipewire-0" 4 || true
+    [ -f "$USER_RUN/pipewire.pid" ] && kill "$(cat "$USER_RUN/pipewire.pid")" 2>/dev/null || true
+    wait_for_sock "$USER_RT/pipewire-0" 4 || true
 fi
 
 PW_STARTED=false
-if ! pgrep -x pipewire >/dev/null 2>&1; then
+if ! pgrep -u "$TARGET_USER" -x pipewire >/dev/null 2>&1; then
+    if [ "$USER_UID" -ne 0 ]; then
+        echo "SKIPPED: no pipewire runs as $TARGET_USER (dwm-start starts it at X login)."
+        exit 0
+    fi
     echo "  No PipeWire session found — starting one..."
     pipewire &
     PW_STARTED=true
-    if ! wait_for_sock "$ROOT_RT/pipewire-0" 3; then
+    if ! wait_for_sock "$USER_RT/pipewire-0" 3; then
         echo "ERROR: pipewire control socket never appeared"; exit 1
     fi
 else
@@ -74,35 +98,55 @@ else
 fi
 
 # wireplumber (session/policy manager) and pipewire-pulse (PulseAudio compat)
-if ! pgrep -x wireplumber >/dev/null 2>&1; then
+# Never start these as root inside another user's runtime dir — that is the
+# session's job (pipewire-ensure); report and defer instead.
+if ! pgrep -u "$TARGET_USER" -x wireplumber >/dev/null 2>&1; then
+    [ "$USER_UID" -ne 0 ] && { echo "SKIPPED: wireplumber not running for $TARGET_USER."; exit 0; }
     wireplumber &
     sleep 0.5
 fi
-if ! pgrep -x pipewire-pulse >/dev/null 2>&1; then
+if ! pgrep -u "$TARGET_USER" -x pipewire-pulse >/dev/null 2>&1; then
+    [ "$USER_UID" -ne 0 ] && { echo "SKIPPED: pipewire-pulse not running for $TARGET_USER."; exit 0; }
     pipewire-pulse &
-    wait_for_sock "$ROOT_RT/pulse/native" 3 || echo "  WARNING: pipewire-pulse socket not up"
+    wait_for_sock "$USER_RT/pulse/native" 3 || echo "  WARNING: pipewire-pulse socket not up"
 fi
 
-pactl info >/dev/null 2>&1 || echo "  WARNING: pactl cannot talk to the session"
+if [ "$USER_UID" -ne 0 ]; then
+    su "$TARGET_USER" -c "export XDG_RUNTIME_DIR='$USER_RT'; timeout 4 pactl info" >/dev/null 2>&1 \
+        || { echo "SKIPPED: pactl cannot talk to $TARGET_USER's session."; exit 0; }
+else
+    pactl info >/dev/null 2>&1 || echo "  WARNING: pactl cannot talk to the session"
+fi
 
 # ── Test mic capture as the target user ────────────────────────────────
 echo "  Ensuring capture profile is active..."
+
+# pactl must run as the session's owner; root cannot open another user's
+# PulseAudio socket (0700) even though it can read the path.
+pactl_as() {
+    if [ "$USER_UID" -eq 0 ]; then
+        timeout 4 pactl "$@" 2>/dev/null
+    else
+        su "$TARGET_USER" -c "export XDG_RUNTIME_DIR='$USER_RT'; timeout 4 pactl $*" 2>/dev/null
+    fi
+}
+
 # Force duplex profile if not already set (jack detection may show mic as unavailable)
-CAPTURE_SOURCE=$(pactl list sources short 2>/dev/null | grep -v monitor | head -1 | awk '{print $2}')
+CAPTURE_SOURCE=$(pactl_as list sources short | grep -v monitor | head -1 | awk '{print $2}')
 if [ -z "$CAPTURE_SOURCE" ]; then
-    CARD_ID=$(pactl list cards short 2>/dev/null | grep alsa | head -1 | awk '{print $1}')
+    CARD_ID=$(pactl_as list cards short | grep alsa | head -1 | awk '{print $1}')
     if [ -n "$CARD_ID" ]; then
-        pactl set-card-profile "$CARD_ID" output:analog-stereo+input:analog-stereo 2>/dev/null || true
-        pactl set-card-profile "$CARD_ID" output:analog-stereo+input:iec958-stereo 2>/dev/null || true
+        pactl_as set-card-profile "$CARD_ID" output:analog-stereo+input:analog-stereo || true
+        pactl_as set-card-profile "$CARD_ID" output:analog-stereo+input:iec958-stereo || true
         sleep 1
-        CAPTURE_SOURCE=$(pactl list sources short 2>/dev/null | grep -v monitor | head -1 | awk '{print $2}')
+        CAPTURE_SOURCE=$(pactl_as list sources short | grep -v monitor | head -1 | awk '{print $2}')
     fi
 fi
 echo "  Testing microphone capture for $TARGET_USER..."
 capture_ok=1
 if [ -n "$CAPTURE_SOURCE" ]; then
     su "$TARGET_USER" -c "
-        export XDG_RUNTIME_DIR='$ROOT_RT'
+        export XDG_RUNTIME_DIR='$USER_RT'
         timeout 6 parecord --device='$CAPTURE_SOURCE' /tmp/cap-user-\$USER.wav 2>/dev/null
     "
 else
