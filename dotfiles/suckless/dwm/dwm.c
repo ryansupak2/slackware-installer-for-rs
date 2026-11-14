@@ -177,6 +177,7 @@ static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusmon(const Arg *arg);
 static void focusstack(const Arg *arg);
+static void gatherall(const Arg *arg);
 static Atom getatomprop(Client *c, Atom prop);
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
@@ -994,6 +995,28 @@ focusstack(const Arg *arg)
 		}
 		restack(selmon);
 	}
+}
+
+/* Mod+0: gather every window onto tag 1 and hide all other tags from the
+ * bar (dynamic tags: a tag only exists while it is in bartags, so once the
+ * clients all sit on tag 1 there is nothing left to keep 2..9 revealed).
+ * This replaces the old "show all tags in the bar" behaviour: the bar and
+ * the view now name exactly one tag, and unmanage() recomputes the same
+ * bartags set from the clients' tags, so the result is stable. */
+void
+gatherall(const Arg *arg)
+{
+	Client *c;
+	Monitor *m = selmon;
+
+	for (c = m->clients; c; c = c->next)
+		c->tags = 1;                   /* tag 1 is the anchor tag */
+	m->bartags = 1;                        /* only tag 1 in the topbar */
+	m->curtagidx = 0;
+	m->tagset[0] = m->tagset[1] = 1;
+	focus(NULL);
+	arrange(m);
+	drawbars();
 }
 
 Atom
@@ -2185,9 +2208,12 @@ spawn(const Arg *arg)
 void
 tag(const Arg *arg)
 {
-	/* Rule 5: only tag onto tags that are in the bar */
+	/* Rule 5: only tag onto tags that are in the bar. The assignment is
+	 * clamped to bartags: Mod+Shift+0 (Arg ~0) used to put a window on all
+	 * nine tags, including tags that no longer exist in the topbar since
+	 * Mod+0 became "gather everything onto tag 1" (gatherall()). */
 	if (selmon->sel && (arg->ui & TAGMASK) && (selmon->bartags & arg->ui)) {
-		selmon->sel->tags = arg->ui & TAGMASK;
+		selmon->sel->tags = arg->ui & TAGMASK & selmon->bartags;
 		focus(NULL);
 		arrange(selmon);
 	}
@@ -2780,17 +2806,6 @@ view(const Arg *arg)
 {
 	Monitor *m = selmon;
 	unsigned int mask = arg->ui & TAGMASK;
-
-	/* Mod+0: show all tags in the bar */
-	if (mask == TAGMASK) {
-		m->bartags = TAGMASK;
-		m->curtagidx = 0;
-		m->tagset[0] = m->tagset[1] = 1;
-		focus(NULL);
-		arrange(m);
-		drawbars();
-		return;
-	}
 
 	/* Rule 5: only switch to tags that are in the bar */
 	if (!(m->bartags & mask))
