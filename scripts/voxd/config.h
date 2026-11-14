@@ -9,10 +9,14 @@
 #define JOINER     MODEL_DIR "/joiner-epoch-99-avg-1.onnx"
 
 /* --- ALSA --- */
-/* Preferred capture device. sof-soundwire renumbers its PCM devices between
- * boots (this mic has been 0,7 / 0,6 / 0,4), so this is only a hint: voxd
- * falls back to auto-detection (first capture-capable PCM), then "default".
- * Force one explicitly with VOXD_ALSA_DEVICE=plughw:0,4 in the environment. */
+/* Hardware capture hint, used ONLY when the sound server cannot be reached.
+ * voxd tries the shared path first ("default" -> pulse/pipewire, see
+ * alsa_open() in voxd.c) because holding a hw PCM exclusively makes
+ * WirePlumber mark the whole card unavailable (no sound anywhere).
+ * sof-soundwire renumbers its PCM devices between boots (this mic has been
+ * 0,7 / 0,6 / 0,4), so this is a hint: voxd falls back to auto-detection
+ * (first capture-capable PCM). Force one explicitly with
+ * VOXD_ALSA_DEVICE=plughw:0,4 in the environment. */
 #define ALSA_DEVICE      "plughw:0,4"  /* DMIC capture device (hint) */
 #define SAMPLE_RATE      16000
 #define CHANNELS         1

@@ -359,16 +359,33 @@ static snd_pcm_t *alsa_open(void) {
     const char *cands[5];
     const char *env = getenv("VOXD_ALSA_DEVICE"), *det;
     int n = 0, i;
+    /* Order matters. The SHARED sound-server path is tried first.
+     *
+     * A capture opened on a hw PCM (plughw:X,Y) holds that PCM exclusively
+     * for as long as the handle lives. WirePlumber's ALSA monitor probes
+     * every PCM of the card, and the moment one is busy it declares the
+     * WHOLE card unavailable:
+     *   spa.alsa alsa-udev.c: check_pcm_device_availability: card 0 pcm
+     *       device pcm4c busy
+     *   spa.alsa alsa-udev.c: process_card: ALSA card 0 unavailable
+     *       (Device or resource busy): wait for it
+     * so it publishes no device at all and every stream falls back to
+     * "Dummy Output" — the machine goes silent until voxd exits. That is
+     * exactly how a long-running voxd killed system audio here (2026-11-14).
+     *
+     * "default" is /etc/asound.conf -> pulse (pipewire-pulse), which shares
+     * the card with everything else. The hw PCMs stay as a fallback for a
+     * session with no sound server running. */
     if (env && *env) cands[n++] = env;          /* explicit override */
-    cands[n++] = ALSA_DEVICE;                   /* compiled-in hint */
+    cands[n++] = "default";                     /* sound server — shared */
+    cands[n++] = ALSA_DEVICE;                   /* compiled-in hw hint */
     det = alsa_detect_device();                 /* what ALSA can capture now */
     if (det && strcmp(det, ALSA_DEVICE) != 0) cands[n++] = det;
-    cands[n++] = "default";                     /* pipewire/pulse path */
     for (i = 0; i < n; i++) {
         snd_pcm_t *h = alsa_try(cands[i]);
         if (h) {
-            if (strcmp(cands[i], ALSA_DEVICE) != 0)
-                log_msg("ALSA: %s unusable — using %s instead", ALSA_DEVICE, cands[i]);
+            if (i > 0)
+                log_msg("ALSA: %s unusable — using %s instead", cands[0], cands[i]);
             return h;
         }
         log_msg("ALSA: cannot open %s", cands[i]);
@@ -498,7 +515,7 @@ static void run_alsa_mode(void) {
                     log_msg("Opening ALSA capture device...");
                     alsa = alsa_open();
                     if (!alsa) {
-                        log_msg("FATAL: no usable ALSA capture device (tried %s, auto-detect, default)", ALSA_DEVICE);
+                        log_msg("FATAL: no usable ALSA capture device (tried default, %s, auto-detect)", ALSA_DEVICE);
                         state_clear();
                         if (g_dump_audio) dump_close();
                         return;
@@ -751,14 +768,19 @@ static void run_alsa_mode(void) {
                     if (r) SherpaOnnxDestroyOnlineRecognizerResult(r);
                 }
 
-                /* Stop audio capture but keep ALSA and model loaded */
-                if (alsa) snd_pcm_drop(alsa);
+                /* Release the capture device completely: stop the stream and
+                 * CLOSE it. snd_pcm_drop() alone keeps the PCM handle open,
+                 * and an open hw PCM keeps the whole card "busy" for
+                 * WirePlumber even while dictation is off (see alsa_open()).
+                 * The next TOGGLE ON re-opens it through the lazy-open path.
+                 * The model itself stays warm. */
+                if (alsa) { snd_pcm_close(alsa); alsa = NULL; }
                 if (g_dump_audio) dump_close();
 
                 state_clear();
                 recording = 0;
                 /* primed removed — drain handles this */
-                log_msg("Mic closed — model stays warm for next use");
+                log_msg("Mic released — model stays warm for next use");
             }
             continue;
         }

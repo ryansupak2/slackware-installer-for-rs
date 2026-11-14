@@ -1,0 +1,293 @@
+#!/bin/sh
+# session-stop — tear down everything a login session started
+#
+# POLICY (decided 2026-11-14): when a session ends, NOTHING of that session
+# survives. The only thing that lives on is the system-level connection
+# itself (NetworkManager/wifi). VPN, audio, VOX dictation, bars, clipboard
+# helpers, browsers — all of it stops here.
+#
+# Why this exists: a per-user daemon outliving its session can keep hardware
+# busy, and the NEXT session inherits the damage. Measured 2026-11-14: rs's
+# voxd (started in an earlier X session, still alive after rs logged out) held
+# /dev/snd/pcmC0D4c open, so WirePlumber's ALSA monitor declared the WHOLE card
+# unavailable —
+#   spa.alsa alsa-udev.c: check_pcm_device_availability: card 0 pcm device
+#       pcm4c busy
+#   spa.alsa alsa-udev.c: process_card: ALSA card 0 unavailable
+#       (Device or resource busy): wait for it
+# — and the next session got "Dummy Output" only, i.e. no sound at all, until
+# that stale process was stopped by hand.
+#
+# Modes:
+#   session-stop              end THIS session: stop every process in this
+#                             session's elogind cgroup (plus the named
+#                             per-user daemons), graceful TERM first, KILL for
+#                             stragglers. Note: this ends the desktop too.
+#   session-stop --stale      start-of-session sweep: stop this user's
+#                             processes that sit in elogind session cgroups
+#                             which are NO LONGER live (a session that died
+#                             hard never ran its cleanup). Kernel threads,
+#                             system services (wifi!), the live session calling
+#                             this, and any other live session are untouched.
+#
+# Options:
+#   --dry-run | -n            print what would be stopped, change nothing
+#
+# Exit: 0 = clean, 1 = something of this user still holds ALSA hardware.
+#
+# Never done here (learned the hard way): removing /run/user/<uid> socket files
+# of a *live* daemon. That leaves pipewire listening on unlinked inodes and
+# every client gets ECONNREFUSED afterwards. If the audio stack is stopped,
+# /usr/local/bin/pipewire-ensure rebuilds it at the next session start.
+
+set -u
+
+MODE="current"
+DRY=0
+for arg in "$@"; do
+    case "$arg" in
+        --stale)   MODE="stale" ;;
+        -n|--dry-run) DRY=1 ;;
+        -h|--help)
+            sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "session-stop: unknown option '$arg' (try --help)" >&2
+            exit 2
+            ;;
+    esac
+done
+
+MYUID=$(id -u)
+CG_ROOT=/sys/fs/cgroup/elogind
+
+say() { printf 'session-stop[%s]: %s\n' "$MODE" "$*"; }
+
+# ── this process and its ancestors are never touched ─────────────────
+# The cleanup runs inside the session it is tearing down (xinitrc -> xinit ->
+# startx -> dwm-start). Killing those would abort the teardown half done.
+PROTECT=" "
+_p=$$
+while [ -n "$_p" ] && [ "$_p" != "0" ] && [ "$_p" != "1" ]; do
+    PROTECT="$PROTECT$_p "
+    _p=$(awk '{print $4}' "/proc/$_p/stat" 2>/dev/null) || break
+done
+
+is_protected() {
+    case "$PROTECT" in *" $1 "*) return 0 ;; esac
+    return 1
+}
+
+# ── which elogind session are we in? ─────────────────────────────────
+SESSION=""
+if [ -r /proc/self/cgroup ]; then
+    SESSION=$(sed -n 's/.*name=elogind:\/\([0-9][0-9]*\).*/\1/p' /proc/self/cgroup | head -1)
+fi
+
+live_sessions() {
+    if command -v loginctl >/dev/null 2>&1; then
+        loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}'
+    elif [ -d "$CG_ROOT" ]; then
+        for d in "$CG_ROOT"/[0-9]*; do [ -d "$d" ] && basename "$d"; done
+    fi
+}
+
+is_live_session() {   # $1 = session id
+    for s in $(live_sessions); do
+        [ "$s" = "$1" ] && return 0
+    done
+    return 1
+}
+
+in_session() {   # $1 = pid, $2 = session id
+    [ -r "$CG_ROOT/$2/cgroup.procs" ] || return 1
+    grep -qx "$1" "$CG_ROOT/$2/cgroup.procs" 2>/dev/null
+}
+
+uid_of() { awk '/^Uid:/{print $2; exit}' "/proc/$1/status" 2>/dev/null; }
+
+# Another LIVE session's process is out of scope: logging out of X must never
+# kill an ssh login's work.
+in_other_live_session() {   # $1 = pid
+    for s in $(live_sessions); do
+        [ "$s" = "$SESSION" ] && continue
+        in_session "$1" "$s" && return 0
+    done
+    return 1
+}
+
+# ── system daemons that MUST outlive a session ───────────────────
+# These are started from a login shell (an installer step, or rc.local via
+# a session) and therefore sit in a session cgroup here — measured: acpid
+# and powerkey-hold both landed in a session cgroup on this machine. They
+# are system services, not session things, so they are never touched:
+#   powerkey-hold  the power button MUST work at the login prompt
+#   acpid          lid/power ACPI events
+#   networking     the only thing the policy lets survive (wifi)
+#   sshd/udevd/elogind/crond/syslogd  base system
+# Anything not listed here that a session started is stopped.
+is_exempt() {   # $1 = pid
+    n=$(cat "/proc/$1/comm" 2>/dev/null) || return 1
+    case "$n" in
+        powerkey-hold|acpid|NetworkManager|wpa_supplicant|dhcpcd|sshd|udevd|elogind|crond|syslogd|klogd)
+            return 0 ;;
+    esac
+    return 1
+}
+
+skip_pid() {   # $1 = pid — true means "do not touch"
+    is_protected "$1" && return 0
+    is_exempt "$1" && return 0
+    if [ "$MODE" = "stale" ]; then
+        # starting up: our own (live) session's processes are in use, and
+        # another live session's work is never touched either.
+        in_session "$1" "$SESSION" && return 0
+    fi
+    in_other_live_session "$1" && return 0
+    return 1
+}
+
+# ── 1. Named per-user daemons: graceful TERM first ───────────────────
+# voxd gets a normal TERM so it exits through its signal handler and CLOSES
+# its ALSA handle (that is the whole point of this script). Same for anything
+# this session started that is not necessarily inside the cgroup (a daemon
+# launched with su from outside the session still belongs to this user).
+stop_named() {
+    for name in voxd copilot-mod dwm-status net-watch autocutsel; do
+        for p in $(pgrep -u "$MYUID" -x "$name" 2>/dev/null); do
+            skip_pid "$p" && continue
+            if [ "$DRY" = 1 ]; then
+                say "would stop $name (pid $p)"
+            else
+                say "stopping $name (pid $p)"
+                kill -TERM "$p" 2>/dev/null || true
+            fi
+        done
+    done
+    for pat in '/usr/local/bin/clipboard-ensure' '/usr/local/bin/idle-lock.sh'; do
+        for p in $(pgrep -u "$MYUID" -f "$pat" 2>/dev/null); do
+            skip_pid "$p" && continue
+            if [ "$DRY" = 1 ]; then
+                say "would stop ${pat##*/} (pid $p)"
+            else
+                say "stopping ${pat##*/} (pid $p)"
+                kill -TERM "$p" 2>/dev/null || true
+            fi
+        done
+    done
+}
+
+# ── 2. Everything else in scope ──────────────────────────────────────
+# current: every pid of THIS session's cgroup (the whole desktop).
+# stale:   ONLY what can hurt the next session — a leftover non-live session
+#          process holding a /dev/snd/pcm* device (the exact failure that
+#          silenced this machine). Named session daemons are handled by
+#          stop_named; everything else that outlives a hard-killed session
+#          is elogind's job at logout (KillUserProcesses=yes). Reaping whole
+#          dead cgroups looked tempting but is NOT safe here: acpid and
+#          powerkey-hold sit in an old session cgroup on this machine, and
+#          those must outlive sessions by design.
+targets() {
+    if [ "$MODE" = "current" ]; then
+        if [ -n "$SESSION" ] && [ -r "$CG_ROOT/$SESSION/cgroup.procs" ]; then
+            cat "$CG_ROOT/$SESSION/cgroup.procs"
+        else
+            pgrep -u "$MYUID" 2>/dev/null    # no elogind session cgroup
+        fi
+        return 0
+    fi
+
+    # stale
+    pcm_holders | cut -f1
+}
+
+sweep() {
+    round=1
+    while [ $round -le 3 ]; do
+        pids=""
+        for p in $(targets); do
+            [ "$p" = "$$" ] && continue
+            skip_pid "$p" && continue
+            pids="$pids $p"
+        done
+        if [ -z "${pids# }" ]; then
+            [ $round -eq 1 ] && say "nothing to stop"
+            return 0
+        fi
+        # de-duplicate (stop_named may already have TERMed some of them)
+        pids=$(echo $pids | tr ' ' '\n' | sort -n -u | tr '\n' ' ')
+
+        if [ $round -eq 1 ]; then
+            say "stopping $(echo $pids | wc -w) process(es):$(echo "$pids" | head -c 400)"
+        else
+            # round 2+: a `daemon -r` respawn or a re-parented helper that was
+            # re-added to the session cgroup after the first pass
+            say "round $round: stopping remaining process(es):$(echo "$pids" | head -c 400)"
+        fi
+
+        if [ "$DRY" = 1 ]; then
+            for p in $pids; do
+                printf '  would TERM %6s %s\n' "$p" "$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null)"
+            done
+            return 0
+        fi
+
+        kill -TERM $pids 2>/dev/null || true
+        # give them up to 5 s to exit (voxd closes ALSA, pipewire flushes state)
+        i=0
+        while [ $i -lt 50 ]; do
+            left=""
+            for p in $pids; do
+                [ -d "/proc/$p" ] && left="$left $p"
+            done
+            [ -z "${left# }" ] && break
+            sleep 0.1
+            i=$((i + 1))
+        done
+        if [ -n "${left# }" ]; then
+            say "SIGKILL for stragglers:$left"
+            kill -KILL $left 2>/dev/null || true
+            sleep 0.5
+        fi
+        round=$((round + 1))
+    done
+    return 0
+}
+
+# ── 3. Anything of ours still on the sound hardware? ─────────────────
+pcm_holders() {
+    for p in $(pgrep -u "$MYUID" 2>/dev/null); do
+        [ -r "/proc/$p/status" ] || continue
+        for f in "/proc/$p"/fd/*; do
+            t=$(readlink "$f" 2>/dev/null) || continue
+            case "$t" in
+                /dev/snd/pcm*)
+                    printf '%s\t%s\t%s\n' "$p" "$t" "$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null)"
+                    break
+                    ;;
+            esac
+        done
+    done
+}
+
+stop_named
+sweep
+
+if [ "$DRY" = 1 ]; then
+    say "dry run — nothing was stopped"
+    exit 0
+fi
+
+sleep 0.3
+HOLD=$(pcm_holders)
+if [ -n "$HOLD" ]; then
+    say "ERROR: this user still holds ALSA hardware:"
+    printf '  pid   device          command\n'
+    printf '%s\n' "$HOLD" | awk -F'\t' '{printf "  %-5s %-15s %s\n", $1, $2, $3}'
+    say "the sound card stays 'busy' for WirePlumber until these exit"
+    exit 1
+fi
+
+say "done — no ALSA hardware held by uid $MYUID"
+exit 0

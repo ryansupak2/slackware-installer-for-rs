@@ -14,8 +14,13 @@ Streaming speech-to-text using sherpa-onnx (Zipformer EN 20M).
 ```
 Mod+V → toggle-vox.sh → SIGUSR1 → voxd daemon
                                       │
-              ALSA capture @ 16kHz mono (auto-detected:
-                          plughw:0,4 here — index moves between boots)
+              ALSA capture @ 16kHz mono, through the SOUND SERVER when it is
+                          running ("default" → pipewire-pulse). The hw DMIC PCM
+                          (plughw:0,4 here — index moves between boots) is only
+                          a fallback: holding it exclusively makes WirePlumber
+                          mark the whole card unavailable and all system audio
+                          drops to Dummy Output. The PCM is also closed on
+                          every toggle OFF, so nothing sits on the card.
                                       │
                           Zipformer EN 20M (streaming transducer)
                                       │

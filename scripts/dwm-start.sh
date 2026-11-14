@@ -45,6 +45,21 @@ export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
 
 # ── Audio ──
 echo "── audio ──"
+# Stale-session sweep FIRST: a daemon left behind by a session that died
+# hard (X crash, SIGKILL, or a logout before the cleanup trap existed) can
+# still hold a hardware device. Measured 2026-11-14: a stale voxd held
+# /dev/snd/pcmC0D4c, WirePlumber then reported "ALSA card 0 unavailable
+# (Device or resource busy)" and this session would have had Dummy Output
+# only — no sound — with nothing on screen explaining why. session-stop
+# --stale stops only processes that belong to NO live session, so an ssh
+# login's work is never touched. Policy: nothing of a session survives it;
+# only the system wifi connection does (steps/session-cleanup.sh).
+if [ -x /usr/local/bin/session-stop ]; then
+    /usr/local/bin/session-stop --stale
+else
+    echo "  WARNING: session-stop missing — run steps/session-cleanup.sh"
+    pkill -u "$(id -u)" -x voxd 2>/dev/null || true
+fi
 # Audio is owned by /usr/local/bin/pipewire-ensure (steps/pipewire.sh).
 # It probes the session and, if clients cannot connect (which happens after
 # exit/re-enter X: /run/user/<uid> is emptied when the logind session ends,
@@ -182,15 +197,32 @@ DWL_FIRST_TERMINAL=1 st-logged &
 cleanup() {
     echo "[dwm-start] X session ending — cleaning up..."
     pkill -f '/usr/local/bin/idle-lock.sh' 2>/dev/null || true
+    # VPN is a root helper (outside this session's cgroup), so it needs its
+    # own disconnect before the sweep: nothing of a session outlives it.
     /usr/local/bin/vpn disconnect 2>/dev/null || true
-    pkill -USR1 voxd 2>/dev/null || true
-    # Audio daemons are deliberately NOT killed and their sockets NOT removed.
-    # Doing that is what used to break sound: the supervisors respawn the
-    # daemons, but the rm -f left them listening on unlinked inodes, so every
-    # client got ECONNREFUSED after re-entering X. /usr/local/bin/pipewire-ensure
-    # at the next session start validates and repairs the session instead.
-    echo "[dwm-start] cleanup complete (audio left running)"
+    # Everything else this session started — voxd (device holder),
+    # pipewire/wireplumber/pipewire-pulse, bars, clipboard helpers, browsers —
+    # is stopped by session-stop, which works on this session's elogind
+    # cgroup: TERM first, KILL for stragglers, then it verifies that nothing
+    # of this user still holds /dev/snd/pcm*. The audio stack is rebuilt at
+    # the next session start by pipewire-ensure (never rm its sockets while
+    # it is alive — that is what used to leave clients with ECONNREFUSED).
+    if [ -x /usr/local/bin/session-stop ]; then
+        /usr/local/bin/session-stop || echo "[dwm-start] WARNING: session-stop reported leftover ALSA holders"
+    else
+        echo "[dwm-start] WARNING: session-stop missing — session daemons may survive"
+        pkill -u "$(id -u)" -x voxd 2>/dev/null || true
+    fi
+    echo "[dwm-start] cleanup complete"
 }
+
+# The cleanup must actually RUN. It was defined but never called (no trap),
+# which is how rs's voxd survived a logout and silenced the next session:
+# run it on every way out of the xinitrc (dwm quit, X death, signals).
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 dwm
 XEOF
