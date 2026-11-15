@@ -226,14 +226,21 @@ Hard rule: **nothing may be visible on wake except slock.** That is enforced
 mechanically, not by sleeps: `slock` writes `/run/slock.locked` only after its
 keyboard/pointer grabs succeed, and `scripts/lock-screen.sh` returns 0 only when
 that marker exists and its pid is really slock. The elogind sleep hook
-(`/lib64/elogind/system-sleep/10-slock-lock`, `pre` stage) and
-`scripts/idle-lock.sh` (locks `IDLE_LOCK_LEAD` seconds before the DPMS blank)
-both wait on it before sleeping/blanking. Unlock destroys the covering window
-*while the grabs are still held* so no keystroke leaks into the desktop.
+(`/lib64/elogind/system-sleep/10-slock-lock`, `pre` stage) waits on it before
+suspending. Unlock destroys the covering window *while the grabs are still
+held* so no keystroke leaks into the desktop.
 
-`steps/slock.sh` builds slock (`sources/slock`), `xidle` (`sources/xidle`,
-MIT-SCREEN-SAVER; nothing in the base system reports idle time) and installs
-`/etc/pam.d/slock`. `steps/screen-locking.sh` owns the lid/sleep policy and
+**There is no idle screensaver lock** (removed 2026-11-15). While the lid is
+open, an idle desktop is never locked: `xidle`, `idle-lock.sh` and their
+`IDLE_LOCK_LEAD` knob are gone, and `steps/slock.sh` / `steps/screen-locking.sh`
+delete any leftover copy in `/usr/local/bin`. The DPMS blank from
+`scripts/dwm-start.sh` stays, but it only turns the panel off — waking it shows
+the desktop, which is intended. Do not reintroduce an idle timer in front of
+slock; locking is sleep-driven (lid close) plus explicit (Mod+Escape,
+`lock-screen.sh`).
+
+`steps/slock.sh` builds slock (`sources/slock`) and installs `lock-screen.sh`
+plus `/etc/pam.d/slock`. `steps/screen-locking.sh` owns the lid/sleep policy and
 installs both sleep hooks (`10-slock-lock`, `20-sleep-log`). Never
 `rm /usr/local/bin/slock` (an old version of that step did, silently deleting
 the locker on every run). Details and verification: `doc/screen-locking.md`.
@@ -253,6 +260,37 @@ default again. `/var/log/<user>-sleep.log` (hook `20-sleep-log`) writes a
 `pre` line before sleeping and a `post` line after waking, so "did it come
 back?" is answerable from disk after a hard power-off — syslogd is frozen for
 the whole suspend, so `/var/log/messages` cannot answer it.
+
+---
+
+# Soulseek (slskd) — per login session, no sudo, never at the login prompt
+
+**slskd is a SESSION daemon.** `scripts/dwm-start.sh` runs
+`slsk start --session-start` before `startx`, so the process lands in that
+login's elogind cgroup and dies with the session (dwm-start's EXIT trap runs
+`slsk stop`, `scripts/session-stop` names `slskd`, and elogind's
+`KillUserProcesses=yes` is the backstop). Data persists in
+`~/.local/share/slskd` (per user) and `/var/lib/slskd` (shared library,
+group `slskd`); the process does not. **Do not put it back in rc.local and do
+not reintroduce `/etc/rc.d/rc.slskd`**: that version ran as a system user at
+boot, survived every logout, and needed `sudo` — which rs does not have. Any
+user (root, rs) starts and stops their own instance with `slsk` and **no
+root at all**; `/etc/sudoers.d/slskd` is retired and `steps/slskd.sh` deletes
+it.
+
+`/etc/slskd/slskd.yml` is only a TEMPLATE — `slsk start` copies it to the
+user's app dir on first use, so the web UI can save settings without write
+access to `/etc` (`slsk reset-config` drops the copy). The ports stay shared
+(5030 web, 50300 Soulseek), so only one session can run it at a time and a
+second start names the process holding the port.
+
+Two traps, both measured: slskd uses its **current directory** as the ASP.NET
+content root (started with an unreadable cwd it dies with
+`DirectoryNotFoundException`), so `slsk start` `cd`s into the app dir first;
+and the config heredoc in `steps/slskd.sh` is unquoted, so a backtick in it
+is *executed* while the step runs (one such comment started the old daemon
+and printed its output into the config). Notes, API and verification:
+`doc/slskd.md`.
 
 ---
 

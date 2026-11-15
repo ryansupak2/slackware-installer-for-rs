@@ -28,12 +28,12 @@ Everything installed, as a normal desktop user:
 
 | area | how |
 |---|---|
-| dwm / st / slock / xidle / dwm-status | `x`, Mod+Escape, per-user session log under `/var/log/rs/` |
+| dwm / st / slock / dwm-status | `x`, Mod+Escape, per-user session log under `/var/log/rs/` |
 | Chrome / Chromium | `/usr/local/bin/chrome`, `chromium` |
 | audio, mic, VOX | rs's **own** PipeWire session at `/run/user/4877`, started by `pipewire-ensure` from `dwm-start` |
 | video / camera / input / backlight | groups `video`, `input`, `audio`, `power` (plus `plugdev`, `netdev`, `cdrom`, `lp`, `scanner`, `kvm`, `dialout`, `tty`, `seat`) |
 | Wi-Fi | `wifi` → `wifi-manager` (nmcli; rs may read and connect) |
-| VPN, power/brightness, Soulseek | via the narrow passwordless helper rules (below) |
+| VPN, power/brightness, Soulseek | VPN and power/brightness use the narrow passwordless rules (below); `slsk` needs no sudo at all — it controls *rs's own* session instance |
 | pi coding agent | `/usr/local/bin/pi` → `/opt/pi-agent` (readable by all); config and API key in `~/.pi/agent`, mode 600 |
 | URL shortcuts | `~/.web/shortcuts`, from `dotfiles/chromium/shortcuts.default` |
 | desktop background | `~/.dwm-background`, else `/etc/dwm/backgrounds.conf` (`rs=#808080`) |
@@ -47,13 +47,16 @@ rs ALL=(ALL) NOPASSWD: /usr/local/bin/power
 rs ALL=(ALL) NOPASSWD: /usr/local/bin/vpn, /usr/sbin/openvpn, /usr/bin/setsid,
     /usr/bin/chmod, /usr/bin/pkill, /sbin/sysctl, /usr/sbin/iptables,
     /usr/sbin/ip6tables, /sbin/ip, /usr/sbin/ip
-rs ALL=(ALL) NOPASSWD: /etc/rc.d/rc.slskd *
 ```
 
 These are exactly the commands the installed tools call through `sudo -n`
-(`scripts/power.sh`, `scripts/vpn.sh`, `scripts/slsk.sh`). Without them those
-features fail for a non-root user; with them `rs` still has no shell, no
-package management and no arbitrary root command.
+(`scripts/power.sh`, `scripts/vpn.sh`). Without them those features fail for
+a non-root user; with them `rs` still has no shell, no package management and
+no arbitrary root command.
+
+Soulseek (`slsk`) is **not** here: slskd runs as `rs` inside rs's own session
+(steps/slskd.sh), so starting and stopping it needs no root — and the old
+`/etc/rc.d/rc.slskd` rule is gone with the boot service.
 
 ## Deliberately NOT available to rs
 
@@ -90,8 +93,10 @@ is set and persists in `~/.dwm-background`.
 `slock` is installed **setuid root** (`4755`): `pam_unix` must read
 `/etc/shadow`, which a normal user cannot. The lock marker is per user —
 `/run/slock.locked` for root, `$XDG_RUNTIME_DIR/slock.locked` for everyone else
-(`/run` is not writable by rs). `scripts/lock-screen.sh` and `scripts/idle-lock.sh`
-compute the same path.
+(`/run` is not writable by rs). `scripts/lock-screen.sh` computes that path.
+
+There is **no idle lock**: rs's desktop never puts slock up just because it
+was left alone. slock appears on lid close (sleep hook) and on Mod+Escape.
 
 The elogind sleep hook (`10-slock-lock`, runs as root) finds the active seat's
 session via `loginctl` and re-runs `lock-screen.sh` **as that user**, so a lid

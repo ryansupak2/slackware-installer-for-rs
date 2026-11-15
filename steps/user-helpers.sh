@@ -5,8 +5,10 @@
 #
 #   power             brightness / power profile / panel control (needs sysfs)
 #   vpn               NordVPN: openvpn, kill switch (iptables/ip/pkill/sysctl)
-#   slsk              /etc/rc.d/rc.slskd start|stop|restart|status
 #
+# slskd is NOT in this list any more: it runs as the logged-in user inside
+# that user's session (steps/slskd.sh), so `slsk` needs no root at all — and
+# there is no rc.slskd service to control.
 # Without these rules those features simply do not work for a non-root user,
 # so "can use everything that is installed" requires them. They are scoped to
 # the named user (NOT the wheel group) and to exactly those binaries — this is
@@ -64,10 +66,8 @@ Defaults:$TARGET_USER env_keep += "POWER_ELEVATED POWER_INVOKER POWER_DISPLAY PO
 # vpn: NordVPN client + kill switch (same command set as dotfiles/sudoers/nordvpn)
 $TARGET_USER ALL=(ALL) NOPASSWD: /usr/local/bin/vpn, /usr/sbin/openvpn, /usr/bin/setsid, /usr/bin/chmod, /usr/bin/pkill, /sbin/sysctl, /usr/sbin/iptables, /usr/sbin/ip6tables, /sbin/ip, /usr/sbin/ip
 
-# slsk: Soulseek daemon control (start/stop/restart/status only)
-$TARGET_USER ALL=(ALL) NOPASSWD: /etc/rc.d/rc.slskd *
-
-Defaults:$TARGET_USER !requiretty, lecture=never
+# Soulseek (slskd) is deliberately absent: it is a per-session process of
+# $TARGET_USER and `slsk start|stop|status` runs unprivileged.
 EOF
 
 chmod 0440 "$TMP"
@@ -75,6 +75,13 @@ if ! visudo -cqf "$TMP" >/dev/null 2>&1; then
     echo "ERROR: generated sudoers snippet is invalid:"
     visudo -cf "$TMP"
     exit 1
+fi
+
+# dropped 2026-11-15: slskd is per-session now (steps/slskd.sh owns it) and
+# the sudoers rule for the retired rc.slskd script was a root path into a
+# daemon that should never have been root's business.
+if [ -f /etc/sudoers.d/slskd ]; then
+    rm -f /etc/sudoers.d/slskd && echo "  removed retired /etc/sudoers.d/slskd"
 fi
 
 if [ -f "$DEST" ] && cmp -s "$TMP" "$DEST"; then
@@ -85,7 +92,7 @@ else
 fi
 
 echo "  granted (passwordless, $TARGET_USER only):"
-echo "    power, vpn/openvpn + kill switch, slskd rc script"
+echo "    power, vpn/openvpn + kill switch"
 echo "  NOT granted: package installs, shell, arbitrary commands, wheel"
 echo "SUCCESS: helper sudo rules ensured for $TARGET_USER."
 exit 0

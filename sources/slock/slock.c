@@ -98,7 +98,7 @@ beep(void)
  * /run/slock.locked. Root keeps the historical path (sleep hooks and docs
  * refer to it); every other user gets the marker in their own
  * XDG_RUNTIME_DIR, which that desktop session owns.
- * scripts/lock-screen.sh and scripts/idle-lock.sh compute the same path. */
+ * scripts/lock-screen.sh computes the same path. */
 #define LOCK_MARKER_ROOT "/run/slock.locked"
 #define LOCK_MARKER_NAME "slock.locked"
 

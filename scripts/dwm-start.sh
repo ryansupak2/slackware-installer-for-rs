@@ -137,6 +137,15 @@ xset r rate 250 34 2>/dev/null || true
 
 # Screen blanking / DPMS from the power policy (/var/lib/power/state).
 # Applied on every X start so an X exit/restart cannot lose it.
+#
+# This is a plain panel blank — there is NO idle screensaver lock (decided
+# 2026-11-15). An open lid with an idle desktop never puts slock up; slock is
+# only used on lid close / suspend (elogind sleep hook, steps/screen-locking.sh)
+# and when asked for (Mod+Escape, /usr/local/bin/lock-screen.sh).
+#
+# The blank timer is kept for power reasons only: it turns the panel off. Note
+# the consequence of having no idle locker: waking the panel reveals the
+# desktop, because nothing was put in front of it.
 power_blank=5
 [ -r /var/lib/power/state ] && . /var/lib/power/state 2>/dev/null
 [ -n "${BLANK_MINUTES:-}" ] && power_blank=$BLANK_MINUTES
@@ -148,11 +157,6 @@ else
     xset s 0 0 2>/dev/null || true
     xset dpms 0 0 0 2>/dev/null || true
 fi
-
-# Lock shortly BEFORE the screen blanks (idle-lock.sh reads BLANK_MINUTES from
-# /var/lib/power/state, which is the same value the DPMS timers above use). The
-# lead time is what guarantees a waking display shows slock, never the desktop.
-/usr/local/bin/idle-lock.sh &
 
 # TrackPoint scroll sensitivity
 xinput set-prop "Elan TrackPoint" "libinput Scrolling Factor" 3.0 2>/dev/null || true
@@ -196,7 +200,9 @@ DWL_FIRST_TERMINAL=1 st-logged &
 
 cleanup() {
     echo "[dwm-start] X session ending — cleaning up..."
-    pkill -f '/usr/local/bin/idle-lock.sh' 2>/dev/null || true
+    # Soulseek daemon (slskd) is a SESSION daemon — started for this user only.
+    # Stop it first so the ports are free before the cgroup sweep.
+    [ -x /usr/local/bin/slsk ] && /usr/local/bin/slsk stop --quiet 2>/dev/null
     # VPN is a root helper (outside this session's cgroup), so it needs its
     # own disconnect before the sweep: nothing of a session outlives it.
     /usr/local/bin/vpn disconnect 2>/dev/null || true
@@ -227,6 +233,20 @@ trap 'exit 143' TERM
 dwm
 XEOF
 chmod +x "$XINITRC"
+
+# Soulseek daemon (slskd): a SESSION service, never a boot service.
+# Started here, as the logged-in user, inside this session's elogind cgroup —
+# so it cannot outlive the login: the cleanup trap above stops it, and
+# KillUserProcesses=yes (steps/session-cleanup.sh) catches a hard X death.
+# It used to be started from /etc/rc.d/rc.local as a system user, which left
+# it running at the login prompt and after a logout (and only root/wheel could
+# control it). Its data (per-user DB in ~/.local/share/slskd, shared music
+# library in /var/lib/slskd) persists; the process does not.
+if [ -x /usr/local/bin/slsk ]; then
+    /usr/local/bin/slsk start --session-start || true
+else
+    echo "  WARNING: slsk missing — run steps/slskd.sh"
+fi
 
 startx "$XINITRC"
 rm -f "$XINITRC" 2>/dev/null || true

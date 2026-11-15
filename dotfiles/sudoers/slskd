@@ -1,2 +1,0 @@
-%wheel ALL=(ALL) NOPASSWD: /etc/rc.d/rc.slskd *
-Defaults:%wheel !requiretty

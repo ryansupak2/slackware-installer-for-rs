@@ -1,4 +1,4 @@
-# Screen locking — "on wake you can only ever see slock"
+# Screen locking — slock covers the screen before the machine sleeps
 
 ## Behaviour
 
@@ -6,13 +6,14 @@
 |---|---|
 | **close the lid** | the machine **suspends** — the normal laptop behaviour (elogind `HandleLidSwitch=suspend`). No more `poweroff` on lid close. |
 | **open the lid** | wakes the machine and shows **slock**, already covering the screen. |
-| **idle for `BLANK_MINUTES` (5 by default)** | screen is locked **20 s before** the panel blanks, then the panel blanks on top of it. Waking the display shows slock. |
+| **idle for `BLANK_MINUTES` (5 by default)** | **nothing locks.** The panel blanks (DPMS, power saving only) and waking it shows the desktop. There is no idle screensaver lock on purpose. |
 | **Mod+Escape** | locks immediately (dwm binding, `dotfiles/suckless/dwm/config.h`). |
 | **`/usr/local/bin/lock-screen.sh`** | same thing from a shell; returns 0 only once the screen is covered. |
 | unlock | type `$USER`'s password (root here). Colours: olive = idle, green = typing, yellow = checking, red = wrong. |
 
-No screen content is ever shown before slock covers it, by construction — see
-below.
+The idle lock was removed (2026-11-15): it fired while the lid was open and
+the user was simply away from the keyboard, which was not wanted. Locking is
+now driven only by *sleep* (lid close) and by explicit request.
 
 ## The guarantee, mechanically
 
@@ -35,7 +36,6 @@ scripts/lock-screen.sh ── blocks until the marker exists and its pid is real
         ├── /lib64/elogind/system-sleep/10-slock-lock   (pre: before suspend,
         │                                                post: after resume)
         ├── /lib64/elogind/system-sleep/20-sleep-log    (pre/post: did it wake?)
-        ├── scripts/idle-lock.sh   (at BLANK_MINUTES*60 - 20 s idle)
         └── dwm Mod+Escape
 ```
 
@@ -49,18 +49,15 @@ Two secondary details that matter for the same goal:
   the grabs are still held**, so no keystroke can reach the window underneath
   during the instant the desktop becomes visible. The grabs are released
   implicitly by closing the display connection.
-* A stale marker cannot fake a lock: `lock-screen.sh` and `idle-lock.sh` both
-  validate the pid in it against `/proc/<pid>/comm` == `slock`.
+* A stale marker cannot fake a lock: `lock-screen.sh` validates the pid in
+  it against `/proc/<pid>/comm` == `slock`.
 
 ## Pieces
 
 | file | role |
 |---|---|
-| `sources/slock/slock.c` | the locker (fullscreen override-redirect window, PAM auth, colour feedback) |
-| `sources/xidle/xidle.c` | idle milliseconds via MIT-SCREEN-SAVER (nothing in the base system reports idle time) |
 | `scripts/lock-screen.sh` | lock + wait until covered (exit 0 = covered) |
-| `scripts/idle-lock.sh` | locks before the DPMS blank; started by `scripts/dwm-start.sh` |
-| `steps/slock.sh` | builds/installs slock, xidle and both helpers, `/etc/pam.d/slock`, verifies the PAM stack |
+| `steps/slock.sh` | builds/installs slock + `lock-screen.sh`, `/etc/pam.d/slock`, verifies the PAM stack; removes the retired `idle-lock.sh`/`xidle` |
 | `steps/screen-locking.sh` | lid = suspend, sleep hooks (`10-slock-lock`, `20-sleep-log`), removes the old ACPI `poweroff` handler |
 
 ## Verify
@@ -82,9 +79,8 @@ cat /sys/power/mem_sleep                                   # 's2idle [deep]' = s
 # what the last sleep did (pre without post = it never came back):
 tail -5 /var/log/"$USER"-sleep.log
 
-# the idle watcher:
-pgrep -af idle-lock.sh
-DISPLAY=:0 XAUTHORITY=/root/.Xauthority /usr/local/bin/xidle   # ms idle now
+# the idle lock is gone (nothing should be running):
+pgrep -af 'idle-lock|xidle'                                  # expect no output
 
 # real end-to-end test: close the lid, wait for the fan to stop, open it.
 # You must see slock — never the desktop.
@@ -136,8 +132,7 @@ see `doc/display-freeze.md`.
 
 | knob | where |
 |---|---|
-| blank/idle timeout | `BLANK_MINUTES` in `/var/lib/power/state` (managed by `power`); lock fires 20 s earlier |
-| lock lead time | `IDLE_LOCK_LEAD` (seconds) when running `idle-lock.sh` |
+| blank/idle timeout | `BLANK_MINUTES` in `/var/lib/power/state` (managed by `power`) — panel blank only, it does **not** lock |
 | docked lid | `HandleLidSwitchDocked=ignore` — closing the lid with an external display attached does not suspend |
 | sleep state | `power set sleep s2idle|deep` — s2idle is the supported one here; deep never resumes |
 
@@ -172,5 +167,5 @@ Sleep-hook order in `/lib64/elogind/system-sleep/`: `10-slock-lock` runs before
   *picture* while locked. The keyboard is already grabbed by slock, so the
   recovery is the same: VT switch, kill slock, restart X if needed.
 * If a stale lock marker (`/run/slock.locked` for root, `$XDG_RUNTIME_DIR/
-  slock.locked` otherwise) appears after a hard kill, it is harmless — both
-  helpers check the pid before trusting it, and `idle-lock.sh` removes it.
+  slock.locked` otherwise) appears after a hard kill, it is harmless —
+  `lock-screen.sh` checks the pid before trusting it and ignores a stale one.

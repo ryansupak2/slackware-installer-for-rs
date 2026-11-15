@@ -14,12 +14,16 @@
 #     and waits for it: that script only returns 0 once slock reports its
 #     keyboard/pointer grabs are held (/run/slock.locked). So a waking screen
 #     can only ever show slock, never the desktop.
-#   * The idle path has the same guarantee: /usr/local/bin/idle-lock.sh locks
-#     shortly BEFORE the DPMS blank (started from scripts/dwm-start.sh).
+#   * There is NO idle screensaver lock (decided 2026-11-15): while the lid is
+#     open and the desktop is idle, nothing puts slock up. The DPMS blank in
+#     scripts/dwm-start.sh only turns the panel off — waking it shows the
+#     desktop, because nothing was put in front of it. That is intended.
 #
-# Locker itself: steps/slock.sh builds/installs slock + lock-screen.sh +
-# idle-lock.sh + xidle. This step must NOT remove them (it used to `rm -f
-# /usr/local/bin/slock`, which silently deleted the locker on every run).
+# Locker itself: steps/slock.sh builds/installs slock + lock-screen.sh.
+# idle-lock.sh and xidle were retired with the idle lock; this step removes
+# any copy left in /usr/local/bin. This step must NOT remove slock itself
+# (an old version of it ran `rm -f /usr/local/bin/slock`, which silently
+# deleted the locker on every run).
 #
 # Idempotent: files are compared before copying, the old ACPI event and the old
 # elogind "ignore lid" drop-in are removed if present, and the sleep hook is
@@ -39,8 +43,8 @@ echo "*****************************************************"
 ok=true
 
 # ---------------------------------------------------------------------------
-# 1. Retired pieces: lid-close → poweroff, and physlock/ttylock lockers.
-# ---------------------------------------------------------------------------
+# 1. Retired pieces: lid-close → poweroff, physlock/ttylock lockers, and the
+#    idle screensaver lock (idle-lock.sh + xidle).
 echo "Removing the lid-close → poweroff ACPI handler..."
 if [ -f /etc/acpi/events/lid-close ]; then
     rm -f /etc/acpi/events/lid-close && echo "  removed /etc/acpi/events/lid-close"
@@ -48,9 +52,19 @@ else
     echo "  already gone"
 fi
 
-echo "Removing retired lockers (physlock/ttylock)..."
+echo "Removing retired lockers (physlock/ttylock) and the idle lock..."
 rm -f /usr/local/bin/physlock /usr/local/bin/ttylock
 rm -f /etc/pam.d/physlock /etc/pam.d/ttylock
+# The idle screensaver lock is gone: an idle desktop stays unlocked while the
+# lid is open. Removing the installed leftovers keeps them from being started
+# by an old copy of dwm-start.
+for stale in /usr/local/bin/idle-lock.sh /usr/local/bin/xidle; do
+    if [ -e "$stale" ]; then
+        rm -f "$stale" && echo "  removed $stale (no idle screensaver lock any more)"
+    else
+        echo "  $stale: already gone"
+    fi
+done
 
 if [ -x /usr/local/bin/slock ]; then
     echo "Keeping slock — see steps/slock.sh"
@@ -256,6 +270,7 @@ echo "  sleep hooks: $HOOK_DIR/10-slock-lock, $HOOK_DIR/20-sleep-log"
 lidw=$(find /sys/devices -path '*PNP0C0D*/power/wakeup' 2>/dev/null | head -1)
 echo "  lid wake   : ${lidw:-<none found>} -> $(cat "${lidw:-/dev/null}" 2>/dev/null || echo '?')"
 echo "  ACPI lid   : $([ -f /etc/acpi/events/lid-close ] && echo 'poweroff handler STILL PRESENT' || echo 'none (elogind handles it)')"
+echo "  idle lock  : none — an open lid with an idle desktop never locks"
 echo "  note       : lid close now suspends; opening the lid wakes it. To lock"
 echo "               by hand: Mod+Escape, or /usr/local/bin/lock-screen.sh"
 

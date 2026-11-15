@@ -118,29 +118,21 @@ else
     echo "  WARNING: could not build the PAM checker (skipping the PAM test)"
 fi
 
-# 5. xidle — idle time, needed to lock BEFORE the screen blanks.
-#    (Nothing in the base system reports idle time; see sources/xidle/xidle.c.)
-XIDLE_SRC="$REPO_DIR/sources/xidle/xidle.c"
-XIDLE_DEST="/usr/local/bin/xidle"
-if [ -f "$XIDLE_SRC" ]; then
-    if gcc -O2 -Wall -o "$BUILD/xidle" "$XIDLE_SRC" -lXss -lX11 2>/dev/null \
-       || gcc -O2 -Wall -o "$BUILD/xidle" "$XIDLE_SRC" $(pkg-config --cflags --libs xscrnsaver 2>/dev/null); then
-        if [ -f "$XIDLE_DEST" ] && cmp -s "$BUILD/xidle" "$XIDLE_DEST"; then
-            echo "  $XIDLE_DEST already up to date"
-        else
-            install -Dm 755 "$BUILD/xidle" "$XIDLE_DEST" && echo "  installed $XIDLE_DEST"
-        fi
+# 5. Remove the retired idle-lock watcher and its idle-time helper.
+#    There is NO idle screensaver lock any more (decided 2026-11-15): while the
+#    lid is open and the screen is on, nothing locks the session. slock is
+#    still put up on lid close / suspend (sleep hook) and on demand
+#    (Mod+Escape, lock-screen.sh).
+for stale in /usr/local/bin/idle-lock.sh /usr/local/bin/xidle; do
+    if [ -e "$stale" ]; then
+        rm -f "$stale" && echo "  removed retired $stale"
     else
-        echo "  ERROR: could not build xidle (libXss headers missing?) — idle lock will not work"
-        ok=false
+        echo "  $stale not present (idle lock retired)"
     fi
-else
-    echo "  WARNING: $XIDLE_SRC missing — idle lock will not work"
-fi
+done
 
-# 6. Session helpers: lock-screen.sh (lock + wait until covered) and
-#    idle-lock.sh (lock just before the panel blanks).
-for helper in lock-screen.sh idle-lock.sh; do
+# 6. Session helper: lock-screen.sh (lock + wait until covered).
+for helper in lock-screen.sh; do
     src="$REPO_DIR/scripts/$helper"
     dst="/usr/local/bin/$helper"
     if [ ! -f "$src" ]; then
@@ -157,7 +149,7 @@ done
 # 7. Report the pieces the session needs.
 echo "  binary : $DEST ($(stat -c %a "$DEST" 2>/dev/null))"
 echo "  pam    : $PAM_DEST"
-echo "  helpers: /usr/local/bin/lock-screen.sh, /usr/local/bin/idle-lock.sh, /usr/local/bin/xidle"
+echo "  helpers: /usr/local/bin/lock-screen.sh"
 echo "  marker : /run/slock.locked (root) or <XDG_RUNTIME_DIR>/slock.locked (other users), written only after the grabs succeed"
 if [ -d /usr/local/src/suckless/dwm-stamp ]; then
     if grep -q 'slock' "$REPO_DIR/dotfiles/suckless/dwm/config.h" 2>/dev/null; then

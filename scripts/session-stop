@@ -154,7 +154,7 @@ skip_pid() {   # $1 = pid — true means "do not touch"
 # this session started that is not necessarily inside the cgroup (a daemon
 # launched with su from outside the session still belongs to this user).
 stop_named() {
-    for name in voxd copilot-mod dwm-status net-watch autocutsel; do
+    for name in voxd slskd copilot-mod dwm-status net-watch autocutsel; do
         for p in $(pgrep -u "$MYUID" -x "$name" 2>/dev/null); do
             skip_pid "$p" && continue
             if [ "$DRY" = 1 ]; then
@@ -165,7 +165,7 @@ stop_named() {
             fi
         done
     done
-    for pat in '/usr/local/bin/clipboard-ensure' '/usr/local/bin/idle-lock.sh'; do
+    for pat in '/usr/local/bin/clipboard-ensure'; do
         for p in $(pgrep -u "$MYUID" -f "$pat" 2>/dev/null); do
             skip_pid "$p" && continue
             if [ "$DRY" = 1 ]; then
